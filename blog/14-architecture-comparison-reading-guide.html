@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="把架构、异步框架和 world-model supervision 放到正确层级，并形成一套阅读新 VLA 工作的检查顺序。" />
+    <title>PI0.5、GR00T、VLASH 与 VLA-JEPA 对照 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 四者不在完全相同的层级</a></li>
+<li><a href="#2">2. 总体数据流</a><ul>
+<li><a href="#pi05">PI0.5</a></li>
+<li><a href="#gr00t">GR00T</a></li>
+<li><a href="#vlash-on-pi05">VLASH on PI0.5</a></li>
+<li><a href="#vla-jepa">VLA-JEPA</a></li>
+</ul>
+</li>
+<li><a href="#3">3. 核心结构对照</a></li>
+<li><a href="#4-hidden-widths">4. 典型 hidden widths</a></li>
+<li><a href="#5-state">5. State 到底去哪里</a></li>
+<li><a href="#6-attention">6. Attention 连接方式</a></li>
+<li><a href="#7">7. 训练和推理模块要分开画</a></li>
+<li><a href="#8">8. 常见概念误区</a><ul>
+<li><a href="#12b-token">误区 1：2B 就是 token 维度</a></li>
+<li><a href="#2-condition-token">误区 2：所有 condition 都是 token</a></li>
+<li><a href="#3-t-10">误区 3：训练 t 按推理 10 步离散</a></li>
+<li><a href="#4action-encoder-transformer-encoder">误区 4：Action Encoder 等于 Transformer Encoder</a></li>
+<li><a href="#5vlash-future-image">误区 5：VLASH 预测 future image</a></li>
+<li><a href="#6vla-jepa-world-model">误区 6：VLA-JEPA 推理时运行 world model</a></li>
+<li><a href="#7pi05-multi-expert-router-moe">误区 7：PI0.5 multi-expert 是 router MoE</a></li>
+</ul>
+</li>
+<li><a href="#9-vla">9. 阅读一篇新 VLA 论文的顺序</a><ul>
+<li><a href="#_1">第一步：输入与输出</a></li>
+<li><a href="#hidden-representations">第二步：模态如何变成 hidden representations</a></li>
+<li><a href="#_2">第三步：信息如何融合</a></li>
+<li><a href="#_3">第四步：训练目标</a></li>
+<li><a href="#_4">第五步：推理与部署</a></li>
+<li><a href="#_5">第六步：检查信息泄漏与时间对齐</a></li>
+</ul>
+</li>
+<li><a href="#10">10. 工程选型时真正需要测的量</a></li>
+<li><a href="#11">11. 配套图与文档</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Series 2: VLA architectures, training, and deployment</span><span data-lang="zh">知识链二：VLA 架构、训练方法与部署对照</span> · 14/14</p>
+          <h1>PI0.5、GR00T、VLASH 与 VLA-JEPA 对照</h1>
+          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 4 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 4 分钟阅读</span></p>
+          <p class="article-deck">把架构、异步框架和 world-model supervision 放到正确层级，并形成一套阅读新 VLA 工作的检查顺序。</p>
+          
+          <div class="article-content">
+            <p>这一章不是再介绍一个新模型，而是把前面的概念压缩成一张知识地图，帮助阅读新 VLA 论文和代码。</p>
+<h2 id="1">1. 四者不在完全相同的层级</h2>
+<pre><code class="language-text">PI0.5
+  = 一套 VLM Prefix + Action Expert 的 VLA 架构
+
+GR00T
+  = 一套 VLM memory + embodiment-conditioned DiT 的 VLA 架构
+
+VLASH
+  = 可接到现有 VLA 上的训练时间对齐 + 异步部署方法
+
+VLA-JEPA
+  = VLM + DiT policy，并增加 latent world-model 训练监督
+</code></pre>
+<p>因此：</p>
+<ul>
+<li>PI0.5 与 GR00T 更适合直接比较 backbone/action architecture；</li>
+<li>VLASH 更适合与 synchronous/naive async/RTC 等部署方法比较；</li>
+<li>VLA-JEPA 更适合与 latent-action pretraining、world-model supervision 方法比较。</li>
+</ul>
+<h2 id="2">2. 总体数据流</h2>
+<h3 id="pi05">PI0.5</h3>
+<pre><code class="language-text">image + language + discrete state -&gt; Prefix Expert
+noisy action + flow t            -&gt; Action Expert
+paired joint attention            -&gt; velocity
+</code></pre>
+<h3 id="gr00t">GR00T</h3>
+<pre><code class="language-text">image + language -&gt; VLM memory
+state + noisy action -&gt; DiT query tokens
+cross/self attention -&gt; velocity
+</code></pre>
+<h3 id="vlash-on-pi05">VLASH on PI0.5</h3>
+<pre><code class="language-text">fixed image o_t + future state s_(t+δ)
+  -&gt; PI0.5
+  -&gt; action chunk beginning at t+δ
+
+runtime: execute old chunk while inferring next chunk
+</code></pre>
+<h3 id="vla-jepa">VLA-JEPA</h3>
+<pre><code class="language-text">current image + language -&gt; Qwen latent/action conditions
+  ├-&gt; World Predictor -&gt; future latent loss against frozen V-JEPA2
+  └-&gt; DiT Action Head -&gt; flow velocity loss
+</code></pre>
+<h2 id="3">3. 核心结构对照</h2>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>PI0.5</th>
+<th>GR00T N1.7</th>
+<th>VLASH</th>
+<th>VLA-JEPA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型/方法层级</td>
+<td>VLA architecture</td>
+<td>VLA architecture</td>
+<td>async framework</td>
+<td>VLA + JEPA training framework</td>
+</tr>
+<tr>
+<td>VLM</td>
+<td>Gemma 2B/PaliGemma prefix</td>
+<td>Qwen3-VL/Cosmos backbone</td>
+<td>复用目标 VLA</td>
+<td>Qwen3-VL</td>
+</tr>
+<tr>
+<td>action network</td>
+<td>Gemma 300M Action Expert</td>
+<td>AlternateVLDiT</td>
+<td>复用目标 VLA</td>
+<td>DiT-B Action Head</td>
+</tr>
+<tr>
+<td>VLM–Action 连接</td>
+<td>每层 masked joint attention</td>
+<td>cross-attention to VLM memory</td>
+<td>不强制改变</td>
+<td><code>z_a</code>/context condition Action Head</td>
+</tr>
+<tr>
+<td>state 入口</td>
+<td>默认离散 state prompt</td>
+<td>continuous state token</td>
+<td>execution-time future state</td>
+<td>State Encoder -&gt; DiT</td>
+</tr>
+<tr>
+<td>timestep</td>
+<td>adaRMS condition</td>
+<td>Action Encoder fusion + AdaLN</td>
+<td>沿用基础模型</td>
+<td>DiT condition</td>
+</tr>
+<tr>
+<td>主要训练 loss</td>
+<td>flow matching</td>
+<td>flow matching</td>
+<td>flow loss不变、改样本 offset</td>
+<td><code>L_FM + βL_WM</code></td>
+</tr>
+<tr>
+<td>部署附加模块</td>
+<td>无</td>
+<td>无</td>
+<td>async chunk manager</td>
+<td>teacher/predictor 移除</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-hidden-widths">4. 典型 hidden widths</h2>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>宽度含义</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PI0.5 Prefix</td>
+<td>每个 image/text token 的 hidden width</td>
+<td>2048</td>
+</tr>
+<tr>
+<td>PI0.5 Action Expert</td>
+<td>每个 action position 的 hidden width</td>
+<td>1024</td>
+</tr>
+<tr>
+<td>GR00T VLM memory</td>
+<td>每个 vision/language token 的 hidden width</td>
+<td>2048</td>
+</tr>
+<tr>
+<td>GR00T DiT</td>
+<td>每个 state/action token 的 hidden width</td>
+<td>1536 = 32×48</td>
+</tr>
+<tr>
+<td>VLA-JEPA Qwen</td>
+<td>VLM token hidden width</td>
+<td>取决于 Qwen 配置</td>
+</tr>
+<tr>
+<td>VLA-JEPA world state</td>
+<td>V-JEPA2 target latent width/sequence</td>
+<td>由 target encoder 和多视角组合决定</td>
+</tr>
+</tbody>
+</table>
+<p>宽度描述一次 activation 的最后一维，不是整个模型参数量，也不是 action dimension。</p>
+<h2 id="5-state">5. State 到底去哪里</h2>
+<pre><code class="language-text">PI0.5 默认：
+  normalized state -&gt; discrete values -&gt; prompt tokens -&gt; VLM prefix
+
+PI0：
+  continuous state -&gt; state_proj -&gt; suffix state token
+
+PI0.5 + VLASH state_cond：
+  future state -&gt; StateMLP -&gt; adaRMS condition
+
+GR00T：
+  continuous state -&gt; embodiment-specific MLP -&gt; DiT state token
+
+VLA-JEPA：
+  proprioceptive state -&gt; State Encoder -&gt; DiT Action Head
+  teacher world-state latent 是视频语义状态，不是 robot proprioception
+</code></pre>
+<p>最后一条尤其容易混淆：VLA-JEPA 论文中的 <code>s_t</code> 常表示 V-JEPA2 world-state latent，而机器人关节 state 是 Action Head 的另一条输入。</p>
+<h2 id="6-attention">6. Attention 连接方式</h2>
+<pre><code class="language-text">PI0.5：
+  Prefix/Action 各自 QKV
+  -&gt; 在共同 attention geometry 中按位置联合
+  -&gt; mask 控制信息方向
+
+GR00T：
+  state/action Q
+  -&gt; cross-attend VLM K/V
+  -&gt; 与 state/action self-attention 交替
+
+VLA-JEPA world predictor：
+  history state latents + latent actions
+  -&gt; time-causal attention
+  -&gt; future latent prediction
+</code></pre>
+<p>看到“VLM 给 Action Expert 提供条件”时，不要马上假设是 cross-attention；它也可能是 joint attention、condition token、AdaNorm 或单个 pooled vector。</p>
+<h2 id="7">7. 训练和推理模块要分开画</h2>
+<p>论文框图经常把训练监督画得很大，但不代表部署也需要这些模块。</p>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>训练</th>
+<th>推理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PI0.5 flow noise/target action</td>
+<td>需要</td>
+<td>不需要真实 action，只需要初始 noise</td>
+</tr>
+<tr>
+<td>VLASH temporal offset dataset</td>
+<td>需要</td>
+<td>不需要 dataset offset sampling</td>
+</tr>
+<tr>
+<td>VLASH async scheduler</td>
+<td>不属于模型训练</td>
+<td>需要</td>
+</tr>
+<tr>
+<td>VLA-JEPA Frozen V-JEPA2</td>
+<td>需要 target</td>
+<td>移除</td>
+</tr>
+<tr>
+<td>VLA-JEPA World Predictor</td>
+<td>需要 <code>L_WM</code></td>
+<td>移除</td>
+</tr>
+<tr>
+<td>DiT/Action Expert</td>
+<td>需要</td>
+<td>需要</td>
+</tr>
+</tbody>
+</table>
+<p>阅读任何框图时，先给每条边标注：</p>
+<pre><code class="language-text">training-only
+inference-only
+both
+</code></pre>
+<h2 id="8">8. 常见概念误区</h2>
+<h3 id="12b-token">误区 1：2B 就是 token 维度</h3>
+<p>错误。2B 是参数量，2048 才是特定配置中的 token hidden width。</p>
+<h3 id="2-condition-token">误区 2：所有 condition 都是 token</h3>
+<p>错误。condition 可以是 token、cross-attention K/V、AdaNorm scale/shift/gate，或者直接加到 embedding。</p>
+<h3 id="3-t-10">误区 3：训练 t 按推理 10 步离散</h3>
+<p>通常错误。训练随机采连续 t；推理步数是数值积分精度与延迟的选择。</p>
+<h3 id="4action-encoder-transformer-encoder">误区 4：Action Encoder 等于 Transformer Encoder</h3>
+<p>错误。它可能只是动作模态适配器。应看输入输出和内部深度。</p>
+<h3 id="5vlash-future-image">误区 5：VLASH 预测 future image</h3>
+<p>错误。它保留 stale visual <code>o_t</code>，主要 roll forward 可预测的 robot state。</p>
+<h3 id="6vla-jepa-world-model">误区 6：VLA-JEPA 推理时运行 world model</h3>
+<p>论文标准部署路径不需要。world predictor 和 frozen target encoder主要用于训练监督。</p>
+<h3 id="7pi05-multi-expert-router-moe">误区 7：PI0.5 multi-expert 是 router MoE</h3>
+<p>错误。Prefix/Action expert 由模态固定分配，不是 router top-k 选择。</p>
+<h2 id="9-vla">9. 阅读一篇新 VLA 论文的顺序</h2>
+<p>建议不要从模型名字开始，而是依次回答以下问题。</p>
+<h3 id="_1">第一步：输入与输出</h3>
+<pre><code class="language-text">输入哪些相机、语言、state、history？
+输出 action position、delta、velocity 还是 torque？
+action_dim 和 horizon 是多少？
+</code></pre>
+<h3 id="hidden-representations">第二步：模态如何变成 hidden representations</h3>
+<pre><code class="language-text">图像 encoder 是什么？
+state 是 token 还是 condition？
+noisy action 如何 projection？
+内部 width 与原始 action_dim 各是多少？
+</code></pre>
+<h3 id="_2">第三步：信息如何融合</h3>
+<pre><code class="language-text">self-attention？
+cross-attention？
+joint attention？
+AdaLN/AdaRMS？
+attention mask 的方向是什么？
+</code></pre>
+<h3 id="_3">第四步：训练目标</h3>
+<pre><code class="language-text">behavior cloning？
+flow matching/diffusion？
+latent prediction？
+world-model loss？
+哪些参数被冻结？
+</code></pre>
+<h3 id="_4">第五步：推理与部署</h3>
+<pre><code class="language-text">去噪几步？
+输出整个 chunk 还是一个 action？
+同步还是异步？
+执行多少步后 re-plan？
+训练辅助模块是否移除？
+</code></pre>
+<h3 id="_5">第六步：检查信息泄漏与时间对齐</h3>
+<pre><code class="language-text">future frame 是否进入部署可见路径？
+训练 state/action 是否对应同一执行时刻？
+推理延迟是否使 observation stale？
+</code></pre>
+<h2 id="10">10. 工程选型时真正需要测的量</h2>
+<p>仅知道模型 forward 约 90 ms 不够，还应记录：</p>
+<ul>
+<li>capture 到 request ready；</li>
+<li>serialization/network；</li>
+<li>server queue；</li>
+<li>prefix prefill；</li>
+<li>全部 denoising steps；</li>
+<li>response decode；</li>
+<li>Actor 收到结果到 chunk handoff；</li>
+<li>实际 control rate 和 policy rate；</li>
+<li>p50/p95/p99，而不是只有平均值。</li>
+</ul>
+<p>VLASH 的 offset 应依据 observation 到实际 handoff 的完整延迟；Action Expert 推理步数则依据精度–延迟权衡。</p>
+<h2 id="11">11. 配套图与文档</h2>
+<ul>
+<li><a href="assets/diagrams/pi05_structure.drawio">PI0.5 结构图</a></li>
+<li><a href="assets/diagrams/groot_n1d7_structure.drawio">GR00T N1.7 结构图</a></li>
+<li><a href="assets/diagrams/vlash.drawio">VLASH 训练与异步运行图</a></li>
+<li><a href="assets/diagrams/vla_jepa_structure.drawio">VLA-JEPA 结构图</a></li>
+<li><a href="04-pi05-architecture.html">PI0.5 代码架构说明</a></li>
+<li><a href="07-vlash-integration.html">BrainCo-IL VLASH 实现说明</a></li>
+</ul>
+<p>如果只记住一条主线，可以记成：</p>
+<pre><code class="language-text">原始模态
+-&gt; token/condition representations
+-&gt; attention 与 adaptive modulation
+-&gt; action velocity 或 target latent
+-&gt; training loss
+-&gt; inference integration / runtime scheduling
+</code></pre>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="13-jepa-vla-jepa.html">← 13. JEPA、World Model 与 VLA-JEPA</a>
+            <span></span>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+    
+  </body>
+</html>

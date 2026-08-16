@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="跟踪一条 LeRobot 样本经过 transform、collate 和 sharding，最终成为模型训练 batch 的全过程。" />
+    <title>数据流水线与 batch | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 完整数据链</a></li>
+<li><a href="#2-action-chunk">2. 如何取得未来 action chunk</a></li>
+<li><a href="#3-transform">3. 单条样本的 transform 顺序</a></li>
+<li><a href="#4-create_torch_data_loader">4. create_torch_data_loader() 返回什么</a></li>
+<li><a href="#5-iter-next">5. iter() 和 next() 的含义</a></li>
+<li><a href="#6-batch-observationaction-pair">6. batch 是 observation/action pair 吗</a></li>
+<li><a href="#7-batch-size">7. batch size 意味着什么</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Series 1: Adapting OpenPI / π0.5 for 56D dual-arm dual-hand training</span><span data-lang="zh">知识链一：OpenPI / π0.5 的 56D 双臂双手改造</span> · 03/14</p>
+          <h1>数据流水线与 batch</h1>
+          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 2 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 2 分钟阅读</span></p>
+          <p class="article-deck">跟踪一条 LeRobot 样本经过 transform、collate 和 sharding，最终成为模型训练 batch 的全过程。</p>
+          
+          <div class="article-content">
+            <p>DataLoader 的目标是把 LeRobot 中的一组原始样本变成模型直接使用的：</p>
+<pre><code class="language-python">batch = (observation, actions)
+</code></pre>
+<h2 id="1">1. 完整数据链</h2>
+<p><a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/training/data_loader.py"><code>create_data_loader()</code></a> 的主链为：</p>
+<pre><code class="language-text">config.data.create(...)
+  -&gt; DataConfig
+  -&gt; create_torch_dataset(...)
+  -&gt; transform_dataset(...)
+  -&gt; PyTorch DataLoader
+  -&gt; NumPy batch
+  -&gt; JAX device array + sharding
+  -&gt; DataLoaderImpl
+  -&gt; (Observation, Actions)
+</code></pre>
+<p>这里各框架的分工是：</p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>工作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LeRobot</td>
+<td>读取 parquet、视频、task 和时间序列</td>
+</tr>
+<tr>
+<td>PyTorch DataLoader</td>
+<td>多进程取样、shuffle、collate、batch</td>
+</tr>
+<tr>
+<td>NumPy</td>
+<td>CPU 侧统一的中间数组格式</td>
+</tr>
+<tr>
+<td>JAX</td>
+<td>把 batch 放到设备并执行训练</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-action-chunk">2. 如何取得未来 action chunk</h2>
+<p><code>create_torch_dataset()</code> 根据数据集 FPS 构造时间偏移：</p>
+<pre><code class="language-python">[t / dataset_meta.fps for t in range(action_horizon)]
+</code></pre>
+<p>如果 <code>action_horizon=16</code>，一条样本不只是一个 action，而是从当前时刻开始的 16 个连续动作：</p>
+<pre><code class="language-text">当前 observation_t
+  配对
+[action_t, action_t+1, ..., action_t+15]
+</code></pre>
+<p>这就是 action chunk。</p>
+<h2 id="3-transform">3. 单条样本的 transform 顺序</h2>
+<p><code>transform_dataset()</code> 的顺序不能随意交换：</p>
+<pre><code class="language-text">原始 LeRobot 样本
+  -&gt; repack：统一字段名
+  -&gt; BrainCo data transforms：相机/state/action 语义转换
+  -&gt; Normalize：归一化 state 和 action
+  -&gt; model transforms：resize、tokenize、padding
+</code></pre>
+<p>对于 PI0.5，最终会得到类似：</p>
+<pre><code class="language-text">images                    三路 224x224 RGB
+image_masks               三路图像是否有效
+state                     当前机器人状态
+tokenized_prompt          prompt + 离散 state 的 token IDs
+tokenized_prompt_mask     有效 token mask
+actions                   未来 action chunk
+</code></pre>
+<h2 id="4-create_torch_data_loader">4. <code>create_torch_data_loader()</code> 返回什么</h2>
+<p>它最终返回：</p>
+<pre><code class="language-python">DataLoaderImpl(data_config, TorchDataLoader(...))
+</code></pre>
+<p>内部两层职责不同：</p>
+<ul>
+<li><code>TorchDataLoader</code>：CPU 取样、组 batch，并转换为带 sharding 的 JAX 数组。</li>
+<li><code>DataLoaderImpl</code>：把普通字典转换成结构化 <code>Observation</code>，并返回 actions。</li>
+</ul>
+<p>因此训练循环看见的是：</p>
+<pre><code class="language-python">yield Observation.from_dict(batch), batch[&quot;actions&quot;]
+</code></pre>
+<h2 id="5-iter-next">5. <code>iter()</code> 和 <code>next()</code> 的含义</h2>
+<pre><code class="language-python">data_iter = iter(data_loader)
+batch = next(data_iter)
+</code></pre>
+<ul>
+<li><code>iter(data_loader)</code> 创建迭代器，表示准备按顺序取数据。</li>
+<li><code>next(data_iter)</code> 真正请求下一批数据。</li>
+</ul>
+<p>第一次 <code>next()</code> 会触发完整链路：读取视频/数组、执行 transforms、stack、CPU 到设备搬运。所以日志里的 <code>Initialized data loader</code> 更准确地说是：</p>
+<blockquote>
+<p>已成功跑通 DataLoader，并拿到了第一个可供模型训练的 batch。</p>
+</blockquote>
+<h2 id="6-batch-observationaction-pair">6. batch 是 observation/action pair 吗</h2>
+<p>是，但不是单个 pair，而是 <code>B</code> 个样本组成的一批：</p>
+<pre><code class="language-text">batch
+  ├─ Observation_batch
+  │    ├─ images       [B, 224, 224, 3]
+  │    ├─ state        [B, D]
+  │    └─ prompt IDs   [B, L]
+  └─ Actions_batch     [B, H, D]
+</code></pre>
+<p>以 <code>B=32, H=16, D=28</code> 为例：</p>
+<pre><code class="language-text">state   [32, 28]
+actions [32, 16, 28]
+</code></pre>
+<h2 id="7-batch-size">7. batch size 意味着什么</h2>
+<p><code>batch_size=32</code> 表示一次参数更新同时参考 32 条训练样本：</p>
+<pre><code class="language-text">32 个样本
+  -&gt; 分别计算 loss
+  -&gt; 对 batch、时间和动作维度汇总
+  -&gt; 得到一个标量 loss
+  -&gt; 反向传播一次
+  -&gt; 参数更新一次
+</code></pre>
+<p>它不是拿数字 32 去训练，也不是连续更新 32 次，而是一次更新综合 32 条样本的梯度。</p>
+<p>下一章把这个 batch 放进 PI0.5，观察 VLM 和 Action Expert 的数据流。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="02-config-system.html">← 02. 配置系统：从 YAML 到 DataConfig</a>
+            <a href="04-pi05-architecture.html">04. PI0.5 模型架构 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+    
+  </body>
+</html>

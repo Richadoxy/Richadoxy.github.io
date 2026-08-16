@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="董希越的机器人学习记录：OpenPI、π0.5、56D 双臂双手、VLASH、GR00T 与 VLA-JEPA。" />
+    <title>学习之路 | Xiyue Dong</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="../assets/js/blog-archive.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="archive-shell">
+      <aside class="archive-profile" aria-label="作者信息">
+        <a href="../index.html"><img src="../assets/images/profile-xiyue.jpg" alt="董希越" /></a>
+        <h1>Xiyue Dong</h1>
+        <p class="archive-name-zh">董希越</p>
+        <p><span data-lang="en">PhD Student in Robotics</span><span data-lang="zh">机器人方向博士生</span><br />HKUST (Guangzhou)</p>
+        <ul class="archive-profile-meta">
+          <li><span data-lang="en">Guangzhou, China</span><span data-lang="zh">中国广州</span></li>
+          <li><a href="mailto:xdong851@connect.hkust-gz.edu.cn">Email</a></li>
+          <li><a href="https://github.com/Richadoxy" target="_blank" rel="me noreferrer">GitHub</a></li>
+        </ul>
+      </aside>
+      <main class="archive-main" id="main-content">
+        <header class="archive-intro">
+          <h2><span data-lang="en">Blog posts</span><span data-lang="zh">博客文章</span></h2>
+          <p><span data-lang="en">Notes from my work in robot learning and VLA, organized by year and learning path. The articles themselves remain in Chinese and are best read in numerical order.</span><span data-lang="zh">这里按年份归档我在机器人学习与 VLA 工程中的阶段性记录。可以浏览全部文章，也可以按知识链筛选；建议从编号 01 开始顺序阅读。</span></p>
+        </header>
+        <div class="archive-filters" role="group" aria-label="按知识链筛选文章">
+          <button class="archive-filter is-active" type="button" data-filter="all" aria-pressed="true"><span data-lang="en">All</span><span data-lang="zh">全部</span></button>
+          <button class="archive-filter" type="button" data-filter="openpi" aria-pressed="false">OpenPI / π0.5</button>
+          <button class="archive-filter" type="button" data-filter="vla" aria-pressed="false"><span data-lang="en">VLA Comparison</span><span data-lang="zh">VLA 对照</span></button>
+        </div>
+        <section class="archive-year" aria-labelledby="year-2026">
+          <h2 id="year-2026">2026</h2>
+          <div class="archive-list"><article class="archive-post" data-category="openpi">
+              <span class="archive-anchor" id="openpi-56d" aria-hidden="true"></span>
+              <h3><a href="01-train-entry-and-jax.html"><span class="archive-category"><span data-lang="en">[OpenPI / π0.5]</span><span data-lang="zh">[OpenPI / π0.5]</span></span> 01. 训练入口与 JAX</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">2 min read</span><span data-lang="zh">阅读约 2 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">从 scripts/train.py 出发，梳理 JAX 编译缓存、PRNG、mesh、sharding、checkpoint 与训练循环。</p>
+            </article><article class="archive-post" data-category="openpi">
+              
+              <h3><a href="02-config-system.html"><span class="archive-category"><span data-lang="en">[OpenPI / π0.5]</span><span data-lang="zh">[OpenPI / π0.5]</span></span> 02. 配置系统：从 YAML 到 DataConfig</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">2 min read</span><span data-lang="zh">阅读约 2 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">理解 YAML 如何展开成 TrainConfig、DataConfig，以及 BrainCo policy 层如何定义机器人数据语义。</p>
+            </article><article class="archive-post" data-category="openpi">
+              
+              <h3><a href="03-data-pipeline-and-batch.html"><span class="archive-category"><span data-lang="en">[OpenPI / π0.5]</span><span data-lang="zh">[OpenPI / π0.5]</span></span> 03. 数据流水线与 batch</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">2 min read</span><span data-lang="zh">阅读约 2 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">跟踪一条 LeRobot 样本经过 transform、collate 和 sharding，最终成为模型训练 batch 的全过程。</p>
+            </article><article class="archive-post" data-category="openpi">
+              
+              <h3><a href="04-pi05-architecture.html"><span class="archive-category"><span data-lang="en">[OpenPI / π0.5]</span><span data-lang="zh">[OpenPI / π0.5]</span></span> 04. PI0.5 模型架构</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">4 min read</span><span data-lang="zh">阅读约 4 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">拆解 VLM Prefix Expert、Action Expert、联合 attention 和 flow-matching action generation。</p>
+            </article><article class="archive-post" data-category="openpi">
+              
+              <h3><a href="05-train-state-jit-checkpoint.html"><span class="archive-category"><span data-lang="en">[OpenPI / π0.5]</span><span data-lang="zh">[OpenPI / π0.5]</span></span> 05. TrainState、JIT 与 checkpoint</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">2 min read</span><span data-lang="zh">阅读约 2 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">理解参数初始化、优化器状态、JIT 编译边界、分片方式以及训练恢复流程。</p>
+            </article><article class="archive-post" data-category="openpi">
+              
+              <h3><a href="06-action-dimensions-28d-56d.html"><span class="archive-category"><span data-lang="en">[OpenPI / π0.5]</span><span data-lang="zh">[OpenPI / π0.5]</span></span> 06. 从 28D 到 56D 双臂双手</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">3 min read</span><span data-lang="zh">阅读约 3 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">记录如何把动作空间扩展为 7+7+21+21 的 56D 双臂双手表示，以及投影、mask、归一化和部署端的连锁变化。</p>
+            </article><article class="archive-post" data-category="vla">
+              <span class="archive-anchor" id="vla-comparison" aria-hidden="true"></span>
+              <h3><a href="07-vlash-integration.html"><span class="archive-category"><span data-lang="en">[VLA Comparison]</span><span data-lang="zh">[VLA 对照]</span></span> 07. VLASH 在 BrainCo-IL 中的集成</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">2 min read</span><span data-lang="zh">阅读约 2 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">以当前代码为准，区分已经实现的 temporal offset/future-state condition 与尚未实现的 shared-prefix 多分支训练。</p>
+            </article><article class="archive-post" data-category="vla">
+              
+              <h3><a href="08-transformer-latent-encoder-decoder.html"><span class="archive-category"><span data-lang="en">[VLA Comparison]</span><span data-lang="zh">[VLA 对照]</span></span> 08. Transformer、Encoder/Decoder 与 Latent</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">5 min read</span><span data-lang="zh">阅读约 5 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">建立 token、hidden width、latent、encoder、decoder 和参数量之间的基础概念坐标系。</p>
+            </article><article class="archive-post" data-category="vla">
+              
+              <h3><a href="09-attention-multi-expert-conditioning.html"><span class="archive-category"><span data-lang="en">[VLA Comparison]</span><span data-lang="zh">[VLA 对照]</span></span> 09. QKV、Attention、多专家与条件注入</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">5 min read</span><span data-lang="zh">阅读约 5 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">对比 self/cross/joint attention，解释 PI0.5 multi-expert，以及 token condition 与 AdaNorm 调制。</p>
+            </article><article class="archive-post" data-category="vla">
+              
+              <h3><a href="10-flow-matching-training-inference.html"><span class="archive-category"><span data-lang="en">[VLA Comparison]</span><span data-lang="zh">[VLA 对照]</span></span> 10. Flow Matching：训练、timestep 与推理</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">4 min read</span><span data-lang="zh">阅读约 4 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">从插值路径、velocity target 和 timestep condition 出发，区分训练采样与推理积分。</p>
+            </article><article class="archive-post" data-category="vla">
+              
+              <h3><a href="11-groot-dit-architecture.html"><span class="archive-category"><span data-lang="en">[VLA Comparison]</span><span data-lang="zh">[VLA 对照]</span></span> 11. GR00T 与 DiT Action Head</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">4 min read</span><span data-lang="zh">阅读约 4 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">梳理 VLM memory、state/action encoders、AlternateVLDiT、AdaLN 与 action decoder 的数据流。</p>
+            </article><article class="archive-post" data-category="vla">
+              
+              <h3><a href="12-vlash-principles-async-runtime.html"><span class="archive-category"><span data-lang="en">[VLA Comparison]</span><span data-lang="zh">[VLA 对照]</span></span> 12. VLASH：Temporal Offset 与异步执行</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">5 min read</span><span data-lang="zh">阅读约 5 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">从同步推理瓶颈出发，理解 offset augmentation、future state、异步 inference/actor 通信与 chunk handoff。</p>
+            </article><article class="archive-post" data-category="vla">
+              
+              <h3><a href="13-jepa-vla-jepa.html"><span class="archive-category"><span data-lang="en">[VLA Comparison]</span><span data-lang="zh">[VLA 对照]</span></span> 13. JEPA、World Model 与 VLA-JEPA</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">5 min read</span><span data-lang="zh">阅读约 5 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">理解 teacher/student/predictor、latent world-model supervision、leakage-free training 和联合 action loss。</p>
+            </article><article class="archive-post" data-category="vla">
+              
+              <h3><a href="14-architecture-comparison-reading-guide.html"><span class="archive-category"><span data-lang="en">[VLA Comparison]</span><span data-lang="zh">[VLA 对照]</span></span> 14. PI0.5、GR00T、VLASH 与 VLA-JEPA 对照</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">4 min read</span><span data-lang="zh">阅读约 4 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-summary">把架构、异步框架和 world-model supervision 放到正确层级，并形成一套阅读新 VLA 工作的检查顺序。</p>
+            </article></div>
+          <p class="archive-empty" hidden><span data-lang="en">There are no posts in this category yet.</span><span data-lang="zh">这个分类下暂时还没有文章。</span></p>
+        </section>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

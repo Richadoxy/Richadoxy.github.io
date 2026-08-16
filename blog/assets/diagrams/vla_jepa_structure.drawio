@@ -1,0 +1,144 @@
+<mxfile host="app.diagrams.net" modified="2026-08-14T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="vla-jepa-structure" name="VLA-JEPA Structure">
+    <mxGraphModel dx="1680" dy="1050" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2100" pageHeight="1450" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="&lt;b&gt;VLA-JEPA — Latent World-Model Supervision + Flow-Matching Action Generation&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=26;fontColor=#172B4D;" parent="1" vertex="1">
+          <mxGeometry x="250" y="20" width="1600" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="Teacher 只生成 future-latent 训练目标；Student 学习状态转移并生成动作。部署时仅保留 Qwen3-VL + DiT Action Head。" style="text;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=14;fontColor=#5E6C84;" parent="1" vertex="1">
+          <mxGeometry x="350" y="65" width="1400" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="input_zone" value="&lt;b&gt;1 · Training inputs&lt;/b&gt;" style="swimlane;html=1;rounded=1;horizontal=1;startSize=38;fillColor=#F7F8F9;swimlaneFillColor=#FFFFFF;strokeColor=#B3BAC5;fontColor=#344563;fontSize=15;" parent="1" vertex="1">
+          <mxGeometry x="35" y="115" width="300" height="1000" as="geometry"/>
+        </mxCell>
+        <mxCell id="student_zone" value="&lt;b&gt;2 · Online / Student VLA pathway · receives gradients&lt;/b&gt;" style="swimlane;html=1;rounded=1;horizontal=1;startSize=38;fillColor=#E9F2FF;swimlaneFillColor=#FFFFFF;strokeColor=#4C9AFF;strokeWidth=2;fontColor=#0747A6;fontSize=16;" parent="1" vertex="1">
+          <mxGeometry x="365" y="115" width="860" height="1000" as="geometry"/>
+        </mxCell>
+        <mxCell id="teacher_zone" value="&lt;b&gt;3 · Target / Teacher world-model supervision · training only&lt;/b&gt;" style="swimlane;html=1;rounded=1;horizontal=1;startSize=38;fillColor=#F3F0FF;swimlaneFillColor=#FFFFFF;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontColor=#403294;fontSize=16;" parent="1" vertex="1">
+          <mxGeometry x="1255" y="115" width="800" height="1000" as="geometry"/>
+        </mxCell>
+        <mxCell id="output_zone" value="&lt;b&gt;4 · Joint optimization and deployment&lt;/b&gt;" style="swimlane;html=1;rounded=1;horizontal=1;startSize=38;fillColor=#F7F8F9;swimlaneFillColor=#FFFFFF;strokeColor=#B3BAC5;fontColor=#344563;fontSize=15;" parent="1" vertex="1">
+          <mxGeometry x="35" y="1145" width="2020" height="250" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="current_images" value="&lt;b&gt;Current multi-view images&lt;/b&gt;&lt;br&gt;I&lt;sub&gt;t&lt;/sub&gt; only&lt;br&gt;&lt;font color=&quot;#5E6C84&quot;&gt;student must not see future frames&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4C9AFF;strokeWidth=1.5;fontColor=#172B4D;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="65" y="180" width="240" height="95" as="geometry"/>
+        </mxCell>
+        <mxCell id="language" value="&lt;b&gt;Language instruction&lt;/b&gt;&lt;br&gt;task / prompt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4C9AFF;strokeWidth=1.5;fontColor=#172B4D;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="65" y="310" width="240" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="state" value="&lt;b&gt;Robot proprioceptive state&lt;/b&gt;&lt;br&gt;q&lt;sub&gt;t&lt;/sub&gt; · joints / gripper / pose" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#00B8D9;strokeWidth=1.5;fontColor=#006677;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="65" y="470" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="gt_actions" value="&lt;b&gt;Ground-truth robot actions&lt;/b&gt;&lt;br&gt;A&lt;sub&gt;0:H&lt;/sub&gt;&lt;br&gt;&lt;font color=&quot;#BF2600&quot;&gt;robot-data training only&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBE6;strokeColor=#DE350B;strokeWidth=1.5;fontColor=#BF2600;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="65" y="650" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="noise_time" value="&lt;b&gt;Gaussian noise ε + flow time τ&lt;/b&gt;&lt;br&gt;construct noisy action A&lt;sup&gt;τ&lt;/sup&gt;&lt;br&gt;&lt;font color=&quot;#7A3E00&quot;&gt;training / iterative inference&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0E0;strokeColor=#FF991F;strokeWidth=1.5;fontColor=#7A3E00;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="65" y="780" width="240" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="future_video" value="&lt;b&gt;Training video clip&lt;/b&gt;&lt;br&gt;I&lt;sub&gt;t0:tT&lt;/sub&gt; · current/history + future frames&lt;br&gt;&lt;font color=&quot;#403294&quot;&gt;future frames never enter Qwen/student&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F0FF;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontColor=#403294;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="65" y="960" width="240" height="105" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="qwen" value="&lt;b&gt;Qwen3-VL student / online backbone&lt;/b&gt;&lt;br&gt;SigLIP-2 vision encoder + Qwen3 language model&lt;br&gt;&lt;font color=&quot;#0747A6&quot;&gt;processes current images + instruction&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DEEBFF;strokeColor=#0052CC;strokeWidth=2;fontColor=#0747A6;fontSize=15;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="425" y="175" width="330" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="context_tokens" value="&lt;b&gt;Vision-language context tokens&lt;/b&gt;&lt;br&gt;current scene semantics + task" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9F2FF;strokeColor=#4C9AFF;strokeWidth=1.5;fontColor=#0747A6;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="805" y="180" width="300" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="latent_tokens" value="&lt;b&gt;Learnable latent/action tokens&lt;/b&gt;&lt;br&gt;z&lt;sub&gt;t&lt;/sub&gt;: action-relevant transition representation&lt;br&gt;z&lt;sub&gt;a&lt;/sub&gt;: condition for physical action generation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B3D4FF;strokeColor=#0052CC;strokeWidth=2;fontColor=#0747A6;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="630" y="330" width="330" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="state_encoder" value="&lt;b&gt;State Encoder&lt;/b&gt;&lt;br&gt;q&lt;sub&gt;t&lt;/sub&gt; → state tokens" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6FCFF;strokeColor=#00B8D9;strokeWidth=1.5;fontColor=#006677;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="425" y="510" width="220" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="noisy_action_encoder" value="&lt;b&gt;Action Encoder + time embedding&lt;/b&gt;&lt;br&gt;(A&lt;sup&gt;τ&lt;/sup&gt;, τ) → noisy action tokens" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0E0;strokeColor=#FF991F;strokeWidth=2;fontColor=#7A3E00;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="425" y="690" width="250" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="dit" value="&lt;b&gt;DiT-B Flow-Matching Action Head&lt;/b&gt;&lt;br&gt;self-attention over state/action tokens&lt;br&gt;cross-attention to Qwen context / z&lt;sub&gt;a&lt;/sub&gt;&lt;br&gt;timestep-conditioned normalization" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE8CC;strokeColor=#FF991F;strokeWidth=2;fontColor=#7A3E00;fontSize=15;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="750" y="620" width="370" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="velocity" value="&lt;b&gt;Predicted flow velocity&lt;/b&gt;&lt;br&gt;v&lt;sub&gt;θ&lt;/sub&gt;(A&lt;sup&gt;τ&lt;/sup&gt;, τ | z&lt;sub&gt;a&lt;/sub&gt;, q&lt;sub&gt;t&lt;/sub&gt;)&lt;br&gt;&lt;font color=&quot;#7A3E00&quot;&gt;shape [B, H, D&lt;sub&gt;a&lt;/sub&gt;]&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE8CC;strokeColor=#FF991F;strokeWidth=2;fontColor=#7A3E00;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="805" y="820" width="300" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="fm_loss" value="&lt;b&gt;Action supervision L&lt;sub&gt;FM&lt;/sub&gt;&lt;/b&gt;&lt;br&gt;MSE(predicted velocity, target velocity)&lt;br&gt;&lt;font color=&quot;#BF2600&quot;&gt;requires labeled robot actions&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBE6;strokeColor=#DE350B;strokeWidth=2;fontColor=#BF2600;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="780" y="975" width="330" height="95" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="teacher_encoder" value="&lt;b&gt;Frozen V-JEPA2 Target Encoder&lt;/b&gt;&lt;br&gt;encodes each training-video timestep&lt;br&gt;&lt;font color=&quot;#403294&quot;&gt;stop-gradient · no optimizer update&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAE6FF;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontColor=#403294;fontSize=15;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="1515" y="190" width="300" height="115" as="geometry"/>
+        </mxCell>
+        <mxCell id="target_latents" value="&lt;b&gt;Teacher world-state latent sequence&lt;/b&gt;&lt;br&gt;s&lt;sub&gt;t0:tT&lt;/sub&gt; = F(I&lt;sub&gt;t0:tT&lt;/sub&gt;)&lt;br&gt;&lt;font color=&quot;#403294&quot;&gt;history = causal input · future = target&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAE6FF;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontColor=#403294;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="1515" y="350" width="300" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="world_predictor" value="&lt;b&gt;Online Action-Conditioned World Predictor&lt;/b&gt;&lt;br&gt;history/current latent + z&lt;sub&gt;t&lt;/sub&gt;&lt;br&gt;→ predict future latent states&lt;br&gt;&lt;font color=&quot;#0747A6&quot;&gt;trainable Student component&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DEEBFF;strokeColor=#0052CC;strokeWidth=2;fontColor=#0747A6;fontSize=15;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="1440" y="555" width="380" height="125" as="geometry"/>
+        </mxCell>
+        <mxCell id="pred_latents" value="&lt;b&gt;Predicted future-state latents&lt;/b&gt;&lt;br&gt;ŝ&lt;sub&gt;t+1:t+T&lt;/sub&gt;&lt;br&gt;&lt;font color=&quot;#0747A6&quot;&gt;semantic world transition prediction&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DEEBFF;strokeColor=#0052CC;strokeWidth=1.5;fontColor=#0747A6;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="1440" y="735" width="300" height="95" as="geometry"/>
+        </mxCell>
+        <mxCell id="jepa_loss" value="&lt;b&gt;World-model supervision L&lt;sub&gt;WM&lt;/sub&gt;&lt;/b&gt;&lt;br&gt;distance(ŝ&lt;sub&gt;future&lt;/sub&gt;, stopgrad(s&lt;sub&gt;future&lt;/sub&gt;))&lt;br&gt;&lt;font color=&quot;#403294&quot;&gt;latent prediction · no pixel reconstruction&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F0FF;strokeColor=#6554C0;strokeWidth=2;fontColor=#403294;fontSize=14;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="1510" y="900" width="360" height="105" as="geometry"/>
+        </mxCell>
+        <mxCell id="no_leak" value="&lt;b&gt;Leakage-free rule&lt;/b&gt;&lt;br&gt;future frames cannot enter Qwen&lt;br&gt;time-causal mask blocks future latent input" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0F6;strokeColor=#FF5630;strokeWidth=1.5;dashed=1;fontColor=#BF2600;fontSize=13;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="1780" y="520" width="240" height="105" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="total_loss" value="&lt;b&gt;Joint training objective&lt;/b&gt;&lt;br&gt;L = L&lt;sub&gt;FM&lt;/sub&gt; + β · L&lt;sub&gt;WM&lt;/sub&gt;&lt;br&gt;&lt;font color=&quot;#BF2600&quot;&gt;gradient updates Student/VLM, predictor and action head; never Target Encoder&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBE6;strokeColor=#DE350B;strokeWidth=2;fontColor=#BF2600;fontSize=15;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="500" y="1195" width="520" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="euler" value="&lt;b&gt;Inference: Euler integration / iterative denoising&lt;/b&gt;&lt;br&gt;noise → repeated DiT velocity updates → action chunk&lt;br&gt;&lt;font color=&quot;#006644&quot;&gt;standard setting: current observation + Qwen3-VL + DiT only&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3FCEF;strokeColor=#36B37E;strokeWidth=2;fontColor=#006644;fontSize=15;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="1195" width="540" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="action_output" value="&lt;b&gt;Robot action chunk&lt;/b&gt;&lt;br&gt;â&lt;sub&gt;0:H&lt;/sub&gt; [B, H, D&lt;sub&gt;a&lt;/sub&gt;]&lt;br&gt;unnormalize → execute / receding horizon" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ABF5D1;strokeColor=#00875A;strokeWidth=2;fontColor=#006644;fontSize=15;spacing=8;" parent="1" vertex="1">
+          <mxGeometry x="1725" y="1195" width="280" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend_student" value="&lt;b&gt;Blue&lt;/b&gt; = trainable Student / online path" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DEEBFF;strokeColor=#4C9AFF;fontColor=#0747A6;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="65" y="1335" width="285" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend_teacher" value="&lt;b&gt;Purple dashed&lt;/b&gt; = Teacher target, training only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAE6FF;strokeColor=#6554C0;dashed=1;fontColor=#403294;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="370" y="1335" width="305" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend_action" value="&lt;b&gt;Orange&lt;/b&gt; = flow-matching action generation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE8CC;strokeColor=#FF991F;fontColor=#7A3E00;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="695" y="1335" width="305" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend_infer" value="&lt;b&gt;Green&lt;/b&gt; = deployment output path" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3FCEF;strokeColor=#36B37E;fontColor=#006644;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="1020" y="1335" width="270" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_img_qwen" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#4C9AFF;strokeWidth=2;" parent="1" source="current_images" target="qwen" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_lang_qwen" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#4C9AFF;strokeWidth=2;" parent="1" source="language" target="qwen" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_qwen_context" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;" parent="1" source="qwen" target="context_tokens" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_qwen_latent" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;" parent="1" source="qwen" target="latent_tokens" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_state_enc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#00B8D9;strokeWidth=2;" parent="1" source="state" target="state_encoder" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_state_dit" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#00B8D9;strokeWidth=2;" parent="1" source="state_encoder" target="dit" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_gt_action_enc" value="noising/interpolation" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#FF991F;strokeWidth=1.5;fontSize=11;fontColor=#7A3E00;" parent="1" source="gt_actions" target="noisy_action_encoder" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_noise_action_enc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#FF991F;strokeWidth=2;" parent="1" source="noise_time" target="noisy_action_encoder" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_action_dit" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#FF991F;strokeWidth=2;" parent="1" source="noisy_action_encoder" target="dit" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_context_dit" value="cross-attention K/V" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#4C9AFF;strokeWidth=2;fontSize=11;fontColor=#0747A6;" parent="1" source="context_tokens" target="dit" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_latent_dit" value="z_a condition" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;fontSize=11;fontColor=#0747A6;" parent="1" source="latent_tokens" target="dit" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_dit_velocity" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#FF991F;strokeWidth=2;" parent="1" source="dit" target="velocity" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_vel_fm" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#DE350B;strokeWidth=2;" parent="1" source="velocity" target="fm_loss" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_gt_fm" value="target velocity" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#DE350B;strokeWidth=1.5;fontSize=11;fontColor=#BF2600;" parent="1" source="gt_actions" target="fm_loss" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="e_future_teacher" value="training only" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontSize=11;fontColor=#403294;" parent="1" source="future_video" target="teacher_encoder" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_teacher_target" value="stop-gradient" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontSize=11;fontColor=#403294;" parent="1" source="teacher_encoder" target="target_latents" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_history_world" value="past/current s only · causal teacher forcing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6554C0;strokeWidth=1.5;dashed=1;fontSize=11;fontColor=#403294;" parent="1" source="target_latents" target="world_predictor" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_latent_world" value="transition/action representation" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;fontSize=11;fontColor=#0747A6;" parent="1" source="latent_tokens" target="world_predictor" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_world_pred" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;" parent="1" source="world_predictor" target="pred_latents" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_pred_jepa" value="prediction" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;fontSize=11;fontColor=#0747A6;" parent="1" source="pred_latents" target="jepa_loss" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_target_jepa" value="teacher target" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontSize=11;fontColor=#403294;" parent="1" source="target_latents" target="jepa_loss" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="e_fm_total" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#DE350B;strokeWidth=2;" parent="1" source="fm_loss" target="total_loss" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_jepa_total" value="β × L_WM" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6554C0;strokeWidth=2;fontSize=11;fontColor=#403294;" parent="1" source="jepa_loss" target="total_loss" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_vel_euler" value="repeat at inference" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#36B37E;strokeWidth=2;fontSize=11;fontColor=#006644;" parent="1" source="velocity" target="euler" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_euler_output" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#00875A;strokeWidth=2;" parent="1" source="euler" target="action_output" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

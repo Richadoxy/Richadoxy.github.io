@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="对比 self/cross/joint attention，解释 PI0.5 multi-expert，以及 token condition 与 AdaNorm 调制。" />
+    <title>QKV、Attention、多专家与条件注入 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1-qkv">1. Q、K、V 的直觉</a></li>
+<li><a href="#2-multi-head-attention">2. Multi-head Attention</a></li>
+<li><a href="#3-self-attention-cross-attention">3. Self-attention 与 Cross-attention</a><ul>
+<li><a href="#31-self-attention">3.1 Self-attention</a></li>
+<li><a href="#32-cross-attention">3.2 Cross-attention</a></li>
+</ul>
+</li>
+<li><a href="#4-pi05-attention">4. PI0.5 的联合 Attention</a></li>
+<li><a href="#5-multi-expert-moe">5. Multi-expert 和常见 MoE 的区别</a><ul>
+<li><a href="#51-moe">5.1 常见稀疏 MoE</a></li>
+<li><a href="#52-pi05-multi-expert">5.2 PI0.5 multi-expert</a></li>
+</ul>
+</li>
+<li><a href="#6">6. 广义条件与狭义条件调制</a></li>
+<li><a href="#7-token">7. 作为 token 注入</a></li>
+<li><a href="#8-adalnadarms">8. 通过 AdaLN/AdaRMS 调制</a></li>
+<li><a href="#9-pi0pi05gr00t-timestep">9. PI0、PI0.5、GR00T 的 timestep 路径</a></li>
+<li><a href="#10-vlash-future-state">10. VLASH future state 的条件注入</a></li>
+<li><a href="#11">11. 为什么论文常在条件上创新</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Series 2: VLA architectures, training, and deployment</span><span data-lang="zh">知识链二：VLA 架构、训练方法与部署对照</span> · 09/14</p>
+          <h1>QKV、Attention、多专家与条件注入</h1>
+          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 5 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 5 分钟阅读</span></p>
+          <p class="article-deck">对比 self/cross/joint attention，解释 PI0.5 multi-expert，以及 token condition 与 AdaNorm 调制。</p>
+          
+          <div class="article-content">
+            <p>这一章回答四组经常混在一起的问题：</p>
+<ol>
+<li>Q/K/V 是什么？</li>
+<li>self-attention 和 cross-attention 有什么区别？</li>
+<li>PI0.5 的 multi-expert 为什么不是常见 MoE？</li>
+<li>token 注入和 AdaLN/AdaRMS 条件调制有什么区别？</li>
+</ol>
+<h2 id="1-qkv">1. Q、K、V 的直觉</h2>
+<p>每个 token hidden vector 会经过三组可训练投影：</p>
+<pre><code class="language-text">Q = X W_Q  Query：我想找什么信息
+K = X W_K  Key：我能用什么特征被匹配
+V = X W_V  Value：匹配后真正提供什么内容
+</code></pre>
+<p>Attention 权重来自 Q 与 K 的相似度：</p>
+<pre><code class="language-text">Attention(Q,K,V) = softmax(QK^T / sqrt(d_head)) V
+</code></pre>
+<p>直觉上：</p>
+<pre><code class="language-text">Query 提问
+Key 用于检索匹配
+Value 提供答案内容
+</code></pre>
+<p>Q/K/V 都是一次前向计算产生的 activation，不是固定数据；生成它们的 <code>W_Q/W_K/W_V</code> 才是可训练权重。</p>
+<h2 id="2-multi-head-attention">2. Multi-head Attention</h2>
+<p>一个 token 的隐藏宽度会被组织为多个 attention heads。</p>
+<p>PI0.5 的 Gemma 配置中：</p>
+<pre><code class="language-text">num_query_heads = 8
+head_dim = 256
+8 × 256 = 2048
+</code></pre>
+<p>因此 2048 宽度可以拆成 8 个 256 维 query heads。但这只是该配置内部维度设计的一致关系，不表示“先决定 Q head，才产生 Gemma 2B 宽度”。模型宽度、head 数和 head_dim 是共同设计的超参数。</p>
+<p>该配置使用 grouped/multi-query attention：</p>
+<pre><code class="language-text">Q:  8 × 256
+K/V: 1 × 256
+</code></pre>
+<p>8 个 query heads 共享较少的 K/V heads，可以降低 KV cache 和计算开销。</p>
+<h2 id="3-self-attention-cross-attention">3. Self-attention 与 Cross-attention</h2>
+<h3 id="31-self-attention">3.1 Self-attention</h3>
+<p>Q、K、V 来自同一组 token：</p>
+<pre><code class="language-text">action/state tokens --Q/K/V--&gt; self-attention
+</code></pre>
+<p>它适合序列内部交互，例如：</p>
+<ul>
+<li>action chunk 中不同时间步保持轨迹一致；</li>
+<li>state token 告诉所有 action tokens 当前机器人姿态；</li>
+<li>文本 token 结合上下文理解指令。</li>
+</ul>
+<h3 id="32-cross-attention">3.2 Cross-attention</h3>
+<p>Q 来自当前处理流，K/V 来自另一组 memory：</p>
+<pre><code class="language-text">Action tokens -&gt; Q
+VLM features  -&gt; K/V
+</code></pre>
+<p>这表示动作网络主动从视觉语言 memory 中检索相关信息。</p>
+<p>GR00T 的 DiT 使用这种清晰的两段式结构：先得到 VLM hidden memory，再让 state/action query stream 对它做 cross-attention。</p>
+<h2 id="4-pi05-attention">4. PI0.5 的联合 Attention</h2>
+<p>PI0.5 不是简单的：</p>
+<pre><code class="language-text">Gemma 2B 完整运行结束 -&gt; 一个向量 -&gt; Gemma 300M
+</code></pre>
+<p>而是在 18 个 paired layers 中反复协同：</p>
+<pre><code class="language-text">Prefix Expert hidden [B,Lp,2048] -&gt; 自己的 Q/K/V 投影
+Action Expert hidden [B,H,1024]   -&gt; 自己的 Q/K/V 投影
+
+Q/K/V 在共同 head geometry 中按序列位置组合
+  -&gt; masked joint attention
+  -&gt; 输出再回到各自 expert 的 hidden width
+</code></pre>
+<p>Attention mask 保证：</p>
+<pre><code class="language-text">Prefix query -&gt; Prefix K/V
+Action query -&gt; Prefix + Action K/V
+</code></pre>
+<p>因此 Action Expert 可以读取图像、语言和 state，Prefix 不会被 noisy action 污染。</p>
+<p>完整图见 <a href="assets/diagrams/pi05_structure.drawio">pi05_structure.drawio</a>。</p>
+<h2 id="5-multi-expert-moe">5. Multi-expert 和常见 MoE 的区别</h2>
+<h3 id="51-moe">5.1 常见稀疏 MoE</h3>
+<p>典型 Mixture of Experts 有 router：</p>
+<pre><code class="language-text">token
+  -&gt; router 计算 expert scores
+  -&gt; 选择 top-k experts
+  -&gt; experts 分别计算
+  -&gt; 加权合并
+</code></pre>
+<p>不同 token 可能动态选择不同 expert，目的通常是在计算量增长较少的情况下扩大参数容量。</p>
+<h3 id="52-pi05-multi-expert">5.2 PI0.5 multi-expert</h3>
+<p>PI0.5 中 expert 分工是由 token 类型预先确定的：</p>
+<pre><code class="language-text">image/text/state prefix -&gt; Gemma 2B Prefix Expert
+noisy action suffix     -&gt; Gemma 300M Action Expert
+</code></pre>
+<p>这里没有 router，也没有对每个 token 做 top-k 随机或动态选择。因此它是多组 expert-specific weights 的协同 Transformer，但不是最常见的 sparse routed MoE。</p>
+<p>可以记成：</p>
+<pre><code class="language-text">稀疏 MoE：谁处理 token，由 router 动态选择
+PI0.5：谁处理 token，由 prefix/action 模态身份固定决定
+</code></pre>
+<h2 id="6">6. 广义条件与狭义条件调制</h2>
+<p>“condition”是一个很宽的词。任何影响输出的信息都可以叫条件：</p>
+<ul>
+<li>图像；</li>
+<li>语言；</li>
+<li>robot state；</li>
+<li>noisy action；</li>
+<li>flow timestep；</li>
+<li>embodiment ID；</li>
+<li>goal 或 future state。</li>
+</ul>
+<p>因此“作为 token 注入”也是一种 conditioning。工程讨论中，通常把下面两种路径分开说。</p>
+<h2 id="7-token">7. 作为 token 注入</h2>
+<p>以 GR00T state 为例：</p>
+<pre><code class="language-text">state [B,D]
+  -&gt; State Encoder
+  -&gt; state token [B,1,1536]
+
+noisy action [B,H,D]
+  -&gt; Action Encoder
+  -&gt; action tokens [B,H,1536]
+
+concat -&gt; [B,1+H,1536]
+</code></pre>
+<p>state token：</p>
+<ul>
+<li>占一个序列位置；</li>
+<li>产生自己的 Q/K/V；</li>
+<li>通过 self-attention 与 action tokens 交换信息；</li>
+<li>可以在不同层形成新的 hidden representation。</li>
+</ul>
+<p>它像一个加入会议的参与者。</p>
+<h2 id="8-adalnadarms">8. 通过 AdaLN/AdaRMS 调制</h2>
+<p>flow timestep 通常是全局噪声阶段，更适合控制整层计算方式：</p>
+<pre><code class="language-text">t -&gt; sin/cos embedding -&gt; time MLP -&gt; condition c
+</code></pre>
+<p>对某一层 hidden states <code>x</code>：</p>
+<pre><code class="language-text">[scale, shift, gate] = Linear_layer(c)
+normed = RMSNorm(x)
+modulated = normed * (1 + scale) + shift
+y = Attention_or_FFN(modulated)
+x_next = x + gate * y
+</code></pre>
+<p>其中：</p>
+<ul>
+<li><code>scale</code> 调整每个特征通道的强弱；</li>
+<li><code>shift</code> 改变每个特征通道的基准；</li>
+<li><code>gate</code> 控制当前子层对 residual 的贡献。</li>
+</ul>
+<p>condition 没有序列位置，也不生成 Q/K/V。它更像调节整个会议室工作模式的控制面板。</p>
+<p>BrainCo-IL 中具体实现见：</p>
+<ul>
+<li><a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/models/pi0.py"><code>Pi0.embed_suffix()</code></a>：构造 time/state condition；</li>
+<li><a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/models/gemma.py"><code>RMSNorm</code></a>：生成 scale、shift、gate；</li>
+<li><a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/models/gemma.py"><code>Layers.__call__()</code></a>：在 Attention 和 FFN 前使用 condition。</li>
+</ul>
+<h2 id="9-pi0pi05gr00t-timestep">9. PI0、PI0.5、GR00T 的 timestep 路径</h2>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>noisy action</th>
+<th>flow timestep</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PI0</td>
+<td>投影成 action embedding</td>
+<td>与 action embedding 拼接后过 MLP</td>
+</tr>
+<tr>
+<td>PI0.5</td>
+<td><code>action_in_proj</code> 形成 action tokens</td>
+<td>time MLP 后通过 adaRMS 调制</td>
+</tr>
+<tr>
+<td>GR00T N1.x</td>
+<td>embodiment-specific Action Encoder</td>
+<td>既融合进 action encoding，又通过 AdaLayerNorm 调制 DiT</td>
+</tr>
+</tbody>
+</table>
+<p>注意 flow timestep 不是控制系统时间戳，也不是 action horizon 的位置编号。它表示当前 <code>x_t</code> 位于 noise 到 action 路径的什么位置。</p>
+<h2 id="10-vlash-future-state">10. VLASH future state 的条件注入</h2>
+<p>当前 BrainCo-IL 的 <code>state_cond=true</code> 路径为：</p>
+<pre><code class="language-text">c_time  = TimeMLP(t)
+c_state = StateMLP(state_(t+δ))
+c       = c_time + c_state
+</code></pre>
+<p>然后 <code>c</code> 在 Action Expert 每层产生 scale/shift/gate。</p>
+<p>一次去噪推理中：</p>
+<pre><code class="language-text">future state s_(t+δ)：对这个请求固定
+flow timestep：随每个 Euler step 改变
+</code></pre>
+<p>VLASH 的核心不是强制所有模型都使用 AdaRMS，而是让策略以执行时刻 state 为条件。对其他 backbone，future state 也可以作为 token、cross-attention memory 或原生 state 输入。</p>
+<h2 id="11">11. 为什么论文常在条件上创新</h2>
+<p>增加条件通常参数少、易复用 checkpoint，又可以让行为更可控。常见条件包括 future state、历史动作、触觉、力觉、目标图像、价值、子目标和 embodiment ID。</p>
+<p>但有效创新不能只看“加了一个输入”，还要检查：</p>
+<ol>
+<li>该信息在部署时是否可获得或可靠预测；</li>
+<li>训练与推理的条件分布是否一致；</li>
+<li>是否把未来真值泄漏给了部署路径；</li>
+<li>模型是否真正使用该条件；</li>
+<li>注入位置是 token、cross-attention 还是 adaptive norm，为什么适合。</li>
+</ol>
+<p>下一章将 timestep 放回 flow matching 的完整训练和推理过程，解释它为什么是必要条件。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="08-transformer-latent-encoder-decoder.html">← 08. Transformer、Encoder/Decoder 与 Latent</a>
+            <a href="10-flow-matching-training-inference.html">10. Flow Matching：训练、timestep 与推理 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+    
+  </body>
+</html>

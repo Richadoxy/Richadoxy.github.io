@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="记录如何把动作空间扩展为 7+7+21+21 的 56D 双臂双手表示，以及投影、mask、归一化和部署端的连锁变化。" />
+    <title>从 28D 到 56D 双臂双手 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1-brainco">1. BrainCo 关节组</a></li>
+<li><a href="#2">2. 模型中哪些层直接改变形状</a></li>
+<li><a href="#3-tensor">3. 还有哪些 tensor 跟着改变</a></li>
+<li><a href="#4-vlm">4. VLM 为什么不需要换输入层</a></li>
+<li><a href="#5-action_in_proj-vlm">5. action_in_proj 会进入 VLM 吗</a></li>
+<li><a href="#6-70d56d-28d">6. 70D、56D 和 28D 数据转换</a></li>
+<li><a href="#7">7. 为什么预训练动作接口可能重新初始化</a></li>
+<li><a href="#8-lora_vlm_only">8. 当前 lora_vlm_only 实际训练什么</a></li>
+<li><a href="#9">9. 改维度时的检查清单</a></li>
+<li><a href="#10">10. 最终结论</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Series 1: Adapting OpenPI / π0.5 for 56D dual-arm dual-hand training</span><span data-lang="zh">知识链一：OpenPI / π0.5 的 56D 双臂双手改造</span> · 06/14</p>
+          <h1>从 28D 到 56D 双臂双手</h1>
+          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 3 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 3 分钟阅读</span></p>
+          <p class="article-deck">记录如何把动作空间扩展为 7+7+21+21 的 56D 双臂双手表示，以及投影、mask、归一化和部署端的连锁变化。</p>
+          
+          <div class="article-content">
+            <p><code>action_dim</code> 不只是一个数字，它同时约束数据、模型和部署接口。</p>
+<h2 id="1-brainco">1. BrainCo 关节组</h2>
+<p><a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/policies/brainco_policy.py"><code>BrainCoPolicyIOConfig</code></a> 定义四组关节：</p>
+<table>
+<thead>
+<tr>
+<th>关节组</th>
+<th style="text-align: right;">维度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>left_arm</code></td>
+<td style="text-align: right;">7</td>
+</tr>
+<tr>
+<td><code>right_arm</code></td>
+<td style="text-align: right;">7</td>
+</tr>
+<tr>
+<td><code>left_hand</code></td>
+<td style="text-align: right;">21</td>
+</tr>
+<tr>
+<td><code>right_hand</code></td>
+<td style="text-align: right;">21</td>
+</tr>
+</tbody>
+</table>
+<p>典型 56D 布局：</p>
+<pre><code class="language-text">left_arm(7) + right_arm(7) + left_hand(21) + right_hand(21) = 56
+</code></pre>
+<p>当前右侧 28D 布局：</p>
+<pre><code class="language-text">right_arm(7) + right_hand(21) = 28
+</code></pre>
+<p>顺序必须在数据集、norm stats、训练配置和部署端保持一致。</p>
+<h2 id="2">2. 模型中哪些层直接改变形状</h2>
+<p>PI0.5 初始化时创建：</p>
+<pre><code class="language-python">action_in_proj  = Linear(action_dim, 1024)
+action_out_proj = Linear(1024, action_dim)
+</code></pre>
+<p>因此：</p>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th><code>action_in_proj</code></th>
+<th><code>action_out_proj</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>28D</td>
+<td><code>Linear(28, 1024)</code></td>
+<td><code>Linear(1024, 28)</code></td>
+</tr>
+<tr>
+<td>56D</td>
+<td><code>Linear(56, 1024)</code></td>
+<td><code>Linear(1024, 56)</code></td>
+</tr>
+</tbody>
+</table>
+<p>以下主体结构不会因为 D 改变：</p>
+<ul>
+<li>SigLIP 图像编码器宽度</li>
+<li>Gemma 2B VLM 宽度和层数</li>
+<li>Gemma 300M Action Expert 宽度和层数</li>
+<li>time MLP 的 1024 维宽度</li>
+</ul>
+<h2 id="3-tensor">3. 还有哪些 tensor 跟着改变</h2>
+<p>模型输入规格将 state 维度也设为 <code>action_dim</code>：</p>
+<pre><code class="language-text">state   [B, D]
+actions [B, H, D]
+noise   [B, H, D]
+v_t     [B, H, D]
+</code></pre>
+<p>所以改 D 不只是改最终输出层，还改变 action chunk、flow noise、loss 和当前 state 的数据合同。</p>
+<h2 id="4-vlm">4. VLM 为什么不需要换输入层</h2>
+<p>PI0.5 的 state 先被离散化并写入 prompt：</p>
+<pre><code class="language-text">28D state -&gt; 28 个离散数值对应的文本内容
+56D state -&gt; 56 个离散数值对应的文本内容
+</code></pre>
+<p>tokenizer 最后都输出固定：</p>
+<pre><code class="language-text">[B, max_token_len]
+</code></pre>
+<p>因此 Gemma 2B 的 token embedding 和 2048 维隐藏层形状不变。变化的是 VLM 看到的内容和有效 token 数，不是网络输入宽度。</p>
+<h2 id="5-action_in_proj-vlm">5. <code>action_in_proj</code> 会进入 VLM 吗</h2>
+<p>不会进入 VLM prefix。两路关系是：</p>
+<pre><code class="language-text">图像 + prompt + state tokens
+  -&gt; VLM Prefix
+       │
+       │ 被 Action Expert attention 读取
+       ▼
+noisy actions -&gt; action_in_proj -&gt; Action Expert -&gt; action_out_proj
+</code></pre>
+<p><code>action_in_proj</code> 是 Action Expert 的动作入口。它的输出会参与联合 Transformer attention，但 noisy action 不会成为 Gemma 2B prefix 的输入。</p>
+<p>训练时 action loss 仍可沿 attention 路径传回可训练的 VLM/LoRA 参数，这与“action 被输入 VLM”不是一回事。</p>
+<h2 id="6-70d56d-28d">6. 70D、56D 和 28D 数据转换</h2>
+<p>仓库提供一个特定转换：</p>
+<pre><code class="language-text">70D = 左EEF(7) + 右EEF(7) + 左臂(7) + 右臂(7) + 左手(21) + 右手(21)
+  -&gt; 删除两组 EEF pose
+56D = 左臂 + 右臂 + 左手 + 右手
+</code></pre>
+<p>对应 <a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/policies/brainco_policy.py"><code>BrainCoRevo3EefJointHandToJointHand</code></a>。</p>
+<p>它是明确的 70D→56D 转换，不是通用的 70D→任意 D 裁剪器。</p>
+<p>当前 28D YAML 配置的是已经为右臂+右手整理好的 28D 数据集，并关闭该 70D→56D transform：</p>
+<pre><code class="language-yaml">revo3_eef_joint_hand_to_joint_hand: false
+dataset_state_dim: 28
+dataset_state_indices: null
+</code></pre>
+<h2 id="7">7. 为什么预训练动作接口可能重新初始化</h2>
+<p>如果基础 checkpoint 的动作维度与目标配置不同，下面两层 shape 不匹配：</p>
+<pre><code class="language-text">action_in_proj
+action_out_proj
+</code></pre>
+<p>当前 28D 配置使用 <code>PartialCheckpointWeightLoader</code> 并允许跳过这些不匹配层。主体预训练权重继续加载，新的 28D 动作接口保留随机初始化，再通过训练学会映射。</p>
+<h2 id="8-lora_vlm_only">8. 当前 <code>lora_vlm_only</code> 实际训练什么</h2>
+<p>当前 28D YAML 使用：</p>
+<pre><code class="language-text">paligemma_variant   = gemma_2b_lora
+action_expert       = gemma_300m
+freeze_strategy     = lora_and_action_interface
+</code></pre>
+<p>因此允许更新的主要参数是：</p>
+<ul>
+<li>Gemma 2B VLM 中的 LoRA 参数；</li>
+<li><code>action_in_proj</code> 和 <code>action_out_proj</code>；</li>
+<li><code>time_mlp_in</code> 和 <code>time_mlp_out</code>。</li>
+</ul>
+<p>Gemma 300M Action Expert 主体没有选择 LoRA 变体，并被该 freeze strategy 冻结。也就是说，文件名中的 <code>vlm_only</code> 主要描述“大模型主体只训练 VLM LoRA”，但新动作接口和时间条件层仍然必须训练。</p>
+<p>LoRA/full training 与 28D/56D 是两个不同维度的配置选择：前者决定哪些参数更新，后者决定 state/action 的数据合同和动作投影层 shape。</p>
+<h2 id="9">9. 改维度时的检查清单</h2>
+<p>不能只改 <code>model.action_dim</code>。至少检查：</p>
+<ul>
+<li>[ ] 数据集 <code>observation.state</code> 的维度和顺序</li>
+<li>[ ] 数据集 <code>action</code> 的维度和顺序</li>
+<li>[ ] <code>policy_io.state_groups</code> 和 <code>action_groups</code></li>
+<li>[ ] <code>delta_action_groups</code> 与 delta mask</li>
+<li>[ ] <code>model.action_dim</code></li>
+<li>[ ] norm stats 是否与新布局对应</li>
+<li>[ ] 权重加载器如何处理不匹配的投影层</li>
+<li>[ ] <code>max_token_len</code> 是否容纳离散 state</li>
+<li>[ ] 部署端是否使用同一 action 顺序和 delta/absolute 语义</li>
+</ul>
+<h2 id="10">10. 最终结论</h2>
+<p>从 56D 改到 28D 时：</p>
+<pre><code class="language-text">直接改变参数 shape：action_in_proj、action_out_proj
+改变 tensor shape：state、actions、noise、velocity、loss 输入
+改变 VLM 内容：离散 state token 的数量和语义
+不改变主体宽度：SigLIP、Gemma 2B、Gemma 300M
+必须同步改变：数据语义、norm stats、delta 规则和部署合同
+</code></pre>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="05-train-state-jit-checkpoint.html">← 05. TrainState、JIT 与 checkpoint</a>
+            <a href="07-vlash-integration.html">07. VLASH 在 BrainCo-IL 中的集成 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+    
+  </body>
+</html>

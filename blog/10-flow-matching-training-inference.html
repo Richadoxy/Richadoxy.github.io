@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="从插值路径、velocity target 和 timestep condition 出发，区分训练采样与推理积分。" />
+    <title>Flow Matching：训练、timestep 与推理 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 三个最重要的对象</a></li>
+<li><a href="#2-pi05">2. PI0.5 的约定</a></li>
+<li><a href="#3-gr00t">3. GR00T 的方向约定</a></li>
+<li><a href="#4-timestep">4. timestep 为什么不是监督目标</a></li>
+<li><a href="#5">5. 训练时存在推理去噪步数吗</a></li>
+<li><a href="#6-40k-training-steps-loss">6. 40k training steps 对应多少次 loss</a></li>
+<li><a href="#7">7. 训练时反向更新什么</a></li>
+<li><a href="#8-action">8. 推理如何从噪声得到 action</a></li>
+<li><a href="#9-action-chunk-tensor">9. action chunk、模型内部 tensor 与有效输出</a></li>
+<li><a href="#10-flow-matching">10. Flow Matching 与异步执行是两个层级</a></li>
+<li><a href="#11-flow-matching">11. 阅读 Flow Matching 代码的检查表</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Series 2: VLA architectures, training, and deployment</span><span data-lang="zh">知识链二：VLA 架构、训练方法与部署对照</span> · 10/14</p>
+          <h1>Flow Matching：训练、timestep 与推理</h1>
+          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 4 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 4 分钟阅读</span></p>
+          <p class="article-deck">从插值路径、velocity target 和 timestep condition 出发，区分训练采样与推理积分。</p>
+          
+          <div class="article-content">
+            <p>Flow matching 在 PI0.5、GR00T 和 VLA-JEPA Action Head 中承担同一类任务：学习一个速度场，把随机噪声逐步变成 action chunk。</p>
+<h2 id="1">1. 三个最重要的对象</h2>
+<p>设：</p>
+<pre><code class="language-text">a：数据集中的真实 action chunk，shape [B,H,D]
+ε：同 shape 的高斯噪声
+t：flow timestep，每个训练样本采一个标量
+</code></pre>
+<p>模型不直接监督“预测最终 action”，而是在噪声和 action 之间构造中间点 <code>x_t</code>，监督模型预测该位置的速度方向。</p>
+<h2 id="2-pi05">2. PI0.5 的约定</h2>
+<p>当前 BrainCo-IL/OpenPI 使用：</p>
+<pre><code class="language-text">x_t = t * ε + (1 - t) * a
+u_t = ε - a
+</code></pre>
+<p>因此：</p>
+<pre><code class="language-text">t = 0：x_t 是真实 action
+t = 1：x_t 是纯噪声
+</code></pre>
+<p>模型预测：</p>
+<pre><code class="language-text">v_θ(x_t, t | observation)
+</code></pre>
+<p>训练 loss：</p>
+<pre><code class="language-text">L_FM = mean((v_θ - u_t)^2)
+</code></pre>
+<h2 id="3-gr00t">3. GR00T 的方向约定</h2>
+<p>GR00T 常用相反参数方向：</p>
+<pre><code class="language-text">x_t = (1 - t) * ε + t * a
+u_t = a - ε
+</code></pre>
+<p>因此：</p>
+<pre><code class="language-text">t = 0：纯噪声
+t = 1：真实 action
+</code></pre>
+<p>两者描述的是同一条直线，只是 t 的方向和目标速度符号相反。比较论文或代码时必须同时检查：</p>
+<ul>
+<li><code>x_t</code> 的公式；</li>
+<li>target velocity 的符号；</li>
+<li>推理时 <code>dt</code> 的正负方向。</li>
+</ul>
+<p>不能只看“t=0”或“t=1”判断实现是否相同。</p>
+<h2 id="4-timestep">4. timestep 为什么不是监督目标</h2>
+<p>训练监督仍然是：</p>
+<pre><code class="language-text">predicted velocity 与 target velocity 的 loss
+</code></pre>
+<p>t 不需要模型预测，它是告诉模型当前输入处于哪个噪声阶段的条件。</p>
+<p>同一个模型需要同时处理：</p>
+<pre><code class="language-text">几乎纯净的动作
+中等噪声的动作
+接近纯噪声的动作
+</code></pre>
+<p>如果没有 t，模型只能看到 <code>x_t</code>，却不知道应该使用哪一个阶段的速度场。于是完整函数应写为：</p>
+<pre><code class="language-text">v_θ(x_t, t, image, language, state)
+</code></pre>
+<p>“条件”表示在给定 t、图像、语言和 state 的情况下预测速度；它不表示这些输入都是 loss target。</p>
+<h2 id="5">5. 训练时存在推理去噪步数吗</h2>
+<p>通常不存在“一次训练样本内部跑 10 次去噪”的过程。</p>
+<p>一次训练前向通常只做：</p>
+<pre><code class="language-text">随机采一个连续 t
+构造一个 x_t
+预测一次 v_t
+计算一次 flow loss
+</code></pre>
+<p>推理时才把区间离散成若干 Euler steps，例如 10 步：</p>
+<pre><code class="language-text">t_0 -&gt; t_1 -&gt; ... -&gt; t_10
+</code></pre>
+<p>训练中的随机 t 是对连续区间的采样，不必预先被 <code>1/10</code> 分割。因为模型在训练中见过大量不同 t，推理时可以选择 4、10 或其他数量的积分步数；步数越多通常积分误差越小，但延迟越大。</p>
+<p>有些实现会把 t 离散成 bucket 用于 embedding，例如 GR00T 的 1000 个 timestep buckets。这仍不等于推理必须执行 1000 步。</p>
+<h2 id="6-40k-training-steps-loss">6. 40k training steps 对应多少次 loss</h2>
+<p>如果训练配置是：</p>
+<pre><code class="language-text">num_train_steps = 40,000
+</code></pre>
+<p>那么优化器通常更新 40,000 次，每个 step 产生一个 batch loss：</p>
+<pre><code class="language-text">40,000 次 batch-level loss / backward / optimizer update
+</code></pre>
+<p>若 batch size 为 B，每个 batch 中每个样本都独立采样噪声和 t，所以样本级 flow targets 约为：</p>
+<pre><code class="language-text">40,000 × global_batch_size
+</code></pre>
+<p>每个样本的 loss 又会对 <code>[H,D]</code> 上的误差求平均。不能把“一个 tensor 中有 H×D 个误差项”说成 H×D 次独立反向传播；它们汇总成一次标量 loss，再共同反向传播。</p>
+<p>如果使用梯度累积，则 micro-batch forward 次数可能更多，但 optimizer step 仍以配置和训练循环定义为准。</p>
+<h2 id="7">7. 训练时反向更新什么</h2>
+<p>计算：</p>
+<pre><code class="language-text">L_FM = MSE(v_pred, velocity_target)
+</code></pre>
+<p>自动求导会沿预测路径更新所有允许训练的参数，例如：</p>
+<ul>
+<li>action input/output projection；</li>
+<li>Action Expert 或 DiT；</li>
+<li>timestep MLP/AdaNorm modulation；</li>
+<li>state encoder/condition MLP；</li>
+<li>未冻结的 VLM 参数。</li>
+</ul>
+<p>噪声、t、真实 action 和 target velocity 都是构造出来的训练数据，不是可训练参数。</p>
+<h2 id="8-action">8. 推理如何从噪声得到 action</h2>
+<p>推理没有真实 action，先采样：</p>
+<pre><code class="language-text">x_noise ~ Normal(0,I), shape [B,H,D]
+</code></pre>
+<p>以 PI0.5 为例，从噪声端向数据端做 Euler 积分：</p>
+<pre><code class="language-text">for each timestep:
+    v = model(observation, x_t, t)
+    x_next = x_t + dt * v
+</code></pre>
+<p>最终 <code>x</code> 成为 denoised action chunk。图像、语言和 state 通常在一次 action sampling 中保持不变；noisy action 和 flow timestep 每一步变化。</p>
+<h2 id="9-action-chunk-tensor">9. action chunk、模型内部 tensor 与有效输出</h2>
+<p>模型内部 tensor 不一定等于机器人真正需要的动作尺寸。</p>
+<p>例如 GR00T N1.7 可以有：</p>
+<pre><code class="language-text">内部 capacity: [B,40,132]
+有效机器人动作: [B,16,56]
+</code></pre>
+<p>训练时有效区域由 mask 监督；推理完成后切出：</p>
+<pre><code class="language-text">horizon 0:16
+dimension 0:56
+</code></pre>
+<p>所以“model tensor”只是统一多机器人模型使用的 padded 内部容器，不代表机器人真的有 132 个自由度或执行 40 步。</p>
+<h2 id="10-flow-matching">10. Flow Matching 与异步执行是两个层级</h2>
+<p>Flow matching 负责单次模型调用内部如何从噪声生成 action：</p>
+<pre><code class="language-text">noise -&gt; iterative denoising -&gt; action chunk
+</code></pre>
+<p>同步、异步、VLASH 则负责不同模型调用与控制器执行之间如何调度：</p>
+<pre><code class="language-text">什么时候采 observation
+推理时机器人是否继续执行旧 chunk
+新 chunk 从哪个 state 开始执行
+什么时候切换 active/pending chunk
+</code></pre>
+<p>VLASH 不需要改变 PI0.5 的 flow objective；它改变的是训练样本的时间对齐和部署调度条件。</p>
+<h2 id="11-flow-matching">11. 阅读 Flow Matching 代码的检查表</h2>
+<p>看到一个新 VLA 的 action generator 时，依次检查：</p>
+<ol>
+<li>真实 action 和噪声如何插值得到 <code>x_t</code>；</li>
+<li><code>t=0/1</code> 分别代表 noise 还是 action；</li>
+<li>target 是 <code>a-ε</code> 还是 <code>ε-a</code>；</li>
+<li>timestep 是 token fusion、AdaNorm，还是两者都有；</li>
+<li>训练时 t 的分布是什么；</li>
+<li>推理使用多少步、什么积分器；</li>
+<li>action mask、padding 和有效维度如何处理；</li>
+<li>最终输出是否需要 slice、unnormalize 或坐标变换。</li>
+</ol>
+<p>PI0.5 的完整结构和公式也可以配合 <a href="assets/diagrams/pi05_structure.drawio">pi05_structure.drawio</a> 阅读。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="09-attention-multi-expert-conditioning.html">← 09. QKV、Attention、多专家与条件注入</a>
+            <a href="11-groot-dit-architecture.html">11. GR00T 与 DiT Action Head →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+    
+  </body>
+</html>

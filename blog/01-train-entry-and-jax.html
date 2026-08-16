@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="从 scripts/train.py 出发，梳理 JAX 编译缓存、PRNG、mesh、sharding、checkpoint 与训练循环。" />
+    <title>训练入口与 JAX | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1-main">1. main() 的启动顺序</a></li>
+<li><a href="#2-jax">2. JAX 编译缓存</a></li>
+<li><a href="#3">3. 为什么训练需要随机数</a></li>
+<li><a href="#4-mesh-sharding">4. mesh 和 sharding</a></li>
+<li><a href="#5-checkpoint">5. 为什么先初始化 checkpoint 目录</a></li>
+<li><a href="#6-batch">6. 第一个 batch 和训练循环</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Series 1: Adapting OpenPI / π0.5 for 56D dual-arm dual-hand training</span><span data-lang="zh">知识链一：OpenPI / π0.5 的 56D 双臂双手改造</span> · 01/14</p>
+          <h1>训练入口与 JAX</h1>
+          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 2 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 2 分钟阅读</span></p>
+          <p class="article-deck">从 scripts/train.py 出发，梳理 JAX 编译缓存、PRNG、mesh、sharding、checkpoint 与训练循环。</p>
+          
+          <div class="article-content">
+            <p>训练入口是 <a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/scripts/train.py"><code>scripts/train.py</code></a>。文件末尾只有一条主入口：</p>
+<pre><code class="language-python">if __name__ == &quot;__main__&quot;:
+    main(_config.cli())
+</code></pre>
+<p>它可以拆成两步：</p>
+<pre><code class="language-text">_config.cli()  -&gt; 读取配置，得到 TrainConfig
+main(config)   -&gt; 根据配置组装并运行训练
+</code></pre>
+<h2 id="1-main">1. <code>main()</code> 的启动顺序</h2>
+<pre><code class="language-text">检查 batch size
+  -&gt; 设置 JAX 编译缓存
+  -&gt; 创建随机 key
+  -&gt; 创建设备 mesh 和 sharding
+  -&gt; 初始化 checkpoint 目录
+  -&gt; 保存训练配置并启动 SwanLab
+  -&gt; 创建 DataLoader，取第一个 batch
+  -&gt; 初始化或恢复 TrainState
+  -&gt; JIT 编译 train_step
+  -&gt; 进入训练循环
+</code></pre>
+<p>这个顺序有一个重要目的：先检查配置、checkpoint 和数据，再进行昂贵的模型初始化与训练。</p>
+<h2 id="2-jax">2. JAX 编译缓存</h2>
+<pre><code class="language-python">jax.config.update(
+    &quot;jax_compilation_cache_dir&quot;,
+    str(epath.Path(&quot;~/.cache/jax&quot;).expanduser()),
+)
+</code></pre>
+<p>JAX 不只是逐条执行 Python 运算。<code>jax.jit()</code> 会把前向、反向和优化器更新转换为 XLA 可执行程序，再交给 GPU 执行。</p>
+<pre><code class="language-text">Python/JAX 函数
+  -&gt; 计算图
+  -&gt; XLA 优化与编译
+  -&gt; GPU 可执行程序
+</code></pre>
+<p>第一次遇到一组新 shape 时通常需要编译，后续相同 shape 可以复用。缓存目录让之后的进程也有机会复用编译结果。</p>
+<p>这也是训练时固定以下 shape 的原因之一：</p>
+<ul>
+<li>batch size</li>
+<li>图像分辨率</li>
+<li>token 最大长度</li>
+<li>action horizon</li>
+<li>action dimension</li>
+</ul>
+<h2 id="3">3. 为什么训练需要随机数</h2>
+<pre><code class="language-python">rng = jax.random.key(config.seed)
+train_rng, init_rng = jax.random.split(rng)
+</code></pre>
+<p>随机数在当前训练中至少用于：</p>
+<ul>
+<li>随机初始化没有预训练权重的参数</li>
+<li>打乱数据顺序</li>
+<li>图像数据增强</li>
+<li>为 flow matching 生成随机噪声</li>
+<li>随机采样 flow timestep</li>
+</ul>
+<p>JAX 不依赖一个隐式的全局随机状态，而是显式传递 key。<code>split()</code> 从父 key 派生互不相同的子 key：</p>
+<pre><code class="language-text">root key
+  ├─ init_rng   模型初始化
+  └─ train_rng  逐步训练
+</code></pre>
+<p>每个训练 step 又执行：</p>
+<pre><code class="language-python">train_rng = jax.random.fold_in(rng, state.step)
+</code></pre>
+<p>因此不同 step 得到不同随机数；相同 seed 和 step 又能得到可复现的结果。</p>
+<h2 id="4-mesh-sharding">4. mesh 和 sharding</h2>
+<pre><code class="language-python">mesh = sharding.make_mesh(config.fsdp_devices)
+data_sharding = NamedSharding(mesh, PartitionSpec(DATA_AXIS))
+replicated_sharding = NamedSharding(mesh, PartitionSpec())
+</code></pre>
+<p>可以先把 mesh 理解为“训练使用的 GPU 排列表”。sharding 描述数组怎样放在这张表上：</p>
+<ul>
+<li><code>data_sharding</code>：沿 batch 维分给不同设备。</li>
+<li><code>replicated_sharding</code>：每张设备都持有相同的小对象，例如随机 key 和指标。</li>
+<li><code>train_state_sharding</code>：根据参数形状决定参数是否进行 FSDP 切分。</li>
+</ul>
+<h2 id="5-checkpoint">5. 为什么先初始化 checkpoint 目录</h2>
+<pre><code class="language-python">checkpoint_manager, resuming = initialize_checkpoint_dir(...)
+</code></pre>
+<p>这里会提前决定：</p>
+<ul>
+<li>新建训练目录；</li>
+<li><code>overwrite=True</code> 时清空已有目录；</li>
+<li><code>resume=True</code> 时从已有 checkpoint 恢复；</li>
+<li>两者都没有但目录已存在时直接报错。</li>
+</ul>
+<p>把这个检查放在模型初始化之前，可以让路径或恢复配置错误尽早暴露。</p>
+<p>随后：</p>
+<pre><code class="language-python">save_train_config(...)
+init_swanlab(...)
+</code></pre>
+<p>训练使用的完整配置会写入 checkpoint 目录，SwanLab 则记录 loss、梯度范数、参数范数和样例图像。</p>
+<h2 id="6-batch">6. 第一个 batch 和训练循环</h2>
+<pre><code class="language-python">data_iter = iter(data_loader)
+batch = next(data_iter)
+</code></pre>
+<p>这一步不是创建一个空壳，而是实际读取、解码、transform、组 batch，并把第一批数据放到 JAX 设备。之后它还会被用于第一次训练更新。</p>
+<p>训练循环的核心只有：</p>
+<pre><code class="language-python">train_state, info = ptrain_step(train_rng, train_state, batch)
+batch = next(data_iter)
+</code></pre>
+<p>即：用当前 batch 更新一次参数，然后获取下一批数据。</p>
+<p>下一章继续追踪 <code>_config.cli()</code> 如何构造 <code>TrainConfig</code>。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <span></span>
+            <a href="02-config-system.html">02. 配置系统：从 YAML 到 DataConfig →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+    
+  </body>
+</html>

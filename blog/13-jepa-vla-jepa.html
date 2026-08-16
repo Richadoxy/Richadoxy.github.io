@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="理解 teacher/student/predictor、latent world-model supervision、leakage-free training 和联合 action loss。" />
+    <title>JEPA、World Model 与 VLA-JEPA | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1-jepa">1. JEPA 的通用定义</a></li>
+<li><a href="#2-latent-pixels">2. 为什么预测 latent 而不是 pixels</a></li>
+<li><a href="#3-teacher-student">3. Teacher 与 Student</a></li>
+<li><a href="#4-predictor">4. Predictor 是什么</a></li>
+<li><a href="#5-world-model">5. World model 监督</a></li>
+<li><a href="#6-vla-jepa-teacher">6. VLA-JEPA 的 Teacher 路径</a></li>
+<li><a href="#7-vla-jepa-studentonline">7. VLA-JEPA 的 Student/Online 路径</a></li>
+<li><a href="#8-world-predictor-latent-action">8. World Predictor 如何使用 latent action</a></li>
+<li><a href="#9-leakage-free">9. Leakage-free 为什么重要</a></li>
+<li><a href="#10-teacher-forcing-teacher-network">10. Teacher forcing 不等于 Teacher network</a></li>
+<li><a href="#11-action-generation">11. Action generation 路径</a></li>
+<li><a href="#12">12. 两类数据和联合目标</a><ul>
+<li><a href="#human-video">Human video</a></li>
+<li><a href="#robot-demonstration">Robot demonstration</a></li>
+</ul>
+</li>
+<li><a href="#13">13. 推理时保留什么</a></li>
+<li><a href="#14-teacherstudent-rl">14. Teacher/Student 在 RL 中的其他含义</a></li>
+<li><a href="#15-vla-jepa">15. 对 VLA-JEPA 的准确总结</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Series 2: VLA architectures, training, and deployment</span><span data-lang="zh">知识链二：VLA 架构、训练方法与部署对照</span> · 13/14</p>
+          <h1>JEPA、World Model 与 VLA-JEPA</h1>
+          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 5 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 5 分钟阅读</span></p>
+          <p class="article-deck">理解 teacher/student/predictor、latent world-model supervision、leakage-free training 和联合 action loss。</p>
+          
+      <figure class="architecture-figure">
+        <div class="mxgraph" data-mxgraph="{&quot;highlight&quot;: &quot;#2f7f9f&quot;, &quot;nav&quot;: true, &quot;resize&quot;: true, &quot;toolbar&quot;: &quot;zoom layers lightbox&quot;, &quot;xml&quot;: &quot;&lt;mxfile host=\&quot;app.diagrams.net\&quot; modified=\&quot;2026-08-14T00:00:00.000Z\&quot; agent=\&quot;Codex\&quot; version=\&quot;24.7.17\&quot;&gt;\n  &lt;diagram id=\&quot;vla-jepa-structure\&quot; name=\&quot;VLA-JEPA Structure\&quot;&gt;\n    &lt;mxGraphModel dx=\&quot;1680\&quot; dy=\&quot;1050\&quot; grid=\&quot;1\&quot; gridSize=\&quot;10\&quot; guides=\&quot;1\&quot; tooltips=\&quot;1\&quot; connect=\&quot;1\&quot; arrows=\&quot;1\&quot; fold=\&quot;1\&quot; page=\&quot;1\&quot; pageScale=\&quot;1\&quot; pageWidth=\&quot;2100\&quot; pageHeight=\&quot;1450\&quot; math=\&quot;0\&quot; shadow=\&quot;0\&quot;&gt;\n      &lt;root&gt;\n        &lt;mxCell id=\&quot;0\&quot;/&gt;\n        &lt;mxCell id=\&quot;1\&quot; parent=\&quot;0\&quot;/&gt;\n\n        &lt;mxCell id=\&quot;title\&quot; value=\&quot;&amp;lt;b&amp;gt;VLA-JEPA — Latent World-Model Supervision + Flow-Matching Action Generation&amp;lt;/b&amp;gt;\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=26;fontColor=#172B4D;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;250\&quot; y=\&quot;20\&quot; width=\&quot;1600\&quot; height=\&quot;45\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;subtitle\&quot; value=\&quot;Teacher 只生成 future-latent 训练目标；Student 学习状态转移并生成动作。部署时仅保留 Qwen3-VL + DiT Action Head。\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;resizable=0;fontSize=14;fontColor=#5E6C84;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;350\&quot; y=\&quot;65\&quot; width=\&quot;1400\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n\n        &lt;mxCell id=\&quot;input_zone\&quot; value=\&quot;&amp;lt;b&amp;gt;1 · Training inputs&amp;lt;/b&amp;gt;\&quot; style=\&quot;swimlane;html=1;rounded=1;horizontal=1;startSize=38;fillColor=#F7F8F9;swimlaneFillColor=#FFFFFF;strokeColor=#B3BAC5;fontColor=#344563;fontSize=15;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;35\&quot; y=\&quot;115\&quot; width=\&quot;300\&quot; height=\&quot;1000\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;student_zone\&quot; value=\&quot;&amp;lt;b&amp;gt;2 · Online / Student VLA pathway · receives gradients&amp;lt;/b&amp;gt;\&quot; style=\&quot;swimlane;html=1;rounded=1;horizontal=1;startSize=38;fillColor=#E9F2FF;swimlaneFillColor=#FFFFFF;strokeColor=#4C9AFF;strokeWidth=2;fontColor=#0747A6;fontSize=16;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;365\&quot; y=\&quot;115\&quot; width=\&quot;860\&quot; height=\&quot;1000\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;teacher_zone\&quot; value=\&quot;&amp;lt;b&amp;gt;3 · Target / Teacher world-model supervision · training only&amp;lt;/b&amp;gt;\&quot; style=\&quot;swimlane;html=1;rounded=1;horizontal=1;startSize=38;fillColor=#F3F0FF;swimlaneFillColor=#FFFFFF;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontColor=#403294;fontSize=16;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;1255\&quot; y=\&quot;115\&quot; width=\&quot;800\&quot; height=\&quot;1000\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;output_zone\&quot; value=\&quot;&amp;lt;b&amp;gt;4 · Joint optimization and deployment&amp;lt;/b&amp;gt;\&quot; style=\&quot;swimlane;html=1;rounded=1;horizontal=1;startSize=38;fillColor=#F7F8F9;swimlaneFillColor=#FFFFFF;strokeColor=#B3BAC5;fontColor=#344563;fontSize=15;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;35\&quot; y=\&quot;1145\&quot; width=\&quot;2020\&quot; height=\&quot;250\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n\n        &lt;mxCell id=\&quot;current_images\&quot; value=\&quot;&amp;lt;b&amp;gt;Current multi-view images&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;I&amp;lt;sub&amp;gt;t&amp;lt;/sub&amp;gt; only&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#5E6C84&amp;quot;&amp;gt;student must not see future frames&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4C9AFF;strokeWidth=1.5;fontColor=#172B4D;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;65\&quot; y=\&quot;180\&quot; width=\&quot;240\&quot; height=\&quot;95\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;language\&quot; value=\&quot;&amp;lt;b&amp;gt;Language instruction&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;task / prompt\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4C9AFF;strokeWidth=1.5;fontColor=#172B4D;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;65\&quot; y=\&quot;310\&quot; width=\&quot;240\&quot; height=\&quot;75\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;state\&quot; value=\&quot;&amp;lt;b&amp;gt;Robot proprioceptive state&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;q&amp;lt;sub&amp;gt;t&amp;lt;/sub&amp;gt; · joints / gripper / pose\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#00B8D9;strokeWidth=1.5;fontColor=#006677;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;65\&quot; y=\&quot;470\&quot; width=\&quot;240\&quot; height=\&quot;90\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;gt_actions\&quot; value=\&quot;&amp;lt;b&amp;gt;Ground-truth robot actions&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;A&amp;lt;sub&amp;gt;0:H&amp;lt;/sub&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#BF2600&amp;quot;&amp;gt;robot-data training only&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBE6;strokeColor=#DE350B;strokeWidth=1.5;fontColor=#BF2600;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;65\&quot; y=\&quot;650\&quot; width=\&quot;240\&quot; height=\&quot;90\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;noise_time\&quot; value=\&quot;&amp;lt;b&amp;gt;Gaussian noise ε + flow time τ&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;construct noisy action A&amp;lt;sup&amp;gt;τ&amp;lt;/sup&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#7A3E00&amp;quot;&amp;gt;training / iterative inference&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0E0;strokeColor=#FF991F;strokeWidth=1.5;fontColor=#7A3E00;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;65\&quot; y=\&quot;780\&quot; width=\&quot;240\&quot; height=\&quot;100\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;future_video\&quot; value=\&quot;&amp;lt;b&amp;gt;Training video clip&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;I&amp;lt;sub&amp;gt;t0:tT&amp;lt;/sub&amp;gt; · current/history + future frames&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#403294&amp;quot;&amp;gt;future frames never enter Qwen/student&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F0FF;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontColor=#403294;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;65\&quot; y=\&quot;960\&quot; width=\&quot;240\&quot; height=\&quot;105\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n\n        &lt;mxCell id=\&quot;qwen\&quot; value=\&quot;&amp;lt;b&amp;gt;Qwen3-VL student / online backbone&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;SigLIP-2 vision encoder + Qwen3 language model&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#0747A6&amp;quot;&amp;gt;processes current images + instruction&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#DEEBFF;strokeColor=#0052CC;strokeWidth=2;fontColor=#0747A6;fontSize=15;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;425\&quot; y=\&quot;175\&quot; width=\&quot;330\&quot; height=\&quot;110\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;context_tokens\&quot; value=\&quot;&amp;lt;b&amp;gt;Vision-language context tokens&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;current scene semantics + task\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#E9F2FF;strokeColor=#4C9AFF;strokeWidth=1.5;fontColor=#0747A6;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;805\&quot; y=\&quot;180\&quot; width=\&quot;300\&quot; height=\&quot;90\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;latent_tokens\&quot; value=\&quot;&amp;lt;b&amp;gt;Learnable latent/action tokens&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;z&amp;lt;sub&amp;gt;t&amp;lt;/sub&amp;gt;: action-relevant transition representation&amp;lt;br&amp;gt;z&amp;lt;sub&amp;gt;a&amp;lt;/sub&amp;gt;: condition for physical action generation\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#B3D4FF;strokeColor=#0052CC;strokeWidth=2;fontColor=#0747A6;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;630\&quot; y=\&quot;330\&quot; width=\&quot;330\&quot; height=\&quot;110\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;state_encoder\&quot; value=\&quot;&amp;lt;b&amp;gt;State Encoder&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;q&amp;lt;sub&amp;gt;t&amp;lt;/sub&amp;gt; → state tokens\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#E6FCFF;strokeColor=#00B8D9;strokeWidth=1.5;fontColor=#006677;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;425\&quot; y=\&quot;510\&quot; width=\&quot;220\&quot; height=\&quot;80\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;noisy_action_encoder\&quot; value=\&quot;&amp;lt;b&amp;gt;Action Encoder + time embedding&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;(A&amp;lt;sup&amp;gt;τ&amp;lt;/sup&amp;gt;, τ) → noisy action tokens\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0E0;strokeColor=#FF991F;strokeWidth=2;fontColor=#7A3E00;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;425\&quot; y=\&quot;690\&quot; width=\&quot;250\&quot; height=\&quot;90\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;dit\&quot; value=\&quot;&amp;lt;b&amp;gt;DiT-B Flow-Matching Action Head&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;self-attention over state/action tokens&amp;lt;br&amp;gt;cross-attention to Qwen context / z&amp;lt;sub&amp;gt;a&amp;lt;/sub&amp;gt;&amp;lt;br&amp;gt;timestep-conditioned normalization\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE8CC;strokeColor=#FF991F;strokeWidth=2;fontColor=#7A3E00;fontSize=15;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;750\&quot; y=\&quot;620\&quot; width=\&quot;370\&quot; height=\&quot;140\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;velocity\&quot; value=\&quot;&amp;lt;b&amp;gt;Predicted flow velocity&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;v&amp;lt;sub&amp;gt;θ&amp;lt;/sub&amp;gt;(A&amp;lt;sup&amp;gt;τ&amp;lt;/sup&amp;gt;, τ | z&amp;lt;sub&amp;gt;a&amp;lt;/sub&amp;gt;, q&amp;lt;sub&amp;gt;t&amp;lt;/sub&amp;gt;)&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#7A3E00&amp;quot;&amp;gt;shape [B, H, D&amp;lt;sub&amp;gt;a&amp;lt;/sub&amp;gt;]&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE8CC;strokeColor=#FF991F;strokeWidth=2;fontColor=#7A3E00;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;805\&quot; y=\&quot;820\&quot; width=\&quot;300\&quot; height=\&quot;100\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;fm_loss\&quot; value=\&quot;&amp;lt;b&amp;gt;Action supervision L&amp;lt;sub&amp;gt;FM&amp;lt;/sub&amp;gt;&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;MSE(predicted velocity, target velocity)&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#BF2600&amp;quot;&amp;gt;requires labeled robot actions&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBE6;strokeColor=#DE350B;strokeWidth=2;fontColor=#BF2600;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;780\&quot; y=\&quot;975\&quot; width=\&quot;330\&quot; height=\&quot;95\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n\n        &lt;mxCell id=\&quot;teacher_encoder\&quot; value=\&quot;&amp;lt;b&amp;gt;Frozen V-JEPA2 Target Encoder&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;encodes each training-video timestep&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#403294&amp;quot;&amp;gt;stop-gradient · no optimizer update&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#EAE6FF;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontColor=#403294;fontSize=15;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;1515\&quot; y=\&quot;190\&quot; width=\&quot;300\&quot; height=\&quot;115\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;target_latents\&quot; value=\&quot;&amp;lt;b&amp;gt;Teacher world-state latent sequence&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;s&amp;lt;sub&amp;gt;t0:tT&amp;lt;/sub&amp;gt; = F(I&amp;lt;sub&amp;gt;t0:tT&amp;lt;/sub&amp;gt;)&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#403294&amp;quot;&amp;gt;history = causal input · future = target&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#EAE6FF;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontColor=#403294;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;1515\&quot; y=\&quot;350\&quot; width=\&quot;300\&quot; height=\&quot;100\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;world_predictor\&quot; value=\&quot;&amp;lt;b&amp;gt;Online Action-Conditioned World Predictor&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;history/current latent + z&amp;lt;sub&amp;gt;t&amp;lt;/sub&amp;gt;&amp;lt;br&amp;gt;→ predict future latent states&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#0747A6&amp;quot;&amp;gt;trainable Student component&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#DEEBFF;strokeColor=#0052CC;strokeWidth=2;fontColor=#0747A6;fontSize=15;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;1440\&quot; y=\&quot;555\&quot; width=\&quot;380\&quot; height=\&quot;125\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;pred_latents\&quot; value=\&quot;&amp;lt;b&amp;gt;Predicted future-state latents&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;ŝ&amp;lt;sub&amp;gt;t+1:t+T&amp;lt;/sub&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#0747A6&amp;quot;&amp;gt;semantic world transition prediction&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#DEEBFF;strokeColor=#0052CC;strokeWidth=1.5;fontColor=#0747A6;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;1440\&quot; y=\&quot;735\&quot; width=\&quot;300\&quot; height=\&quot;95\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;jepa_loss\&quot; value=\&quot;&amp;lt;b&amp;gt;World-model supervision L&amp;lt;sub&amp;gt;WM&amp;lt;/sub&amp;gt;&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;distance(ŝ&amp;lt;sub&amp;gt;future&amp;lt;/sub&amp;gt;, stopgrad(s&amp;lt;sub&amp;gt;future&amp;lt;/sub&amp;gt;))&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#403294&amp;quot;&amp;gt;latent prediction · no pixel reconstruction&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F0FF;strokeColor=#6554C0;strokeWidth=2;fontColor=#403294;fontSize=14;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;1510\&quot; y=\&quot;900\&quot; width=\&quot;360\&quot; height=\&quot;105\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;no_leak\&quot; value=\&quot;&amp;lt;b&amp;gt;Leakage-free rule&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;future frames cannot enter Qwen&amp;lt;br&amp;gt;time-causal mask blocks future latent input\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0F6;strokeColor=#FF5630;strokeWidth=1.5;dashed=1;fontColor=#BF2600;fontSize=13;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;1780\&quot; y=\&quot;520\&quot; width=\&quot;240\&quot; height=\&quot;105\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n\n        &lt;mxCell id=\&quot;total_loss\&quot; value=\&quot;&amp;lt;b&amp;gt;Joint training objective&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;L = L&amp;lt;sub&amp;gt;FM&amp;lt;/sub&amp;gt; + β · L&amp;lt;sub&amp;gt;WM&amp;lt;/sub&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#BF2600&amp;quot;&amp;gt;gradient updates Student/VLM, predictor and action head; never Target Encoder&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBE6;strokeColor=#DE350B;strokeWidth=2;fontColor=#BF2600;fontSize=15;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;500\&quot; y=\&quot;1195\&quot; width=\&quot;520\&quot; height=\&quot;120\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;euler\&quot; value=\&quot;&amp;lt;b&amp;gt;Inference: Euler integration / iterative denoising&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;noise → repeated DiT velocity updates → action chunk&amp;lt;br&amp;gt;&amp;lt;font color=&amp;quot;#006644&amp;quot;&amp;gt;standard setting: current observation + Qwen3-VL + DiT only&amp;lt;/font&amp;gt;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#E3FCEF;strokeColor=#36B37E;strokeWidth=2;fontColor=#006644;fontSize=15;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;1120\&quot; y=\&quot;1195\&quot; width=\&quot;540\&quot; height=\&quot;120\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;action_output\&quot; value=\&quot;&amp;lt;b&amp;gt;Robot action chunk&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;â&amp;lt;sub&amp;gt;0:H&amp;lt;/sub&amp;gt; [B, H, D&amp;lt;sub&amp;gt;a&amp;lt;/sub&amp;gt;]&amp;lt;br&amp;gt;unnormalize → execute / receding horizon\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#ABF5D1;strokeColor=#00875A;strokeWidth=2;fontColor=#006644;fontSize=15;spacing=8;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;1725\&quot; y=\&quot;1195\&quot; width=\&quot;280\&quot; height=\&quot;120\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n\n        &lt;mxCell id=\&quot;legend_student\&quot; value=\&quot;&amp;lt;b&amp;gt;Blue&amp;lt;/b&amp;gt; = trainable Student / online path\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#DEEBFF;strokeColor=#4C9AFF;fontColor=#0747A6;fontSize=12;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;65\&quot; y=\&quot;1335\&quot; width=\&quot;285\&quot; height=\&quot;35\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;legend_teacher\&quot; value=\&quot;&amp;lt;b&amp;gt;Purple dashed&amp;lt;/b&amp;gt; = Teacher target, training only\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#EAE6FF;strokeColor=#6554C0;dashed=1;fontColor=#403294;fontSize=12;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;370\&quot; y=\&quot;1335\&quot; width=\&quot;305\&quot; height=\&quot;35\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;legend_action\&quot; value=\&quot;&amp;lt;b&amp;gt;Orange&amp;lt;/b&amp;gt; = flow-matching action generation\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE8CC;strokeColor=#FF991F;fontColor=#7A3E00;fontSize=12;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;695\&quot; y=\&quot;1335\&quot; width=\&quot;305\&quot; height=\&quot;35\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;legend_infer\&quot; value=\&quot;&amp;lt;b&amp;gt;Green&amp;lt;/b&amp;gt; = deployment output path\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#E3FCEF;strokeColor=#36B37E;fontColor=#006644;fontSize=12;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;1020\&quot; y=\&quot;1335\&quot; width=\&quot;270\&quot; height=\&quot;35\&quot; as=\&quot;geometry\&quot;/&gt;\n        &lt;/mxCell&gt;\n\n        &lt;mxCell id=\&quot;e_img_qwen\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#4C9AFF;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;current_images\&quot; target=\&quot;qwen\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_lang_qwen\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#4C9AFF;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;language\&quot; target=\&quot;qwen\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_qwen_context\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;qwen\&quot; target=\&quot;context_tokens\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_qwen_latent\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;qwen\&quot; target=\&quot;latent_tokens\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_state_enc\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#00B8D9;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;state\&quot; target=\&quot;state_encoder\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_state_dit\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#00B8D9;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;state_encoder\&quot; target=\&quot;dit\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_gt_action_enc\&quot; value=\&quot;noising/interpolation\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#FF991F;strokeWidth=1.5;fontSize=11;fontColor=#7A3E00;\&quot; parent=\&quot;1\&quot; source=\&quot;gt_actions\&quot; target=\&quot;noisy_action_encoder\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_noise_action_enc\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#FF991F;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;noise_time\&quot; target=\&quot;noisy_action_encoder\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_action_dit\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#FF991F;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;noisy_action_encoder\&quot; target=\&quot;dit\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_context_dit\&quot; value=\&quot;cross-attention K/V\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#4C9AFF;strokeWidth=2;fontSize=11;fontColor=#0747A6;\&quot; parent=\&quot;1\&quot; source=\&quot;context_tokens\&quot; target=\&quot;dit\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_latent_dit\&quot; value=\&quot;z_a condition\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;fontSize=11;fontColor=#0747A6;\&quot; parent=\&quot;1\&quot; source=\&quot;latent_tokens\&quot; target=\&quot;dit\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_dit_velocity\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#FF991F;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;dit\&quot; target=\&quot;velocity\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_vel_fm\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#DE350B;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;velocity\&quot; target=\&quot;fm_loss\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_gt_fm\&quot; value=\&quot;target velocity\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#DE350B;strokeWidth=1.5;fontSize=11;fontColor=#BF2600;\&quot; parent=\&quot;1\&quot; source=\&quot;gt_actions\&quot; target=\&quot;fm_loss\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n\n        &lt;mxCell id=\&quot;e_future_teacher\&quot; value=\&quot;training only\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontSize=11;fontColor=#403294;\&quot; parent=\&quot;1\&quot; source=\&quot;future_video\&quot; target=\&quot;teacher_encoder\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_teacher_target\&quot; value=\&quot;stop-gradient\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontSize=11;fontColor=#403294;\&quot; parent=\&quot;1\&quot; source=\&quot;teacher_encoder\&quot; target=\&quot;target_latents\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_history_world\&quot; value=\&quot;past/current s only · causal teacher forcing\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6554C0;strokeWidth=1.5;dashed=1;fontSize=11;fontColor=#403294;\&quot; parent=\&quot;1\&quot; source=\&quot;target_latents\&quot; target=\&quot;world_predictor\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_latent_world\&quot; value=\&quot;transition/action representation\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;fontSize=11;fontColor=#0747A6;\&quot; parent=\&quot;1\&quot; source=\&quot;latent_tokens\&quot; target=\&quot;world_predictor\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_world_pred\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;world_predictor\&quot; target=\&quot;pred_latents\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_pred_jepa\&quot; value=\&quot;prediction\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#0052CC;strokeWidth=2;fontSize=11;fontColor=#0747A6;\&quot; parent=\&quot;1\&quot; source=\&quot;pred_latents\&quot; target=\&quot;jepa_loss\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_target_jepa\&quot; value=\&quot;teacher target\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6554C0;strokeWidth=2;dashed=1;fontSize=11;fontColor=#403294;\&quot; parent=\&quot;1\&quot; source=\&quot;target_latents\&quot; target=\&quot;jepa_loss\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n\n        &lt;mxCell id=\&quot;e_fm_total\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#DE350B;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;fm_loss\&quot; target=\&quot;total_loss\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_jepa_total\&quot; value=\&quot;β × L_WM\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6554C0;strokeWidth=2;fontSize=11;fontColor=#403294;\&quot; parent=\&quot;1\&quot; source=\&quot;jepa_loss\&quot; target=\&quot;total_loss\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_vel_euler\&quot; value=\&quot;repeat at inference\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#36B37E;strokeWidth=2;fontSize=11;fontColor=#006644;\&quot; parent=\&quot;1\&quot; source=\&quot;velocity\&quot; target=\&quot;euler\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;e_euler_output\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#00875A;strokeWidth=2;\&quot; parent=\&quot;1\&quot; source=\&quot;euler\&quot; target=\&quot;action_output\&quot; edge=\&quot;1\&quot;&gt;&lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;/&gt;&lt;/mxCell&gt;\n      &lt;/root&gt;\n    &lt;/mxGraphModel&gt;\n  &lt;/diagram&gt;\n&lt;/mxfile&gt;\n&quot;}"></div>
+        <figcaption>
+          <span data-lang="en">Architecture diagram · <a href="assets/diagrams/vla_jepa_structure.drawio" download>Download the Draw.io source</a></span>
+          <span data-lang="zh">配套结构图 · <a href="assets/diagrams/vla_jepa_structure.drawio" download>下载 Draw.io 原文件</a></span>
+        </figcaption>
+      </figure>
+    
+          <div class="article-content">
+            <p>JEPA 关注的不是重建每个未来像素，而是在 latent space 中预测目标表示。</p>
+<p>VLA-JEPA 则将这种预测监督引入 VLA，使视觉语言表示不仅能生成动作，还能表达与状态转移相关的动态信息。</p>
+<p>完整框图见 <a href="assets/diagrams/vla_jepa_structure.drawio">vla_jepa_structure.drawio</a>。</p>
+<h2 id="1-jepa">1. JEPA 的通用定义</h2>
+<p>JEPA 是 Joint-Embedding Predictive Architecture。通用结构是：</p>
+<pre><code class="language-text">可见 context
+  -&gt; Context/Online Encoder
+  -&gt; context representation
+  -&gt; Predictor
+  -&gt; predicted target latent
+           ↕ latent-space loss
+目标区域/未来数据
+  -&gt; Target Encoder
+  -&gt; target latent
+</code></pre>
+<p>target 不一定是未来：</p>
+<ul>
+<li>I-JEPA 可以预测同一图像的被遮挡区域表示；</li>
+<li>V-JEPA 可以预测视频中未来或被遮挡时空区域表示；</li>
+<li>VLA-JEPA 预测未来 world-state latent。</li>
+</ul>
+<p>因此更准确的定义是：</p>
+<blockquote>
+<p>根据可见 context 预测不可见 target 的 latent representation，而不是直接重建原始像素。</p>
+</blockquote>
+<h2 id="2-latent-pixels">2. 为什么预测 latent 而不是 pixels</h2>
+<p>像素变化可能来自：</p>
+<ul>
+<li>光照；</li>
+<li>背景；</li>
+<li>相机运动；</li>
+<li>纹理；</li>
+<li>与操作无关的人或物体。</li>
+</ul>
+<p>如果直接预测未来 pixels，loss 容易被这些高维细节支配。语义 latent 可以压缩低层噪声，更关注对象、动作和状态变化。</p>
+<p>但 latent 并不天然保证“只含正确语义”；最终学到什么仍取决于 target encoder、数据和预测任务。</p>
+<h2 id="3-teacher-student">3. Teacher 与 Student</h2>
+<p>典型 JEPA 经常有：</p>
+<pre><code class="language-text">Student/Context Encoder：处理部署可见信息，接收梯度
+Teacher/Target Encoder：产生稳定 target，不接收该 loss 的梯度
+</code></pre>
+<p>Teacher 参数来源有多种：</p>
+<ul>
+<li>student 参数的 EMA；</li>
+<li>已预训练并冻结的 encoder；</li>
+<li>更大或有 privileged information 的模型。</li>
+</ul>
+<p>因此“teacher 一定是固定预训练权重”并不是 JEPA 的通用定义。</p>
+<h2 id="4-predictor">4. Predictor 是什么</h2>
+<p>Predictor 根据 context latent 和相关条件预测 target latent：</p>
+<pre><code class="language-text">predicted_target = Predictor(context_latent, conditions)
+</code></pre>
+<p>它是 JEPA 的核心组件之一，但不一定是最终部署主干。很多 JEPA 训练结束后会丢弃 predictor，只保留学到好表示的 encoder。</p>
+<p>在 VLA-JEPA 中，world predictor 是训练辅助模块；部署 action policy 时可以移除。</p>
+<h2 id="5-world-model">5. World model 监督</h2>
+<p>world model 学习：</p>
+<pre><code class="language-text">当前/历史世界状态 + action-like condition
+  -&gt; 未来世界状态
+</code></pre>
+<p>如果在 latent space 中表示：</p>
+<pre><code class="language-text">s_t = Encoder(observation_t)
+s_hat_(t+1) = WorldPredictor(s_t, z_t)
+L_WM = distance(s_hat_(t+1), stopgrad(s_(t+1)))
+</code></pre>
+<p>这里：</p>
+<ul>
+<li><code>s_t</code> 是抽象 world-state latent；</li>
+<li><code>z_t</code> 是解释状态转移的 latent action/condition；</li>
+<li><code>s_(t+1)</code> 是 target encoder 从真实未来帧产生的监督目标；</li>
+<li>loss 不直接比较未来 RGB pixels。</li>
+</ul>
+<p>“world model 监督”就是用未来状态的真实 latent 约束模型，使中间表示包含可预测的动态结构。</p>
+<h2 id="6-vla-jepa-teacher">6. VLA-JEPA 的 Teacher 路径</h2>
+<p>论文中的 target encoder 是冻结的 V-JEPA2：</p>
+<pre><code class="language-text">training video frames I_t0:tT
+  -&gt; Frozen V-JEPA2 F
+  -&gt; world-state latents s_t0:tT
+</code></pre>
+<p>多视角特征会组合成统一 world-state representation。该路径：</p>
+<ul>
+<li>只在训练时使用；</li>
+<li>stop-gradient；</li>
+<li>不由 <code>L_WM</code> 更新；</li>
+<li>future frames 只用于构造 target。</li>
+</ul>
+<p>VLA-JEPA 不是两个同构 Qwen encoder 做 teacher/student。Qwen3-VL 是 online VLM，V-JEPA2 是异构的 frozen target encoder。</p>
+<h2 id="7-vla-jepa-studentonline">7. VLA-JEPA 的 Student/Online 路径</h2>
+<p>Qwen3-VL 只接收：</p>
+<pre><code class="language-text">当前多视角图像 I_t0
++ language instruction
++ learnable latent/action special tokens
+</code></pre>
+<p>特殊 <code>&lt;latent_i&gt;</code> token 的 hidden representations 记为：</p>
+<pre><code class="language-text">z_t0, z_t1, ..., z_t(T-1)
+</code></pre>
+<p>它们应该表达状态从一步到下一步如何变化，而不是压缩未来图像。</p>
+<h2 id="8-world-predictor-latent-action">8. World Predictor 如何使用 latent action</h2>
+<p>自回归 world predictor 接收：</p>
+<pre><code class="language-text">历史/当前 teacher world states s_t0:i
++ VLM latent actions z_t0:i
+</code></pre>
+<p>预测：</p>
+<pre><code class="language-text">s_hat_t1:i+1 = p_WM(s_t0:i, z_t0:i)
+</code></pre>
+<p>并计算：</p>
+<pre><code class="language-text">L_WM = Σ distance(s_hat_tk, stopgrad(s_tk))
+</code></pre>
+<p>因此不是直接要求：</p>
+<pre><code class="language-text">VLM hidden z_t == teacher future state s_t+1
+</code></pre>
+<p>而是要求：</p>
+<blockquote>
+<p><code>z_t</code> 必须提供足够的状态转移信息，使 world predictor 能从历史状态预测未来状态。</p>
+</blockquote>
+<h2 id="9-leakage-free">9. Leakage-free 为什么重要</h2>
+<p>如果 online VLM 同时看到未来帧，它可能把 <code>&lt;latent_i&gt;</code> 退化成“未来图像压缩包”，而不必学习动作或状态转移语义。</p>
+<p>VLA-JEPA 的约束是：</p>
+<pre><code class="language-text">未来 frames -&gt; 只能进入 frozen target path
+未来 frames -X-&gt; Qwen3-VL student
+</code></pre>
+<p>world predictor 的 time-causal mask 还保证预测某一时刻时，不能读取更未来的 target latent。</p>
+<p>这叫 leakage-free state prediction。</p>
+<h2 id="10-teacher-forcing-teacher-network">10. Teacher forcing 不等于 Teacher network</h2>
+<p>Teacher network 指提供 target 的 V-JEPA2 encoder。</p>
+<p>Teacher forcing 指训练自回归 predictor 时，使用真实历史 state latent 作为下一步输入：</p>
+<pre><code class="language-text">训练：用真实 s_t 预测 s_(t+1)
+自由 rollout：可能用预测 s_hat_t 继续预测下一步
+</code></pre>
+<p>二者只是都带 teacher 一词，概念不同。</p>
+<h2 id="11-action-generation">11. Action generation 路径</h2>
+<p>Qwen3-VL 还有一个 <code>&lt;action&gt;</code> token，其 hidden representation <code>z_a</code> 汇总：</p>
+<pre><code class="language-text">当前图像
+语言
+latent action tokens
+</code></pre>
+<p><code>z_a</code> 作为 DiT Action Head 的条件：</p>
+<pre><code class="language-text">robot state -&gt; State Encoder ------┐
+                                   ├-&gt; DiT-B -&gt; predicted flow velocity
+noisy action + flow time ----------┘
+                        ↑
+                    z_a condition
+</code></pre>
+<p>Flow loss：</p>
+<pre><code class="language-text">L_FM = MSE(v_pred, velocity_target)
+</code></pre>
+<h2 id="12">12. 两类数据和联合目标</h2>
+<h3 id="human-video">Human video</h3>
+<p>没有机器人 action label，只使用：</p>
+<pre><code class="language-text">L_WM
+</code></pre>
+<p>训练 latent action 和状态转移表示。</p>
+<h3 id="robot-demonstration">Robot demonstration</h3>
+<p>有图像、state 和 action，可以使用：</p>
+<pre><code class="language-text">L = L_FM + β L_WM
+</code></pre>
+<p>梯度关系：</p>
+<pre><code class="language-text">L_WM -&gt; world predictor + Qwen latent-action pathway
+L_FM -&gt; DiT Action Head + Qwen action-conditioning pathway
+共享 Qwen 参数同时受到两类目标影响
+Frozen V-JEPA2 永远不更新
+</code></pre>
+<h2 id="13">13. 推理时保留什么</h2>
+<p>机器人部署不需要未来视频 target，也不需要计算 world-model loss：</p>
+<pre><code class="language-text">保留：当前图像 + language -&gt; Qwen3-VL -&gt; z_a -&gt; DiT -&gt; action chunk
+
+移除：Frozen V-JEPA2 Target Encoder
+移除：World Predictor
+移除：future training video
+移除：L_WM
+</code></pre>
+<p>所以 world-model branch 的主要作用是训练表示，不是部署时在线预测未来画面或规划 rollout。</p>
+<h2 id="14-teacherstudent-rl">14. Teacher/Student 在 RL 中的其他含义</h2>
+<p>RL 中常见的 teacher/student 可能是：</p>
+<ul>
+<li>privileged teacher 使用仿真真值，student 只使用部署传感器；</li>
+<li>大 teacher policy 蒸馏到小 student policy；</li>
+<li>planner/expert 产生示范，student 模仿；</li>
+<li>target network 提供稳定 bootstrap target。</li>
+</ul>
+<p>Actor–Critic 不应简单等同于 teacher–student：Critic 评价 action，Actor 产生 action；二者有互相依赖的优化关系，但 Critic 不一定是一个固定老师。</p>
+<h2 id="15-vla-jepa">15. 对 VLA-JEPA 的准确总结</h2>
+<p>可以用下面一句话概括：</p>
+<blockquote>
+<p>冻结 V-JEPA2 将训练视频编码为 future world-state targets；Qwen3-VL 从当前图像和语言产生 latent-action representations；World Predictor 利用历史状态和这些 latent actions 预测 future latents，并以 <code>L_WM</code> 监督；机器人数据上再通过 <code>&lt;action&gt;</code> condition 和 DiT 计算 <code>L_FM</code>，两种 loss 联合训练共享 VLM，部署时只保留 VLM 与 Action Head。</p>
+</blockquote>
+<p>参考论文：<a href="https://arxiv.org/abs/2602.10098">VLA-JEPA: Enhancing Vision-Language-Action Model with Latent World Model</a>。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="12-vlash-principles-async-runtime.html">← 12. VLASH：Temporal Offset 与异步执行</a>
+            <a href="14-architecture-comparison-reading-guide.html">14. PI0.5、GR00T、VLASH 与 VLA-JEPA 对照 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+    <script src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+  </body>
+</html>

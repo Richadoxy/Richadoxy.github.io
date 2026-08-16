@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="理解 YAML 如何展开成 TrainConfig、DataConfig，以及 BrainCo policy 层如何定义机器人数据语义。" />
+    <title>配置系统：从 YAML 到 DataConfig | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1-yaml">1. YAML 如何进入程序</a></li>
+<li><a href="#2-trainconfig">2. TrainConfig 是总配置</a></li>
+<li><a href="#3-configdata-dataconfig">3. config.data 还不是最终 DataConfig</a></li>
+<li><a href="#4-lerobotbraincodataconfigcreate">4. LeRobotBrainCoDataConfig.create() 做什么</a></li>
+<li><a href="#5-brainco_policy">5. brainco_policy 的作用</a></li>
+<li><a href="#6-28d">6. 当前 28D 配置的展开结果</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Series 1: Adapting OpenPI / π0.5 for 56D dual-arm dual-hand training</span><span data-lang="zh">知识链一：OpenPI / π0.5 的 56D 双臂双手改造</span> · 02/14</p>
+          <h1>配置系统：从 YAML 到 DataConfig</h1>
+          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 2 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 2 分钟阅读</span></p>
+          <p class="article-deck">理解 YAML 如何展开成 TrainConfig、DataConfig，以及 BrainCo policy 层如何定义机器人数据语义。</p>
+          
+          <div class="article-content">
+            <p>配置系统负责回答三个问题：</p>
+<ol>
+<li>训练什么模型？</li>
+<li>使用什么数据和 transform？</li>
+<li>用什么训练超参数、权重和保存规则？</li>
+</ol>
+<h2 id="1-yaml">1. YAML 如何进入程序</h2>
+<p>执行：</p>
+<pre><code class="language-bash">python3 scripts/train.py path/to/config.yaml
+</code></pre>
+<p>入口会调用 <a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/training/config.py"><code>config.cli()</code></a>：</p>
+<pre><code class="language-python">if len(sys.argv) == 2 and pathlib.Path(sys.argv[1]).suffix in (&quot;.yaml&quot;, &quot;.yml&quot;):
+    return config_io.load_train_config(sys.argv[1])
+</code></pre>
+<p>因此 YAML 不会留在普通字典阶段，而是被反序列化成有类型的对象树：</p>
+<pre><code class="language-text">YAML
+  -&gt; TrainConfig
+       ├─ model: Pi0Config
+       ├─ data: LeRobotBrainCoDataConfig
+       ├─ optimizer
+       ├─ lr_schedule
+       ├─ weight_loader
+       └─ batch、step、checkpoint 等设置
+</code></pre>
+<h2 id="2-trainconfig">2. <code>TrainConfig</code> 是总配置</h2>
+<p><a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/training/config.py"><code>TrainConfig</code></a> 包含：</p>
+<ul>
+<li><code>model</code>：<code>action_dim</code>、<code>action_horizon</code>、PI0.5 变体等。</li>
+<li><code>data</code>：数据集位置及 BrainCo 数据规则。</li>
+<li><code>weight_loader</code>：从哪里加载预训练参数。</li>
+<li><code>optimizer</code>、<code>lr_schedule</code>：如何更新参数。</li>
+<li><code>freeze_strategy</code>：哪些参数允许训练。</li>
+<li><code>batch_size</code>、<code>num_train_steps</code>：训练规模。</li>
+<li><code>checkpoint_dir</code>：保存位置。</li>
+</ul>
+<p>可以把它看成一次实验的“总施工图”。</p>
+<h2 id="3-configdata-dataconfig">3. <code>config.data</code> 还不是最终 DataConfig</h2>
+<p>YAML 加载完成后：</p>
+<pre><code class="language-python">config.data
+</code></pre>
+<p>通常是一个 <code>LeRobotBrainCoDataConfig</code>，它是 <code>DataConfigFactory</code>，也就是“数据配置工厂”。</p>
+<p>真正展开发生在：</p>
+<pre><code class="language-python">data_config = config.data.create(config.assets_dirs, config.model)
+</code></pre>
+<p>输入：</p>
+<ul>
+<li><code>config.assets_dirs</code>：归一化统计量等 assets 的默认目录。</li>
+<li><code>config.model</code>：模型类型、<code>action_dim</code>、<code>max_token_len</code> 等。</li>
+</ul>
+<p>输出：</p>
+<ul>
+<li>一个完整的 <code>DataConfig</code>。</li>
+</ul>
+<p>注意：这里返回的不是 DataLoader，也没有立即读取数据。它只是把数据路径、归一化统计量和 transform 顺序准备好。</p>
+<h2 id="4-lerobotbraincodataconfigcreate">4. <code>LeRobotBrainCoDataConfig.create()</code> 做什么</h2>
+<p><a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/training/config.py"><code>LeRobotBrainCoDataConfig</code></a> 依次完成：</p>
+<pre><code class="language-text">校验 policy_io
+  -&gt; 创建原始字段重排规则
+  -&gt; 创建 BrainCo 专属输入/输出 transforms
+  -&gt; 可选地执行 70D -&gt; 56D 转换
+  -&gt; 可选地执行 absolute -&gt; delta 动作转换
+  -&gt; 根据 PI0.5/ACT 创建模型 transforms
+  -&gt; 加载 norm stats
+  -&gt; 返回 DataConfig
+</code></pre>
+<p>最终 <code>DataConfig</code> 中最重要的是三组 transform：</p>
+<table>
+<thead>
+<tr>
+<th>transform 组</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>repack_transforms</code></td>
+<td>把数据集原始 key 改成统一 key</td>
+</tr>
+<tr>
+<td><code>data_transforms</code></td>
+<td>BrainCo 关节、相机和 delta/absolute 语义转换</td>
+</tr>
+<tr>
+<td><code>model_transforms</code></td>
+<td>resize、tokenize、padding 等模型输入处理</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-brainco_policy">5. <code>brainco_policy</code> 的作用</h2>
+<p><a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/policies/brainco_policy.py"><code>brainco_policy.py</code></a> 集中保存 BrainCo 机器人的数据语义：</p>
+<ul>
+<li><code>BrainCoPolicyIOConfig</code>：描述 state/action 由哪些关节组组成。</li>
+<li><code>BrainCoRevo3EefJointHandToJointHand</code>：将特定 70D 布局转换成 56D。</li>
+<li><code>BrainCoInputs</code>：把相机、state、prompt 转成模型统一字段。</li>
+<li><code>BrainCoOutputs</code>：推理时把模型 action 转回 BrainCo 输出格式。</li>
+</ul>
+<p><code>policy_io</code> 首先是语义合同和校验器。例如 28D：</p>
+<pre><code class="language-text">state_groups  = right_arm(7) + right_hand(21)
+action_groups = right_arm(7) + right_hand(21)
+</code></pre>
+<p>它不会自动把任意 70D 数据变成任意 28D。实际裁剪必须由明确的 transform 完成，或者数据集本身已经是 28D。</p>
+<h2 id="6-28d">6. 当前 28D 配置的展开结果</h2>
+<p>以 <a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/training/training_config_template/0716_pi05_28D_slow_right28_lora_vlm_only.yaml"><code>0716_pi05_28D_slow_right28_lora_vlm_only.yaml</code></a> 为例：</p>
+<pre><code class="language-text">model.action_dim       = 28
+model.action_horizon   = 16
+model.max_token_len    = 256
+data.policy_io         = right_arm + right_hand
+extra_delta_transform = true
+delta_action_groups    = right_arm
+</code></pre>
+<p>这表示右臂 7 维使用 delta action，右手 21 维保留 absolute action。</p>
+<p>下一章继续看最终的 <code>DataConfig</code> 如何真正产生 batch。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="01-train-entry-and-jax.html">← 01. 训练入口与 JAX</a>
+            <a href="03-data-pipeline-and-batch.html">03. 数据流水线与 batch →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+    
+  </body>
+</html>

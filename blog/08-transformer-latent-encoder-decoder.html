@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="建立 token、hidden width、latent、encoder、decoder 和参数量之间的基础概念坐标系。" />
+    <title>Transformer、Encoder/Decoder 与 Latent | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1-transformer">1. Transformer 是什么</a></li>
+<li><a href="#2">2. 参数量和隐藏宽度不是一回事</a></li>
+<li><a href="#3-token-hidden-vector">3. Token 是位置，hidden vector 是该位置的内部表示</a></li>
+<li><a href="#4-hidden-space-latent">4. Hidden space 和 latent 的关系</a></li>
+<li><a href="#5-encoder-decoder">5. Encoder 和 Decoder 的通用含义</a><ul>
+<li><a href="#51-encoderdecoder-transformer">5.1 经典 Encoder–Decoder Transformer</a></li>
+<li><a href="#52-decoder-only">5.2 Decoder-only 大语言模型</a></li>
+<li><a href="#53-encoder">5.3 视觉 Encoder</a></li>
+<li><a href="#54-action-encoder-decoder">5.4 Action Encoder / Decoder</a></li>
+<li><a href="#55-action_in_proj-encoder">5.5 为什么 action_in_proj 通常不单独叫 Encoder</a></li>
+</ul>
+</li>
+<li><a href="#6-tokenizer-encoder">6. Tokenizer 不属于神经网络 Encoder</a></li>
+<li><a href="#7-encoderdecoder">7. 看到 Encoder/Decoder 时的判断方法</a></li>
+<li><a href="#8">8. 与后续模型的对应关系</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Series 2: VLA architectures, training, and deployment</span><span data-lang="zh">知识链二：VLA 架构、训练方法与部署对照</span> · 08/14</p>
+          <h1>Transformer、Encoder/Decoder 与 Latent</h1>
+          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 5 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 5 分钟阅读</span></p>
+          <p class="article-deck">建立 token、hidden width、latent、encoder、decoder 和参数量之间的基础概念坐标系。</p>
+          
+          <div class="article-content">
+            <p>这一章把后续理解 PI0.5、GR00T、VLASH 和 VLA-JEPA 所需的基础词汇放在同一条链路中：</p>
+<pre><code class="language-text">原始数据
+  -&gt; 预处理 / tokenizer
+  -&gt; encoder 或输入投影
+  -&gt; token hidden representations
+  -&gt; Transformer 计算
+  -&gt; decoder 或输出投影
+  -&gt; 任务输出
+</code></pre>
+<h2 id="1-transformer">1. Transformer 是什么</h2>
+<p>Transformer 是一种神经网络架构，不是 PyTorch、JAX 那样的软件框架。</p>
+<p>它的典型层由以下组件组成：</p>
+<pre><code class="language-text">输入 hidden states
+  -&gt; Norm
+  -&gt; Attention
+  -&gt; Residual
+  -&gt; Norm
+  -&gt; Feed-Forward Network
+  -&gt; Residual
+</code></pre>
+<p>其中 Attention 负责不同 token 之间的信息交换，Feed-Forward Network 负责对每个 token 的特征进行非线性变换。</p>
+<p>Gemma 2B、Gemma 300M、Qwen3-VL、SigLIP 的 Vision Transformer，以及 GR00T 的 DiT，都使用了 Transformer 类组件，但输入类型、attention 连接方式和输出目标并不相同。</p>
+<p>Transformer 之外还有 CNN、RNN/LSTM、状态空间模型、图神经网络和 MLP-Mixer 等架构。现代 VLA 往往不是只用一种架构，而是将视觉编码器、VLM 和动作生成网络组合起来。</p>
+<h2 id="2">2. 参数量和隐藏宽度不是一回事</h2>
+<p>“Gemma 2B”中的 2B 表示整个模型大约有 20 亿个可训练参数，包括：</p>
+<ul>
+<li>token embedding；</li>
+<li>每层 Q/K/V/O 投影；</li>
+<li>Feed-Forward Network；</li>
+<li>normalization；</li>
+<li>输出层等。</li>
+</ul>
+<p>“宽度 2048”表示每一个 token 在层内由 2048 个数表示：</p>
+<pre><code class="language-text">一个 token hidden vector: [2048]
+一段 L 个 token:          [L, 2048]
+一个 batch:               [B, L, 2048]
+</code></pre>
+<p>因此：</p>
+<pre><code class="language-text">2B   = 整个模型一共有多少参数
+2048 = 每个 token 的隐藏表示有多宽
+</code></pre>
+<p>2048 是 Gemma 2B 这个具体配置的模型宽度，不是所有 VLM 的固定输入维度。不同模型可以是 768、1024、1536、2048、4096 等宽度。</p>
+<p>PI0.5 中，SigLIP 输出的 image tokens 需要被投影到 2048 维，才能进入 Gemma 2B prefix expert。Action Expert 则使用 1024 维 hidden representation。</p>
+<h2 id="3-token-hidden-vector">3. Token 是位置，hidden vector 是该位置的内部表示</h2>
+<p>一个 token 不一定是一个单词。它可以表示：</p>
+<ul>
+<li>一段文本子词；</li>
+<li>一个图像 patch；</li>
+<li>一个 action chunk 中的一个动作时间步；</li>
+<li>当前机器人 state；</li>
+<li>特殊的 <code>&lt;action&gt;</code> 或 <code>&lt;latent_i&gt;</code> 位置。</li>
+</ul>
+<p>例如 PI0.5 中：</p>
+<pre><code class="language-text">3 路图像 × 每路 256 patch positions
+  -&gt; 768 个 image tokens
+  -&gt; hidden shape [B, 768, 2048]
+
+H 个 noisy-action 时间步
+  -&gt; H 个 action tokens
+  -&gt; hidden shape [B, H, 1024]
+</code></pre>
+<p>这里 <code>[B,L,2048]</code> 是一次前向计算产生的 activation/hidden states，不是模型权重。模型权重是把这些 hidden states 映射成 Q/K/V、FFN 输出等结果的矩阵。</p>
+<h2 id="4-hidden-space-latent">4. Hidden space 和 latent 的关系</h2>
+<p><code>hidden representation</code> 强调它是网络中间层的数值张量；<code>latent representation</code> 强调它是对原始数据的压缩或抽象表达。</p>
+<p>很多场景中，同一张量既可以叫 hidden，也可以叫 latent：</p>
+<pre><code class="language-text">图像 patch -&gt; SigLIP -&gt; image hidden/latent features
+token IDs  -&gt; Gemma  -&gt; text hidden representations
+noisy action -&gt; projection/Transformer -&gt; action hidden/latent features
+</code></pre>
+<p>但不能简单地说“整个 prefix 就是一个 latent”。更准确的是：</p>
+<pre><code class="language-text">prefix 是一段序列区域
+prefix 内含很多 image/text/state hidden representations
+这些 hidden representations 可以统称为 latent features
+</code></pre>
+<p>同理，suffix 是动作序列区域，其中每个位置都有自己的 action hidden representation。</p>
+<h2 id="5-encoder-decoder">5. Encoder 和 Decoder 的通用含义</h2>
+<p>最宽泛的抽象是：</p>
+<pre><code class="language-text">原始输入 --Encoder--&gt; 内部表示 --Decoder--&gt; 目标输出
+</code></pre>
+<p>但论文中的命名取决于模型层级，不能只根据“输入映射”和“输出映射”判断。</p>
+<h3 id="51-encoderdecoder-transformer">5.1 经典 Encoder–Decoder Transformer</h3>
+<p>机器翻译模型可以是：</p>
+<pre><code class="language-text">源语言 tokens
+  -&gt; Transformer Encoder
+  -&gt; source memory
+  -&gt; Transformer Decoder 自回归生成
+  -&gt; 目标语言 tokens
+</code></pre>
+<p>Decoder 一方面读取已经生成的目标 token，另一方面通过 cross-attention 读取 Encoder memory。</p>
+<h3 id="52-decoder-only">5.2 Decoder-only 大语言模型</h3>
+<p>Gemma、Llama 等现代大语言模型通常是 decoder-only：</p>
+<pre><code class="language-text">已有 tokens -&gt; causal Transformer -&gt; 预测下一个 token
+</code></pre>
+<p>它不需要独立的 Transformer Encoder，因为 prompt 和历史输出放在同一个 causal sequence 中。它仍然可以“理解输入并生成输出”，但架构分类是 decoder-only。</p>
+<h3 id="53-encoder">5.3 视觉 Encoder</h3>
+<p>SigLIP 接收像素并产生 image tokens，所以称为 Vision Encoder：</p>
+<pre><code class="language-text">pixels -&gt; patch embedding + Vision Transformer -&gt; image features
+</code></pre>
+<p>这是一个完整的、具有多层表示学习能力的编码网络。</p>
+<h3 id="54-action-encoder-decoder">5.4 Action Encoder / Decoder</h3>
+<p>GR00T 的命名层级是“动作模态适配器”：</p>
+<pre><code class="language-text">raw/noisy action -&gt; embodiment-specific Action Encoder -&gt; DiT tokens
+DiT hidden       -&gt; embodiment-specific Action Decoder -&gt; action velocity
+</code></pre>
+<p>因此这里的 Encoder/Decoder 指动作空间和 DiT hidden space 之间的双向接口，不是语言模型意义上的 Transformer Encoder/Decoder。</p>
+<h3 id="55-action_in_proj-encoder">5.5 为什么 <code>action_in_proj</code> 通常不单独叫 Encoder</h3>
+<p>PI0.5 的：</p>
+<pre><code class="language-text">action_in_proj  = Linear(D, 1024)
+action_out_proj = Linear(1024, D)
+</code></pre>
+<p>从最宽泛功能看，它们确实做了编码和解码；但它们只是一个线性投影层，没有独立的深层表示学习结构，所以代码和论文通常称为 input/output projection，而不是完整的 Action Encoder/Decoder。</p>
+<p>GR00T 的 embodiment-specific Action Encoder/Decoder 含有多层、非线性和不同机器人的参数选择逻辑，因此采用 Encoder/Decoder 命名更自然。</p>
+<h2 id="6-tokenizer-encoder">6. Tokenizer 不属于神经网络 Encoder</h2>
+<p>Tokenizer 做的是离散符号预处理：</p>
+<pre><code class="language-text">文本 -&gt; token IDs
+</code></pre>
+<p>它通常没有 Transformer 层，也不把文本变成语义 hidden vector。真正把 token ID 变成 hidden representation 的是 embedding 层和后续 Transformer。</p>
+<p>所以：</p>
+<pre><code class="language-text">Tokenizer：符号切分和编号
+Embedding：ID 查表得到初始向量
+Transformer：让向量结合上下文形成语义表示
+</code></pre>
+<h2 id="7-encoderdecoder">7. 看到 Encoder/Decoder 时的判断方法</h2>
+<p>遇到一个名为 Encoder 或 Decoder 的模块，依次问：</p>
+<ol>
+<li>它处理的原始模态是什么：文本、图像、state 还是 action？</li>
+<li>它输出的是 token sequence、单个 latent，还是最终任务结果？</li>
+<li>它是完整多层网络，还是只有一个 projection？</li>
+<li>这里讨论的是整个模型结构，还是某个模态的输入/输出适配器？</li>
+</ol>
+<p>不要仅凭名称判断它在全模型中的地位。</p>
+<h2 id="8">8. 与后续模型的对应关系</h2>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>输入表示</th>
+<th>核心 Transformer</th>
+<th>输出表示</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PI0.5</td>
+<td>SigLIP image tokens、Gemma text/state tokens、action projection</td>
+<td>Gemma Prefix Expert + Action Expert</td>
+<td>flow velocity</td>
+</tr>
+<tr>
+<td>GR00T</td>
+<td>Qwen VLM memory、state/action tokens</td>
+<td>AlternateVLDiT</td>
+<td>flow velocity</td>
+</tr>
+<tr>
+<td>VLASH</td>
+<td>沿用原 VLA 输入，但将 state/action 对齐到未来 offset</td>
+<td>通常不改变 backbone</td>
+<td>temporally aligned action chunk</td>
+</tr>
+<tr>
+<td>VLA-JEPA</td>
+<td>当前图像/语言、latent/action tokens、state/action tokens</td>
+<td>Qwen3-VL + world predictor + DiT</td>
+<td>future latent prediction + action velocity</td>
+</tr>
+</tbody>
+</table>
+<p>下一章继续解释这些 token 如何通过 QKV、self-attention、cross-attention、多专家 attention 和条件调制交换信息。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="07-vlash-integration.html">← 07. VLASH 在 BrainCo-IL 中的集成</a>
+            <a href="09-attention-multi-expert-conditioning.html">09. QKV、Attention、多专家与条件注入 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+    
+  </body>
+</html>
