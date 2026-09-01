@@ -47,11 +47,10 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Series 1: Adapting OpenPI / π0.5 for 56D dual-arm dual-hand training</span><span data-lang="zh">知识链一：OpenPI / π0.5 的 56D 双臂双手改造</span> · 01/14</p>
+          <p class="article-series"><span data-lang="en">Series 1: Adapting OpenPI / π0.5 for 56D dual-arm dual-hand training</span><span data-lang="zh">知识链一：OpenPI / π0.5 的 56D 双臂双手改造</span> · 01/16</p>
           <h1>训练入口与 JAX</h1>
           <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 2 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 2 分钟阅读</span></p>
           <p class="article-deck">从 scripts/train.py 出发，梳理 JAX 编译缓存、PRNG、mesh、sharding、checkpoint 与训练循环。</p>
-          
           <div class="article-content">
             <p>训练入口是 <a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/scripts/train.py"><code>scripts/train.py</code></a>。文件末尾只有一条主入口：</p>
 <pre><code class="language-python">if __name__ == &quot;__main__&quot;:
@@ -163,6 +162,5 @@ batch = next(data_iter)
       </main>
     </div>
     <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
-    
   </body>
 </html>

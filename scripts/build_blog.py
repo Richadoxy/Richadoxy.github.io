@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the static Learning Journey blog from the BrainCo-IL Markdown notes."""
+"""Build the static Learning Journey blog from bundled and upstream Markdown notes."""
 
 from __future__ import annotations
 
@@ -23,6 +23,8 @@ class Post:
     summary: str
     chain: str
     diagram: str | None = None
+    published_en: str = "August 2026"
+    published_zh: str = "2026.08"
 
 
 POSTS = [
@@ -40,6 +42,26 @@ POSTS = [
     Post(12, "12_vlash_principles_and_async_runtime.md", "12-vlash-principles-async-runtime", "VLASH：Temporal Offset 与异步执行", "从同步推理瓶颈出发，理解 offset augmentation、future state、异步 inference/actor 通信与 chunk handoff。", "vla", "vlash.drawio"),
     Post(13, "13_jepa_and_vla_jepa.md", "13-jepa-vla-jepa", "JEPA、World Model 与 VLA-JEPA", "理解 teacher/student/predictor、latent world-model supervision、leakage-free training 和联合 action loss。", "vla", "vla_jepa_structure.drawio"),
     Post(14, "14_architecture_comparison_and_reading_guide.md", "14-architecture-comparison-reading-guide", "PI0.5、GR00T、VLASH 与 VLA-JEPA 对照", "把架构、异步框架和 world-model supervision 放到正确层级，并形成一套阅读新 VLA 工作的检查顺序。", "vla"),
+    Post(
+        15,
+        "15_tvl_paper_reading_notes.md",
+        "15-tvl-touch-vision-language-alignment",
+        "TVL 精读：从触觉表征到 LLaMA",
+        "从 DIGIT 触觉输入出发，串联 CLIP 对齐、InfoNCE、跨模态检索、projector、gate 与 LLaMA 多模态生成。",
+        "tactile",
+        published_en="September 2026",
+        published_zh="2026.09",
+    ),
+    Post(
+        16,
+        "16_tactile_vla_reading_guide.md",
+        "16-tactile-vla-reading-guide",
+        "触觉 VLA 与模仿学习阅读路线",
+        "按表征与数据、Language-Action、力控闭环、灵巧手和前沿专题，组织触觉 VLA 论文的渐进阅读顺序。",
+        "tactile",
+        published_en="September 2026",
+        published_zh="2026.09",
+    ),
 ]
 
 
@@ -54,6 +76,43 @@ CHAINS = {
         "title_en": "Series 2: VLA architectures, training, and deployment",
         "description": "从 VLASH 集成继续向外扩展，对比 attention、flow matching、GR00T、异步运行、JEPA 和不同 VLA 架构的共同点与边界。",
     },
+    "tactile": {
+        "title": "知识链三：触觉表征、VTLA 与接触丰富操作",
+        "title_en": "Series 3: Tactile representation, VTLA, and contact-rich manipulation",
+        "description": "从触觉—视觉—语言表征对齐出发，逐步进入触觉 VLA、闭环力控和灵巧手操作。",
+    },
+}
+
+
+PAPER_LINKS = {
+    "Fu et al. - 2024 - A Touch Vision and Language Dataset for Multimodal Alignment.pdf": "https://proceedings.mlr.press/v235/fu24b.html",
+    "Cheng et al. - 2024 - Touch100k A Large-Scale Touch-Language-Vision Dataset.pdf": "https://arxiv.org/abs/2406.03813",
+    "Yu et al. - 2024 - Octopi Object Property Reasoning with Large Tactile-Language Models.pdf": "https://arxiv.org/abs/2405.02794",
+    "Feng et al. - 2025 - AnyTouch Unified Static-Dynamic Representation across Visuo-tactile Sensors.pdf": "https://arxiv.org/abs/2502.12191",
+    "Jones 等 - 2025 - Beyond Sight Finetuning Generalist Robot Policies with Heterogeneous Sensors via Language Grounding.pdf": "https://arxiv.org/abs/2501.04693",
+    "Hao et al. - 2025 - TLA Tactile-Language-Action Model for Contact-Rich Manipulation.pdf": "https://arxiv.org/abs/2503.08548",
+    "Zhang et al. - 2025 - VTLA Vision-Tactile-Language-Action Model with Preference Learning.pdf": "https://arxiv.org/abs/2505.09577",
+    "Bi et al. - 2025 - VLA-Touch Enhancing Vision-Language-Action Models with Dual-Level Tactile Feedback.pdf": "https://arxiv.org/abs/2507.17294",
+    "Cheng et al. - 2025 - OmniVTLA Vision-Tactile-Language-Action Models with Semantic-Aligned Tactile Sensing.pdf": "https://arxiv.org/abs/2508.08706",
+    "Huang et al. - 2025 - Tactile-VLA Unlocking Physical Knowledge for Tactile Generalization.pdf": "https://arxiv.org/abs/2507.09160",
+    "Yu et al. - 2025 - ForceVLA Enhancing VLA Models with a Force-aware MoE for Contact-rich Manipulation.pdf": "https://arxiv.org/abs/2505.22159",
+    "Ye et al. - 2025 - Learning to Feel the Future DreamTacVLA.pdf": "https://arxiv.org/abs/2512.23864",
+    "Huang et al. - 2026 - TaF-VLA Tactile-Force Alignment in VLA Models.pdf": "https://arxiv.org/abs/2601.20321",
+    "Zhao et al. - 2026 - FD-VLA Force-Distilled Vision-Language-Action Model.pdf": "https://arxiv.org/abs/2602.02142",
+    "Li et al. - 2026 - ForceVLA2 Hybrid Force-Position Control with Force Awareness.pdf": "https://arxiv.org/abs/2603.15169",
+    "Zhang et al. - 2026 - TacVLA Contact-Aware Tactile Fusion for Robust VLA Manipulation.pdf": "https://arxiv.org/abs/2603.12665",
+    "Li et al. - 2026 - AT-VLA Adaptive Tactile Injection for Enhanced Feedback Reaction.pdf": "https://arxiv.org/abs/2605.07308",
+    "Zhang et al. - 2026 - Feeling the Unexpected ResTacVLA via Residual Tactile Representation.pdf": "https://arxiv.org/abs/2607.03387",
+    "Wang et al. - 2026 - ViTaR Visuo-Tactile Residual Adaptation for Foundation VLA Manipulation.pdf": "https://arxiv.org/abs/2608.15816",
+    "Zhou et al. - 2026 - TacForcing Streaming Action Generation with Execution-Time Tactile Feedback.pdf": "https://arxiv.org/abs/2608.25798",
+    "Cui et al. - 2025 - End-to-End Dexterous Arm-Hand VLA Policies via Shared Autonomy.pdf": "https://arxiv.org/abs/2511.00139",
+    "Tang et al. - 2026 - Towards Human-Like Manipulation with MoDE-VLA.pdf": "https://arxiv.org/abs/2603.08122",
+    "Wu et al. - 2026 - Tabero Learning Gentle Manipulation with Vision Touch and Language（复件）.pdf": "https://arxiv.org/abs/2605.27886",
+    "Liu et al. - 2025 - MLA A Multisensory Language-Action Model.pdf": "https://arxiv.org/abs/2509.26642",
+    "Tian et al. - 2026 - VT-WAM Visual-Tactile World Action Model.pdf": "https://arxiv.org/abs/2607.02503",
+    "NeoteAI and Fudan TEAI - 2026 - N0-VTLA Scaling with Latent Tactile Tokens.pdf": "https://arxiv.org/abs/2607.23782",
+    "Van der Merwe et al. - 2026 - TAP-VLA Tactile Annotation Prompting for VLA Models.pdf": "https://arxiv.org/abs/2606.29089",
+    "Gubernatorov et al. - 2026 - HapticVLA Contact-Rich Manipulation without Inference-Time Tactile Sensing.pdf": "https://arxiv.org/abs/2603.15257",
 }
 
 
@@ -79,7 +138,10 @@ def rewrite_links(text: str, posts_by_source: dict[str, Post]) -> str:
 
     def replace(match: re.Match[str]) -> str:
         label, target = match.group(1), match.group(2)
-        if target in posts_by_source:
+        normalized_target = target.removeprefix("<").removesuffix(">")
+        if normalized_target in PAPER_LINKS:
+            target = PAPER_LINKS[normalized_target]
+        elif target in posts_by_source:
             target = f"{posts_by_source[target].slug}.html"
         elif target.endswith(".drawio"):
             target = f"assets/diagrams/{Path(target).name}"
@@ -93,6 +155,20 @@ def rewrite_links(text: str, posts_by_source: dict[str, Post]) -> str:
 def reading_time(source_text: str) -> int:
     units = re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9_]+", source_text)
     return max(2, round(len(units) / 350))
+
+
+def protect_math(text: str) -> tuple[str, dict[str, str]]:
+    """Keep MathJax delimiters from being consumed as Markdown escapes."""
+    replacements = {
+        "MATHDISPLAYOPEN42": r"\[",
+        "MATHDISPLAYCLOSE42": r"\]",
+        "MATHINLINEOPEN42": r"\(",
+        "MATHINLINECLOSE42": r"\)",
+    }
+    protected = text
+    for marker, delimiter in replacements.items():
+        protected = protected.replace(delimiter, marker)
+    return protected, replacements
 
 
 def diagram_embed(diagram_name: str, diagram_dir: Path) -> str:
@@ -126,7 +202,8 @@ def article_page(
     read_minutes: int,
 ) -> str:
     chain = CHAINS[post.chain]
-    viewer_script = '<script src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>' if diagram else ""
+    viewer_script = '\n    <script src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>' if diagram else ""
+    math_script = '\n    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>' if r"\[" in body or r"\(" in body else ""
     prev_link = f'<a href="{previous.slug}.html">← {previous.number:02d}. {html.escape(previous.title)}</a>' if previous else "<span></span>"
     next_link = f'<a href="{following.slug}.html">{following.number:02d}. {html.escape(following.title)} →</a>' if following else "<span></span>"
     return f"""<!doctype html>
@@ -139,7 +216,7 @@ def article_page(
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
     <link rel="stylesheet" href="../assets/css/blog.css" />
-    <script defer src="../assets/js/main.js"></script>
+    <script defer src="../assets/js/main.js"></script>{math_script}
   </head>
   <body>
     <header class="site-header">
@@ -168,11 +245,10 @@ def article_page(
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">{html.escape(chain['title_en'])}</span><span data-lang="zh">{html.escape(chain['title'])}</span> · {post.number:02d}/14</p>
+          <p class="article-series"><span data-lang="en">{html.escape(chain['title_en'])}</span><span data-lang="zh">{html.escape(chain['title'])}</span> · {post.number:02d}/{len(POSTS)}</p>
           <h1>{html.escape(post.title)}</h1>
-          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · {read_minutes} min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 {read_minutes} 分钟阅读</span></p>
-          <p class="article-deck">{html.escape(post.summary)}</p>
-          {diagram}
+          <p class="article-meta"><span data-lang="en">Learning note · {post.published_en} · {read_minutes} min read</span><span data-lang="zh">学习记录 · {post.published_zh} · 约 {read_minutes} 分钟阅读</span></p>
+          <p class="article-deck">{html.escape(post.summary)}</p>{diagram}
           <div class="article-content">
             {body}
           </div>
@@ -183,8 +259,7 @@ def article_page(
         </article>
       </main>
     </div>
-    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
-    {viewer_script}
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>{viewer_script}
   </body>
 </html>
 """
@@ -193,8 +268,10 @@ def article_page(
 def index_page(reading_times: dict[int, int]) -> str:
     entries = []
     for post in POSTS:
-        category_en = "OpenPI / π0.5" if post.chain == "openpi" else "VLA Comparison"
-        category_zh = "OpenPI / π0.5" if post.chain == "openpi" else "VLA 对照"
+        category_en = {"openpi": "OpenPI / π0.5", "vla": "VLA Comparison", "tactile": "Tactile / VTLA"}[post.chain]
+        category_zh = {"openpi": "OpenPI / π0.5", "vla": "VLA 对照", "tactile": "触觉 / VTLA"}[post.chain]
+        published_year, published_month = post.published_zh.split(".")
+        published_zh_long = f"{published_year} 年 {int(published_month)} 月"
         anchor = ""
         if post.number == 1:
             anchor = '<span class="archive-anchor" id="openpi-56d" aria-hidden="true"></span>'
@@ -202,10 +279,10 @@ def index_page(reading_times: dict[int, int]) -> str:
             anchor = '<span class="archive-anchor" id="vla-comparison" aria-hidden="true"></span>'
         entries.append(
             f"""<article class="archive-post" data-category="{post.chain}">
-              {anchor}
+{anchor}
               <h3><a href="{post.slug}.html"><span class="archive-category"><span data-lang="en">[{category_en}]</span><span data-lang="zh">[{category_zh}]</span></span> {post.number:02d}. {html.escape(post.title)}</a></h3>
               <p class="archive-reading-time"><span data-lang="en">{reading_times[post.number]} min read</span><span data-lang="zh">阅读约 {reading_times[post.number]} 分钟</span></p>
-              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
+              <p class="archive-date"><span data-lang="en">Published: {post.published_en}</span><span data-lang="zh">发布于：{published_zh_long}</span></p>
               <p class="archive-summary">{html.escape(post.summary)}</p>
             </article>"""
         )
@@ -214,7 +291,7 @@ def index_page(reading_times: dict[int, int]) -> str:
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="董希越的机器人学习记录：OpenPI、π0.5、56D 双臂双手、VLASH、GR00T 与 VLA-JEPA。" />
+    <meta name="description" content="董希越的机器人学习记录：OpenPI、π0.5、VLA、触觉表征、VTLA 与灵巧操作。" />
     <title>学习之路 | Xiyue Dong</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -255,6 +332,7 @@ def index_page(reading_times: dict[int, int]) -> str:
           <button class="archive-filter is-active" type="button" data-filter="all" aria-pressed="true"><span data-lang="en">All</span><span data-lang="zh">全部</span></button>
           <button class="archive-filter" type="button" data-filter="openpi" aria-pressed="false">OpenPI / π0.5</button>
           <button class="archive-filter" type="button" data-filter="vla" aria-pressed="false"><span data-lang="en">VLA Comparison</span><span data-lang="zh">VLA 对照</span></button>
+          <button class="archive-filter" type="button" data-filter="tactile" aria-pressed="false"><span data-lang="en">Tactile / VTLA</span><span data-lang="zh">触觉 / VTLA</span></button>
         </div>
         <section class="archive-year" aria-labelledby="year-2026">
           <h2 id="year-2026">2026</h2>
@@ -282,17 +360,25 @@ def main() -> None:
     posts_by_source = {post.source: post for post in POSTS}
     reading_times: dict[int, int] = {}
     for post in POSTS:
-        shutil.copy2(source_dir / post.source, source_copy_dir / post.source)
+        upstream = source_dir / post.source
+        bundled = source_copy_dir / post.source
+        if upstream.exists():
+            shutil.copy2(upstream, bundled)
+        elif not bundled.exists():
+            raise FileNotFoundError(f"No Markdown source found for {post.source}")
     for diagram_path in source_dir.glob("*.drawio"):
         shutil.copy2(diagram_path, diagram_dir / diagram_path.name)
 
     for index, post in enumerate(POSTS):
-        raw = (source_dir / post.source).read_text(encoding="utf-8")
+        raw = (source_copy_dir / post.source).read_text(encoding="utf-8")
         reading_times[post.number] = reading_time(raw)
         raw_without_title = re.sub(r"^# .+?\n+", "", raw, count=1)
         rewritten = rewrite_links(raw_without_title, posts_by_source)
+        rewritten, math_replacements = protect_math(rewritten)
         md = markdown.Markdown(extensions=["fenced_code", "tables", "toc", "sane_lists"])
         body = md.convert(rewritten)
+        for marker, delimiter in math_replacements.items():
+            body = body.replace(marker, delimiter)
         diagram = diagram_embed(post.diagram, diagram_dir) if post.diagram else ""
         previous = POSTS[index - 1] if index else None
         following = POSTS[index + 1] if index + 1 < len(POSTS) else None

@@ -40,4 +40,4 @@ python3 -m venv .blog-build-env
 .blog-build-env/bin/python scripts/build_blog.py
 ```
 
-The script rebuilds 14 article pages, copies the original Markdown into `blog/source/`, and copies the editable diagrams into `blog/assets/diagrams/`.
+The script rebuilds 16 article pages, copies or reuses the original Markdown in `blog/source/`, and copies the editable diagrams into `blog/assets/diagrams/`. The bundled tactile-reading notes are kept in `blog/source/` so they remain available when the external BrainCo documentation directory is not present.
