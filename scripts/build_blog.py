@@ -62,6 +62,16 @@ POSTS = [
         published_en="September 2026",
         published_zh="2026.09",
     ),
+    Post(
+        17,
+        "17_octopi_paper_reading_notes.md",
+        "17-octopi-tactile-property-reasoning",
+        "Octopi 精读：从触觉属性到大模型物理推理",
+        "从 PHYSICLEAR 人工属性标注出发，拆解 CLIP 触觉编码器、Vicuna 接入、三阶段训练、OPD 中间描述与零样本 PSR。",
+        "tactile",
+        published_en="September 2026",
+        published_zh="2026.09",
+    ),
 ]
 
 
