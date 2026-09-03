@@ -4,6 +4,8 @@
 > 正式论文：[Feng et al. - 2025 - AnyTouch Unified Static-Dynamic Representation across Visuo-tactile Sensors](<Feng et al. - 2025 - AnyTouch Unified Static-Dynamic Representation across Visuo-tactile Sensors.pdf>)<br>
 > [arXiv](https://arxiv.org/abs/2502.12191)
 
+> 推荐先读：[TVL](15_tvl_paper_reading_notes.md)与[表示学习、CLIP 与对比学习](21_clip_and_contrastive_learning.md)。本文重点是跨传感器、静态—动态统一表征，而不是重新讲解 CLIP 或 Attention 基础。
+
 ## 0. 一句话定位
 
 AnyTouch研究的是：**能否用一个触觉编码器，同时理解不同视触觉传感器、静态接触图像和动态接触视频。**

@@ -4,6 +4,8 @@
 > 正式论文：[Yu et al. - 2024 - Octopi Object Property Reasoning with Large Tactile-Language Models](<Yu et al. - 2024 - Octopi Object Property Reasoning with Large Tactile-Language Models.pdf>)<br>
 > [RSS Proceedings](https://roboticsproceedings.org/rss20/p066.html) · [arXiv](https://arxiv.org/abs/2405.02794) · [代码与数据](https://github.com/clear-nus/octopi)
 
+> 推荐先读：[TVL](15_tvl_paper_reading_notes.md)、[表示学习、CLIP 与对比学习](21_clip_and_contrastive_learning.md)和[多模态融合与条件注入](09_attention_multi_expert_and_conditioning.md)。本文重点是触觉属性接口与语言推理。
+
 ## 0. 一句话定位
 
 Octopi研究的不是“如何根据触觉直接控制机器人”，而是：**如何让大语言模型理解真实触觉，并结合已有常识对物体的物理属性进行推理。**
@@ -695,4 +697,3 @@ PHYSICLEAR提供真实GelSight视频和三个物理属性标签
 它最重要的设计不是一个复杂的融合层，也不是新的LLM推理算法，而是：
 
 > **用显式物理属性描述，把真实触觉感知和大语言模型的常识推理连接起来。**
-

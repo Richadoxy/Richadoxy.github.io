@@ -1,5 +1,7 @@
 # 04. PI0.5：VLM Prefix 与 Action Expert
 
+> 建议先读：[VLA 总览](27_vla_overview.md)、[动作生成方法](25_action_generation_families.md)与[Flow Matching](10_flow_matching_training_and_inference.md)。本文默认读者已经理解 token、attention 和 action chunk。
+
 可以先用一句话理解 PI0.5：
 
 > VLM 负责理解“看到了什么、任务是什么、机器人当前在哪里”，Action Expert 负责生成“接下来怎么动”。

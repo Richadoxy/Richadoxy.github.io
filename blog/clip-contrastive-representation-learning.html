@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="从双塔 encoder、global embedding 和 InfoNCE 出发，区分表示对齐、前向融合与下游控制。" />
+    <title>表示学习、CLIP 与对比学习 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 什么是表示学习</a></li>
+<li><a href="#2">2. 监督学习、预训练与微调</a></li>
+<li><a href="#3-clip">3. CLIP 是什么</a></li>
+<li><a href="#4-infonce">4. 正样本、负样本与 InfoNCE</a></li>
+<li><a href="#5-global-embedding-patch-tokens">5. Global embedding 与 patch tokens</a></li>
+<li><a href="#6">6. 对齐不等于融合</a></li>
+<li><a href="#7">7. 从图文对齐扩展到触觉</a></li>
+<li><a href="#8">8. 如何判断对齐是否成功</a></li>
+<li><a href="#9-clip">9. 阅读 CLIP 类工作时的检查表</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F03</p>
+          <h1>表示学习、CLIP 与对比学习</h1>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 4 min read</span><span data-lang="zh">入门 · 2026.09 · 约 4 分钟阅读</span></p>
+          <p class="article-deck">从双塔 encoder、global embedding 和 InfoNCE 出发，区分表示对齐、前向融合与下游控制。</p>
+          <div class="article-content">
+            <p>这篇文章连接两个常被混在一起的问题：模型怎样把原始输入变成有意义的表示，以及不同模态怎样进入同一个语义空间。</p>
+<p>建议先阅读《Token、Embedding、Encoder/Decoder 与 Latent》和《Transformer 与 Attention》。</p>
+<h2 id="1">1. 什么是表示学习</h2>
+<p>神经网络通常不会直接在原始像素或文字字符串上完成所有任务，而是先把输入变成内部表示：</p>
+<pre><code class="language-text">原始输入 x -&gt; Encoder f -&gt; representation z -&gt; task head -&gt; output
+</code></pre>
+<p>一个好的表示会保留任务所需的信息，同时压缩无关细节。例如触觉图像中的颜色可能来自传感器内部照明，而局部形变和纹理才与材料属性更相关。</p>
+<p><code>representation</code>、<code>feature</code>、<code>embedding</code> 和 <code>latent</code> 在论文中经常指向相近的张量，但侧重点不同：</p>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>常见侧重点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>feature / hidden state</td>
+<td>网络中间层产生的数值特征</td>
+</tr>
+<tr>
+<td>embedding</td>
+<td>可用于比较、检索或作为下游输入的向量</td>
+</tr>
+<tr>
+<td>latent</td>
+<td>对原始数据的压缩或抽象表示</td>
+</tr>
+<tr>
+<td>token representation</td>
+<td>序列中某一个位置的 hidden vector</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2">2. 监督学习、预训练与微调</h2>
+<p>监督学习使用输入和明确目标训练模型：</p>
+<pre><code class="language-text">图像 -&gt; 分类器 -&gt; 物体类别
+机器人观测 -&gt; policy -&gt; 示范动作
+</code></pre>
+<p>预训练则先利用规模更大、任务更宽的数据学习可复用表示，再迁移到具体任务：</p>
+<pre><code class="language-text">大规模图文数据 -&gt; 视觉/语言表示
+                  ↓
+少量机器人数据 -&gt; VLA 或触觉策略
+</code></pre>
+<p>迁移时常见三种方式：</p>
+<ul>
+<li>冻结 encoder，只训练新 head；</li>
+<li>使用 LoRA 等参数高效方法微调部分权重；</li>
+<li>端到端更新全部或大部分网络。</li>
+</ul>
+<p>这三种方式分别偏向稳定、低成本和更强适应能力。</p>
+<h2 id="3-clip">3. CLIP 是什么</h2>
+<p>CLIP 是视觉—语言双编码器：</p>
+<pre><code class="language-text">图像 I -&gt; Vision Encoder -&gt; z_I
+文本 L -&gt; Text Encoder   -&gt; z_L
+</code></pre>
+<p>两侧输出会被投影并归一化到同一维度。相似度通常用余弦相似度或归一化向量的点积：</p>
+<p>\[
+s(I,L)=\frac{z_I^T z_L}{\lVert z_I\rVert\lVert z_L\rVert}
+\]</p>
+<p>CLIP 的主要产物不是一段生成文本，而是一个可以比较图像和文本的语义坐标系。</p>
+<p>OpenCLIP 是 CLIP 类模型的开源训练与实现生态。SigLIP 采用不同的配对损失形式，但在 VLM 中也经常承担视觉编码器和视觉语义预训练的角色。</p>
+<h2 id="4-infonce">4. 正样本、负样本与 InfoNCE</h2>
+<p>一个 batch 中，匹配的图文对是正样本，不匹配的组合是负样本：</p>
+<pre><code class="language-text">(image_i, text_i) -&gt; positive
+(image_i, text_j) -&gt; negative, i != j
+</code></pre>
+<p>以图像检索文本为例，InfoNCE 形式可以写成：</p>
+<p>\[
+\mathcal L_i=-\log
+\frac{\exp(s(z_{I_i},z_{L_i})/\tau)}
+{\sum_j\exp(s(z_{I_i},z_{L_j})/\tau)}
+\]</p>
+<p>训练目标是提高正确配对的相似度，并降低 batch 内错误配对的相似度。实际实现通常还会计算文本到图像的对称方向。</p>
+<p>温度参数 \(\tau\) 控制相似度分布的尖锐程度。batch 的构造也非常重要：错误负样本、重复描述或过强的数据捷径都可能改变模型真正学到的内容。</p>
+<h2 id="5-global-embedding-patch-tokens">5. Global embedding 与 patch tokens</h2>
+<p>ViT 内部产生一组 patch token：</p>
+<pre><code class="language-text">image -&gt; patches -&gt; [N, d] token representations
+</code></pre>
+<p>CLIP 式对比学习通常还会把它们池化或读取为一个全局向量：</p>
+<pre><code class="language-text">[N, d] -&gt; pooling / CLS -&gt; [d] global embedding
+</code></pre>
+<p>两者用途不同：</p>
+<ul>
+<li>patch tokens 保留局部空间信息，适合 VLM、检测和细粒度融合；</li>
+<li>global embedding 适合检索、相似度计算和样本级对齐。</li>
+</ul>
+<p>因此“CLIP 输出一个 embedding”不表示它内部没有 Transformer token；“VLM 使用 CLIP 视觉塔”也不表示它只接收一个全局向量。</p>
+<h2 id="6">6. 对齐不等于融合</h2>
+<p>对比学习和 cross-attention 不在同一层级：</p>
+<pre><code class="language-text">对比学习：训练目标，约束表示空间
+Attention：前向算子，让一组 token 读取另一组信息
+</code></pre>
+<p>两个独立 encoder 可以完全不交换 token，只通过对比 loss 对齐最终 embedding。反过来，两个模态可以在 Transformer 中进行 cross-attention，却没有任何显式对比损失。</p>
+<p>需要分别问：</p>
+<ol>
+<li>前向传播时，模态在哪里交换信息？</li>
+<li>训练时，什么 loss 要求它们在语义上对应？</li>
+</ol>
+<h2 id="7">7. 从图文对齐扩展到触觉</h2>
+<p>TVL 和 AnyTouch 都把 CLIP 语义空间扩展到触觉：</p>
+<pre><code class="language-text">视觉 -&gt; z_V
+文本 -&gt; z_L
+触觉 -&gt; z_T
+</code></pre>
+<p>对存在配对关系的模态计算：</p>
+<pre><code class="language-text">L_TV + L_TL + L_VL
+</code></pre>
+<p>这样触觉 encoder 即使没有直接输出语言，也能让“粗糙地毯”的触觉表示靠近对应图像和文本。</p>
+<p>但语义对齐可能压缩掉控制需要的细粒度信号。两个触觉帧都可以被描述为 <code>hard</code>，其中一个却可能已经出现微小滑移。因此触觉 VLA 往往还需要局部 token、时间建模和动作监督。</p>
+<h2 id="8">8. 如何判断对齐是否成功</h2>
+<p>常见评估包括：</p>
+<ul>
+<li>跨模态 Top-k 检索；</li>
+<li>zero-shot 分类；</li>
+<li>linear probing；</li>
+<li>embedding 可视化；</li>
+<li>下游任务迁移。</li>
+</ul>
+<p>这些指标回答的问题不同。检索准确率高说明表示进入了较合理的语义位置，但不能直接证明：</p>
+<ul>
+<li>模型会生成机器人动作；</li>
+<li>策略会在闭环执行时使用该模态；</li>
+<li>模型能感知滑移或精确控制接触力。</li>
+</ul>
+<h2 id="9-clip">9. 阅读 CLIP 类工作时的检查表</h2>
+<ol>
+<li>每种模态的原始输入是什么？</li>
+<li>encoder 输出 patch tokens 还是 global embedding？</li>
+<li>哪些配对是正样本，负样本从哪里来？</li>
+<li>对齐的是哪些模态组合？</li>
+<li>哪些 encoder 冻结，哪些参数更新？</li>
+<li>是否存在伪标签或视觉猜测触觉属性的偏差？</li>
+<li>评估证明的是表示、生成、决策还是控制？</li>
+</ol>
+<p>一句话总结：</p>
+<blockquote>
+<p>CLIP 类方法通过配对监督建立共享语义空间；Attention 决定一次前向中信息怎样流动；VLA 还需要把这些表示连接到动作学习和在线控制。</p>
+</blockquote>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="19-attention-openclip-tactile-groot.html">← F02 · Transformer 与 Attention：从 QKV 到多模态交互</a>
+            <a href="09-attention-multi-expert-conditioning.html">F04 · 多模态融合、多专家与条件注入 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

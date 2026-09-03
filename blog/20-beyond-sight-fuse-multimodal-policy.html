@@ -113,15 +113,16 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Series 3: Tactile representation, VTLA, and contact-rich manipulation</span><span data-lang="zh">知识链三：触觉表征、VTLA 与接触丰富操作</span> · 20/20</p>
+          <p class="article-series"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span> · TOUCH04</p>
           <h1>Beyond Sight 精读：用语言把触觉与音频接入通用机器人策略</h1>
-          <p class="article-meta"><span data-lang="en">Learning note · September 2026 · 21 min read</span><span data-lang="zh">学习记录 · 2026.09 · 约 21 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">进阶 · September 2026 · 21 min read</span><span data-lang="zh">进阶 · 2026.09 · 约 21 分钟阅读</span></p>
           <p class="article-deck">从Octo与PaliGemma两类backbone出发，拆解FuSe的异构传感器token融合、action readout、语言对比与生成监督，以及真实机器人实验。</p>
           <div class="article-content">
             <blockquote>
 <p>Joshua Jones, Oier Mees, Carmelo Sferrazza, Kyle Stachowicz, Pieter Abbeel, Sergey Levine，IEEE International Conference on Robotics and Automation（ICRA）2025<br>
 正式论文：<a href="https://arxiv.org/abs/2501.04693">Jones 等 - 2025 - Beyond Sight Finetuning Generalist Robot Policies with Heterogeneous Sensors via Language Grounding</a><br>
 <a href="https://arxiv.org/abs/2501.04693">arXiv</a> · <a href="https://fuse-model.github.io/">项目主页</a> · <a href="https://github.com/fuse-model/FuSe">开源代码</a> · <a href="https://huggingface.co/papers/2501.04693">Hugging Face论文页</a></p>
+<p>推荐先读：<a href="imitation-learning-behavior-cloning.html">模仿学习入门</a>、<a href="action-generation-mse-token-diffusion-flow.html">动作生成方法</a>与 TVL。本文是触觉路线从“表征”进入“策略和动作”的收束案例。</p>
 </blockquote>
 <h2 id="0">0. 一句话定位</h2>
 <p>Beyond Sight提出的<strong>FuSe不是一个全新的VLA backbone</strong>，而是一套微调已有通用机器人策略的方法：把视觉、触觉和声音都编码成token，交给同一个策略Transformer处理，再用自然语言作为公共语义监督，逼迫策略真正理解新增传感器，而不是继续只依赖预训练时熟悉的视觉和语言。</p>
@@ -798,7 +799,7 @@ generation loss要求观测能明确说出属性
 </blockquote>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="19-attention-openclip-tactile-groot.html">← 19. Attention 专题：从 OpenCLIP 到触觉模型与 GR00T</a>
+            <a href="17-octopi-tactile-property-reasoning.html">← TOUCH03 · Octopi 精读：从触觉属性到大模型物理推理</a>
             <span></span>
           </nav>
         </article>

@@ -73,15 +73,16 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Series 3: Tactile representation, VTLA, and contact-rich manipulation</span><span data-lang="zh">知识链三：触觉表征、VTLA 与接触丰富操作</span> · 15/20</p>
+          <p class="article-series"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span> · TOUCH01</p>
           <h1>TVL 精读：从触觉表征到 LLaMA</h1>
-          <p class="article-meta"><span data-lang="en">Learning note · September 2026 · 11 min read</span><span data-lang="zh">学习记录 · 2026.09 · 约 11 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">进阶 · September 2026 · 11 min read</span><span data-lang="zh">进阶 · 2026.09 · 约 11 分钟阅读</span></p>
           <p class="article-deck">从 DIGIT 触觉输入出发，串联 CLIP 对齐、InfoNCE、跨模态检索、projector、gate 与 LLaMA 多模态生成。</p>
           <div class="article-content">
             <blockquote>
 <p>Letian Fu et al., ICML 2024 / PMLR 235<br>
 正式论文：<a href="https://proceedings.mlr.press/v235/fu24b.html">Fu et al. - 2024 - A Touch Vision and Language Dataset for Multimodal Alignment</a><br>
 <a href="https://tactile-vlm.github.io/">项目主页</a> · <a href="https://arxiv.org/abs/2402.13232">arXiv</a></p>
+<p>前置概念可先读：<a href="clip-contrastive-representation-learning.html">表示学习、CLIP 与对比学习</a>和<a href="09-attention-multi-expert-conditioning.html">多模态融合与条件注入</a>。本文保留必要回顾，但重点是 TVL 的数据、设计选择和实验边界。</p>
 </blockquote>
 <h2 id="0">0. 一句话定位</h2>
 <p>这篇论文不是直接训练机器人策略，而是在解决更上游的问题：<strong>怎样把触觉、视觉和自然语言放入同一个语义空间，并让语言模型根据视觉和触觉生成触感描述。</strong></p>
@@ -614,8 +615,8 @@ a_t=\pi(I_t,z_t^{touch},q_t,\text{instruction})
 </table>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="14-architecture-comparison-reading-guide.html">← 14. PI0.5、GR00T、VLASH 与 VLA-JEPA 对照</a>
-            <a href="16-tactile-vla-reading-guide.html">16. 触觉 VLA 与模仿学习阅读路线 →</a>
+            <a href="16-tactile-vla-reading-guide.html">← TOUCH00 · 触觉 VLA 与模仿学习阅读地图</a>
+            <a href="18-anytouch-unified-tactile-representation.html">TOUCH02 · AnyTouch 精读：统一静态—动态多传感器触觉表征 →</a>
           </nav>
         </article>
       </main>

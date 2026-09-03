@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="从 demonstration、policy 和 BC 出发，理解离线监督、闭环 rollout 与分布偏移。" />
+    <title>模仿学习与 Behavior Cloning 入门 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 从示范到策略</a></li>
+<li><a href="#2-observation-state">2. Observation 不等于 State</a></li>
+<li><a href="#3-behavior-cloning">3. Behavior Cloning</a></li>
+<li><a href="#4-demonstration">4. Demonstration 从哪里来</a></li>
+<li><a href="#5-offline-online-rollout">5. Offline 训练与 Online Rollout</a></li>
+<li><a href="#6-loss">6. 为什么训练 Loss 低不等于任务成功</a></li>
+<li><a href="#7-generalist-policy-vla">7. Generalist Policy 与 VLA</a></li>
+<li><a href="#8">8. 预训练没有取代模仿学习</a></li>
+<li><a href="#9">9. 阅读模仿学习工作的检查表</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span> · IL01</p>
+          <h1>模仿学习与 Behavior Cloning 入门</h1>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 3 min read</span><span data-lang="zh">入门 · 2026.09 · 约 3 分钟阅读</span></p>
+          <p class="article-deck">从 demonstration、policy 和 BC 出发，理解离线监督、闭环 rollout 与分布偏移。</p>
+          <div class="article-content">
+            <p>模仿学习的目标是让策略从示范中学习行为。它是理解 VLA 动作训练的直接起点。</p>
+<h2 id="1">1. 从示范到策略</h2>
+<p>一条机器人示范通常包含时间序列：</p>
+<p>\[
+\tau=(o_0,a_0,o_1,a_1,\ldots,o_T)
+\]</p>
+<p>其中：</p>
+<ul>
+<li>\(o_t\)：时刻 \(t\) 的观测；</li>
+<li>\(a_t\)：专家在该观测下执行的动作；</li>
+<li>\(\tau\)：一条 trajectory 或 episode。</li>
+</ul>
+<p>策略学习条件分布：</p>
+<p>\[
+\pi_\theta(a_t\mid o_t)
+\]</p>
+<p>VLA 只是在观测中进一步加入视觉和语言，并常输出一段连续动作。</p>
+<h2 id="2-observation-state">2. Observation 不等于 State</h2>
+<p>在机器人学习中可以区分：</p>
+<pre><code class="language-text">world state：环境的完整真实状态，通常不可完全获得
+observation：部署时传感器能够得到的信息
+proprioceptive state：关节角、夹爪状态等机器人自身观测
+</code></pre>
+<p>因此 VLA 的输入可以写成：</p>
+<pre><code class="language-text">o_t = images + language + proprioceptive state + history
+</code></pre>
+<p>这里 robot state 是 observation 的组成部分，不是 action。</p>
+<h2 id="3-behavior-cloning">3. Behavior Cloning</h2>
+<p>Behavior Cloning 把模仿学习转成监督学习：</p>
+<pre><code class="language-text">专家观测 -&gt; policy -&gt; predicted action
+                         ↕ loss
+                      expert action
+</code></pre>
+<p>连续动作直接回归时，最简单的目标是：</p>
+<p>\[
+\mathcal L_{BC}=\lVert\hat a_t-a_t\rVert^2
+\]</p>
+<p>如果动作被离散成 token，可以使用交叉熵；如果用 diffusion 或 flow matching，则监督噪声或速度场。它们仍然可以服务于 Behavior Cloning，只是动作分布的参数化方式不同。</p>
+<h2 id="4-demonstration">4. Demonstration 从哪里来</h2>
+<p>常见数据来源包括：</p>
+<ul>
+<li>人类遥操作；</li>
+<li>手把手 kinesthetic teaching；</li>
+<li>传统规划器或专家 policy；</li>
+<li>仿真中的 scripted policy；</li>
+<li>人类视频与机器人数据的联合预训练。</li>
+</ul>
+<p>数据来源决定了观测质量、动作空间、控制频率和误差模式。人类视频没有机器人 action label，不能直接按普通 BC 使用，但可以提供视觉或动态表示监督。</p>
+<h2 id="5-offline-online-rollout">5. Offline 训练与 Online Rollout</h2>
+<p>BC 训练通常是 offline 的：模型读取已经记录的数据，不与环境实时交互。</p>
+<p>部署 rollout 则是闭环的：</p>
+<pre><code class="language-text">观测 -&gt; 策略 -&gt; 动作 -&gt; 环境改变 -&gt; 新观测 -&gt; 策略
+</code></pre>
+<p>训练样本来自专家访问过的状态，而部署时模型自己的小错误会把机器人带到新状态。这种训练分布和策略访问分布的偏移，是经典的 covariate shift / compounding error 问题。</p>
+<h2 id="6-loss">6. 为什么训练 Loss 低不等于任务成功</h2>
+<p>动作 MSE 可能低，但真实机器人仍失败，原因包括：</p>
+<ul>
+<li>多个动作都合理，MSE 平均后反而不自然；</li>
+<li>某些关键接触时刻在数据中占比很少；</li>
+<li>小误差在闭环中累积；</li>
+<li>相机、物体或机器人状态发生分布偏移；</li>
+<li>action representation、归一化或坐标系不一致；</li>
+<li>推理延迟改变了动作真正开始执行的状态。</li>
+</ul>
+<p>因此机器人论文需要报告 rollout success、接触质量、恢复能力和延迟，而不能只给 validation loss。</p>
+<h2 id="7-generalist-policy-vla">7. Generalist Policy 与 VLA</h2>
+<p>传统单任务策略可能只学习：</p>
+<pre><code class="language-text">固定任务图像 + state -&gt; action
+</code></pre>
+<p>通用策略希望利用多任务、多机器人或多数据集：</p>
+<pre><code class="language-text">images + language instruction + state + embodiment
+                      -&gt; shared policy
+                      -&gt; action
+</code></pre>
+<p>语言提供任务接口，视觉提供环境语义，state 描述机器人当前配置，action head 将共享表示映射回具体控制空间。</p>
+<h2 id="8">8. 预训练没有取代模仿学习</h2>
+<p>VLM 能识别物体和理解语言，不代表它天然会控制机器人。VLA 通常还需要机器人示范来建立：</p>
+<ul>
+<li>视觉语义与可执行动作之间的对应；</li>
+<li>不同 embodiment 的动作接口；</li>
+<li>时间连续性和接触动力学；</li>
+<li>任务成功所需的闭环行为。</li>
+</ul>
+<p>所以可以把 VLA 看成：</p>
+<pre><code class="language-text">视觉语言预训练提供“理解”初始化
++ 机器人模仿数据提供“怎样行动”的监督
+</code></pre>
+<h2 id="9">9. 阅读模仿学习工作的检查表</h2>
+<ol>
+<li>专家是谁，示范怎样采集？</li>
+<li>observation 在部署时是否全部可得？</li>
+<li>action 表示位置、增量、速度还是力矩？</li>
+<li>一次预测一步还是 action chunk？</li>
+<li>loss 是 MSE、token、diffusion 还是 flow？</li>
+<li>训练数据和测试场景差异是什么？</li>
+<li>是否真实闭环 rollout，失败标准是什么？</li>
+<li>策略遇到偏离示范分布的状态能否恢复？</li>
+</ol>
+<p>一句话总结：</p>
+<blockquote>
+<p>Behavior Cloning 用示范动作监督策略；VLA 扩展了策略的感知和任务接口，但数据分布、动作语义与闭环执行问题仍然存在。</p>
+</blockquote>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="model-training-forward-loss-backward.html">← F05 · 模型训练基础：Forward、Loss、Backward 与微调</a>
+            <a href="robot-data-action-semantics.html">IL02 · 机器人数据：Observation、Action 与时间窗口 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

@@ -1,6 +1,6 @@
-# Attention专题：从OpenCLIP触觉编码到GR00T Action Expert
+# Transformer 与 Attention：从 QKV 到多模态交互
 
-> 本文串联Transformer基础、OpenCLIP、TVL、Octopi、AnyTouch与GR00T，重点回答两个问题：Attention究竟在一次前向传播中改变什么？对比学习和cross-attention又有什么本质区别？
+> 本文以 OpenCLIP、触觉模型与 GR00T 为例，系统回答两个问题：Attention 在一次前向传播中改变什么？self、cross 与 joint attention 怎样区分？CLIP 和 InfoNCE 的完整基础放在下一篇《表示学习、CLIP 与对比学习》中。
 
 ## 0. 先给出核心结论
 

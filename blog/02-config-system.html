@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="理解 YAML 如何展开成 TrainConfig、DataConfig，以及 BrainCo policy 层如何定义机器人数据语义。" />
-    <title>配置系统：从 YAML 到 DataConfig | 董希越的学习之路</title>
+    <title>配置与数据合同：从 YAML 到 DataConfig | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
     <link rel="stylesheet" href="../assets/css/blog.css" />
@@ -47,9 +47,9 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Series 1: Adapting OpenPI / π0.5 for 56D dual-arm dual-hand training</span><span data-lang="zh">知识链一：OpenPI / π0.5 的 56D 双臂双手改造</span> · 02/20</p>
-          <h1>配置系统：从 YAML 到 DataConfig</h1>
-          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 2 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 2 分钟阅读</span></p>
+          <p class="article-series"><span data-lang="en">Part 4: OpenPI / BrainCo Engineering</span><span data-lang="zh">第四卷：OpenPI / BrainCo 工程实践</span> · ENG01</p>
+          <h1>配置与数据合同：从 YAML 到 DataConfig</h1>
+          <p class="article-meta"><span data-lang="en">进阶 · August 2026 · 2 min read</span><span data-lang="zh">进阶 · 2026.08 · 约 2 分钟阅读</span></p>
           <p class="article-deck">理解 YAML 如何展开成 TrainConfig、DataConfig，以及 BrainCo policy 层如何定义机器人数据语义。</p>
           <div class="article-content">
             <p>配置系统负责回答三个问题：</p>
@@ -166,8 +166,8 @@ delta_action_groups    = right_arm
 <p>下一章继续看最终的 <code>DataConfig</code> 如何真正产生 batch。</p>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="01-train-entry-and-jax.html">← 01. 训练入口与 JAX</a>
-            <a href="03-data-pipeline-and-batch.html">03. 数据流水线与 batch →</a>
+            <a href="13-jepa-vla-jepa.html">← VLA05 · JEPA、World Model 与 VLA-JEPA</a>
+            <a href="03-data-pipeline-and-batch.html">ENG02 · 从 Dataset 到 Batch →</a>
           </nav>
         </article>
       </main>

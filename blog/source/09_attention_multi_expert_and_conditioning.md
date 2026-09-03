@@ -1,266 +1,210 @@
-# 09. QKV、Attention、多专家与条件注入
+# 多模态融合、多专家与条件注入
 
-这一章回答四组经常混在一起的问题：
+前面的 Attention 专题解释了 Q/K/V、self-attention 和 cross-attention。本篇进一步回答：视觉、语言、state、action 和 timestep 具体可以通过哪些接口影响同一个策略。
 
-1. Q/K/V 是什么？
-2. self-attention 和 cross-attention 有什么区别？
-3. PI0.5 的 multi-expert 为什么不是常见 MoE？
-4. token 注入和 AdaLN/AdaRMS 条件调制有什么区别？
-
-## 1. Q、K、V 的直觉
-
-每个 token hidden vector 会经过三组可训练投影：
+## 1. 对齐、融合与条件不是同一个概念
 
 ```text
-Q = X W_Q  Query：我想找什么信息
-K = X W_K  Key：我能用什么特征被匹配
-V = X W_V  Value：匹配后真正提供什么内容
+alignment：训练目标约束不同表示在语义空间中的关系
+fusion：一次 forward 中，不同信息怎样交换
+conditioning：任何影响输出的已知信息及其注入方式
 ```
 
-Attention 权重来自 Q 与 K 的相似度：
+例如 TVL 用对比 loss 对齐独立的触觉、视觉和文本 encoder；GR00T 的 action stream 用 cross-attention 融合 VLM memory；flow timestep 则通过 AdaNorm 调节动作网络。
+
+## 2. 独立 Encoder + 表示对齐
 
 ```text
-Attention(Q,K,V) = softmax(QK^T / sqrt(d_head)) V
+touch  -> Touch Encoder  -> z_T
+image  -> Vision Encoder -> z_V
+text   -> Text Encoder   -> z_L
+
+contrastive loss: matched embeddings close
 ```
 
-直觉上：
+这种方式在 forward 时不要求不同模态的 token 彼此读取，适合：
+
+- 单模态也要独立推理；
+- 数据经常缺少某些模态；
+- 检索、zero-shot 分类或预训练触觉 encoder；
+- 缓存和复用全局 embedding。
+
+它建立语义坐标，但不会自动产生任务相关的细粒度多模态交互。
+
+## 3. Token Concatenation 与 Joint Attention
+
+先将各模态映射到兼容的 hidden width，再拼成一个序列：
 
 ```text
-Query 提问
-Key 用于检索匹配
-Value 提供答案内容
+[vision tokens, language tokens, touch tokens, state tokens]
+                         -> shared Transformer
 ```
 
-Q/K/V 都是一次前向计算产生的 activation，不是固定数据；生成它们的 `W_Q/W_K/W_V` 才是可训练权重。
+如果 Q/K/V 都来自拼接后的序列，形式上属于 self-attention；因为不同模态 token 在同一 attention matrix 中交流，也常被称为 joint attention 或 early fusion。
 
-## 2. Multi-head Attention
-
-一个 token 的隐藏宽度会被组织为多个 attention heads。
-
-PI0.5 的 Gemma 配置中：
+Mask 决定信息方向。例如：
 
 ```text
-num_query_heads = 8
-head_dim = 256
-8 × 256 = 2048
+bidirectional：所有有效 token 彼此可见
+causal：后面位置只能读取允许的历史
+block mask：某些模态区段只能单向读取另一部分
 ```
 
-因此 2048 宽度可以拆成 8 个 256 维 query heads。但这只是该配置内部维度设计的一致关系，不表示“先决定 Q head，才产生 Gemma 2B 宽度”。模型宽度、head 数和 head_dim 是共同设计的超参数。
+FuSe-Octo 将 vision、touch、audio、language 和 readout token 放进共享 Transformer，属于这一类。
 
-该配置使用 grouped/multi-query attention：
+## 4. Cross-Attention
+
+Cross-attention 显式区分 query stream 和 condition memory：
 
 ```text
-Q:  8 × 256
-K/V: 1 × 256
+action/state tokens -> Q
+VLM memory          -> K/V
 ```
 
-8 个 query heads 共享较少的 K/V heads，可以降低 KV cache 和计算开销。
+它适合以下结构：
 
-## 3. Self-attention 与 Cross-attention
+- VLM 先独立产生可缓存的 memory；
+- Action Network 有自己的 hidden width 和层数；
+- 动作 token 需要按层检索视觉语言信息；
+- 两个模态的序列长度和表示宽度不同。
 
-### 3.1 Self-attention
+Q 与 K 的原始宽度不必相等。各自的投影矩阵会把它们映射到相同 head dimension，再计算点积。
 
-Q、K、V 来自同一组 token：
+GR00T 的 AlternateVLDiT 就让 state/action query stream 交替读取文字与图像 memory。
+
+## 5. PI0.5 的 Masked Joint Attention
+
+PI0.5 不是“Gemma 2B 完整结束后输出一个向量，再交给 Gemma 300M”。两路 expert 在 paired layers 中协同：
 
 ```text
-action/state tokens --Q/K/V--> self-attention
+Prefix Expert hidden [B,Lp,2048] -> prefix-specific Q/K/V
+Action Expert hidden [B,H,1024]   -> action-specific Q/K/V
+                                ↓
+                  common attention geometry
 ```
 
-它适合序列内部交互，例如：
-
-- action chunk 中不同时间步保持轨迹一致；
-- state token 告诉所有 action tokens 当前机器人姿态；
-- 文本 token 结合上下文理解指令。
-
-### 3.2 Cross-attention
-
-Q 来自当前处理流，K/V 来自另一组 memory：
-
-```text
-Action tokens -> Q
-VLM features  -> K/V
-```
-
-这表示动作网络主动从视觉语言 memory 中检索相关信息。
-
-GR00T 的 DiT 使用这种清晰的两段式结构：先得到 VLM hidden memory，再让 state/action query stream 对它做 cross-attention。
-
-## 4. PI0.5 的联合 Attention
-
-PI0.5 不是简单的：
-
-```text
-Gemma 2B 完整运行结束 -> 一个向量 -> Gemma 300M
-```
-
-而是在 18 个 paired layers 中反复协同：
-
-```text
-Prefix Expert hidden [B,Lp,2048] -> 自己的 Q/K/V 投影
-Action Expert hidden [B,H,1024]   -> 自己的 Q/K/V 投影
-
-Q/K/V 在共同 head geometry 中按序列位置组合
-  -> masked joint attention
-  -> 输出再回到各自 expert 的 hidden width
-```
-
-Attention mask 保证：
+Mask 保证：
 
 ```text
 Prefix query -> Prefix K/V
 Action query -> Prefix + Action K/V
 ```
 
-因此 Action Expert 可以读取图像、语言和 state，Prefix 不会被 noisy action 污染。
+因此 action suffix 能读取图像、语言和 state，而 prefix 不会被 noisy action 污染。
 
-完整图见 [pi05_structure.drawio](pi05_structure.drawio)。
+## 6. Projector 与 Pooled Condition
 
-## 5. Multi-expert 和常见 MoE 的区别
-
-### 5.1 常见稀疏 MoE
-
-典型 Mixture of Experts 有 router：
+并非所有系统都保留完整 token sequence。另一种路线是先得到全局表示，再映射到目标模型空间：
 
 ```text
-token
-  -> router 计算 expert scores
-  -> 选择 top-k experts
-  -> experts 分别计算
-  -> 加权合并
+tactile global embedding
+-> MLP Projector
+-> LLM hidden width
+-> multimodal condition/token
 ```
 
-不同 token 可能动态选择不同 expert，目的通常是在计算量增长较少的情况下扩大参数容量。
+Projector 同时解决维度和表示空间不兼容。它可以只是线性层，也可以是两层 MLP、Q-Former 或 resampler。
 
-### 5.2 PI0.5 multi-expert
+一个 pooled vector 成本低，但可能丢失局部接触位置、时间变化和 patch 对应关系。
 
-PI0.5 中 expert 分工是由 token 类型预先确定的：
+## 7. Gate 与 FiLM
+
+Gate 控制新模态对原 backbone 的影响强度：
+
+\[
+h'=h+g\cdot F(h,m)
+\]
+
+如果 \(g\) 零初始化，训练开始时模型保持原始行为，之后逐渐学会使用新输入。TVL-LLaMA 使用的 gated adapter 可以从这个角度理解。
+
+FiLM 则根据 condition 产生通道级 scale 和 shift：
+
+\[
+h'=\gamma(c)\odot h+\beta(c)
+\]
+
+它不要求 condition 占据序列位置。
+
+## 8. AdaLN 与 AdaRMS
+
+Diffusion/flow timestep 通常是全局噪声阶段，更适合调节整层计算：
 
 ```text
-image/text/state prefix -> Gemma 2B Prefix Expert
-noisy action suffix     -> Gemma 300M Action Expert
+t -> sinusoidal embedding -> MLP -> condition c
 ```
 
-这里没有 router，也没有对每个 token 做 top-k 随机或动态选择。因此它是多组 expert-specific weights 的协同 Transformer，但不是最常见的 sparse routed MoE。
-
-可以记成：
+然后生成：
 
 ```text
-稀疏 MoE：谁处理 token，由 router 动态选择
-PI0.5：谁处理 token，由 prefix/action 模态身份固定决定
+scale, shift, optional gate = Linear(c)
+normalized = Norm(x)
+modulated = normalized * (1 + scale) + shift
 ```
 
-## 6. 广义条件与狭义条件调制
+AdaLN 使用 LayerNorm，AdaRMS 使用 RMSNorm。condition 没有序列位置，也不产生自己的 Q/K/V。
 
-“condition”是一个很宽的词。任何影响输出的信息都可以叫条件：
+可以把 token condition 理解为“加入会议的参与者”，把 AdaNorm 理解为“调整整间会议室的工作模式”。
 
-- 图像；
-- 语言；
-- robot state；
-- noisy action；
-- flow timestep；
-- embodiment ID；
-- goal 或 future state。
+## 9. State 与 Timestep 可以走不同路径
 
-因此“作为 token 注入”也是一种 conditioning。工程讨论中，通常把下面两种路径分开说。
-
-## 7. 作为 token 注入
-
-以 GR00T state 为例：
+同一个语义在不同模型中可能采用不同接口：
 
 ```text
-state [B,D]
-  -> State Encoder
-  -> state token [B,1,1536]
-
-noisy action [B,H,D]
-  -> Action Encoder
-  -> action tokens [B,H,1536]
-
-concat -> [B,1+H,1536]
+PI0.5 default state：离散化后进入 VLM prompt
+PI0 state：连续 state token
+PI0.5 + VLASH：future state 进入 AdaRMS condition
+GR00T state：embodiment-specific State Encoder -> DiT token
+VLA-JEPA state：State Encoder -> Action Head
 ```
 
-state token：
+Flow timestep 也可以：
 
-- 占一个序列位置；
-- 产生自己的 Q/K/V；
-- 通过 self-attention 与 action tokens 交换信息；
-- 可以在不同层形成新的 hidden representation。
+- 与 action embedding 拼接；
+- 加到 action token；
+- 通过 AdaLN/AdaRMS 调制；
+- 同时使用 token fusion 和 adaptive normalization。
 
-它像一个加入会议的参与者。
+“作为 condition”不能唯一确定网络结构，必须继续看注入位置。
 
-## 8. 通过 AdaLN/AdaRMS 调制
+## 10. Multi-expert 不一定是 Routed MoE
 
-flow timestep 通常是全局噪声阶段，更适合控制整层计算方式：
+典型稀疏 MoE：
 
 ```text
-t -> sin/cos embedding -> time MLP -> condition c
+token -> router -> top-k experts -> weighted merge
 ```
 
-对某一层 hidden states `x`：
+PI0.5 multi-expert：
 
 ```text
-[scale, shift, gate] = Linear_layer(c)
-normed = RMSNorm(x)
-modulated = normed * (1 + scale) + shift
-y = Attention_or_FFN(modulated)
-x_next = x + gate * y
+image/text/state prefix -> Prefix Expert
+noisy action suffix     -> Action Expert
 ```
 
-其中：
+后者由 token 区段固定选择参数，没有 router 和 top-k。它是 expert-specific weights 的协同 Transformer，但不是常见的 sparse routed MoE。
 
-- `scale` 调整每个特征通道的强弱；
-- `shift` 改变每个特征通道的基准；
-- `gate` 控制当前子层对 residual 的贡献。
+## 11. 几类模型的统一位置
 
-condition 没有序列位置，也不生成 Q/K/V。它更像调节整个会议室工作模式的控制面板。
+| 模型 | 表示对齐 | 前向融合 | 其他条件 |
+| --- | --- | --- | --- |
+| TVL Encoder | Touch/Vision/Text InfoNCE | encoder 间不交换 token | 无 |
+| AnyTouch | 多模态对比 + 跨传感器匹配 | Touch Encoder 内 self-attention | sensor token |
+| Octopi | 属性分类与语言监督 | tactile embeddings 插入 Vicuna 序列 | 无显式 gate |
+| FuSe-Octo | 语言对比/生成辅助 loss | 多模态 joint attention | readout tokens |
+| PI0.5 | 机器人 flow supervision | prefix/action masked joint attention | timestep AdaRMS |
+| GR00T | 机器人 flow supervision | DiT cross-attention + self-attention | timestep AdaLN |
 
-BrainCo-IL 中具体实现见：
+## 12. 设计或阅读时的检查表
 
-- [`Pi0.embed_suffix()`](../../src/openpi/models/pi0.py)：构造 time/state condition；
-- [`RMSNorm`](../../src/openpi/models/gemma.py)：生成 scale、shift、gate；
-- [`Layers.__call__()`](../../src/openpi/models/gemma.py)：在 Attention 和 FFN 前使用 condition。
+1. 输入是 global embedding 还是 token sequence？
+2. 不同模态在 forward 的哪一层第一次交换信息？
+3. 它们使用 self、cross、joint attention，还是只有对比 loss？
+4. condition 是否占据序列位置？
+5. 是否存在 projector、gate、FiLM 或 AdaNorm？
+6. attention mask 允许哪些方向？
+7. 新模态能否在缺失其他模态时独立工作？
+8. 训练 loss 是否迫使策略真正使用新增模态？
 
-## 9. PI0、PI0.5、GR00T 的 timestep 路径
+一句话总结：
 
-| 模型 | noisy action | flow timestep |
-| --- | --- | --- |
-| PI0 | 投影成 action embedding | 与 action embedding 拼接后过 MLP |
-| PI0.5 | `action_in_proj` 形成 action tokens | time MLP 后通过 adaRMS 调制 |
-| GR00T N1.x | embodiment-specific Action Encoder | 既融合进 action encoding，又通过 AdaLayerNorm 调制 DiT |
-
-注意 flow timestep 不是控制系统时间戳，也不是 action horizon 的位置编号。它表示当前 `x_t` 位于 noise 到 action 路径的什么位置。
-
-## 10. VLASH future state 的条件注入
-
-当前 BrainCo-IL 的 `state_cond=true` 路径为：
-
-```text
-c_time  = TimeMLP(t)
-c_state = StateMLP(state_(t+δ))
-c       = c_time + c_state
-```
-
-然后 `c` 在 Action Expert 每层产生 scale/shift/gate。
-
-一次去噪推理中：
-
-```text
-future state s_(t+δ)：对这个请求固定
-flow timestep：随每个 Euler step 改变
-```
-
-VLASH 的核心不是强制所有模型都使用 AdaRMS，而是让策略以执行时刻 state 为条件。对其他 backbone，future state 也可以作为 token、cross-attention memory 或原生 state 输入。
-
-## 11. 为什么论文常在条件上创新
-
-增加条件通常参数少、易复用 checkpoint，又可以让行为更可控。常见条件包括 future state、历史动作、触觉、力觉、目标图像、价值、子目标和 embodiment ID。
-
-但有效创新不能只看“加了一个输入”，还要检查：
-
-1. 该信息在部署时是否可获得或可靠预测；
-2. 训练与推理的条件分布是否一致；
-3. 是否把未来真值泄漏给了部署路径；
-4. 模型是否真正使用该条件；
-5. 注入位置是 token、cross-attention 还是 adaptive norm，为什么适合。
-
-下一章将 timestep 放回 flow matching 的完整训练和推理过程，解释它为什么是必要条件。
+> Alignment 规定表示应该靠近谁，Attention 规定一次前向读取谁，Conditioning 规定哪些已知信息以什么接口影响输出。

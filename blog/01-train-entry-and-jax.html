@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="从 scripts/train.py 出发，梳理 JAX 编译缓存、PRNG、mesh、sharding、checkpoint 与训练循环。" />
-    <title>训练入口与 JAX | 董希越的学习之路</title>
+    <meta name="description" content="从 scripts/train.py 出发，梳理编译缓存、PRNG、mesh、sharding、checkpoint 与训练循环。" />
+    <title>JAX 训练入口 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
     <link rel="stylesheet" href="../assets/css/blog.css" />
@@ -47,10 +47,10 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Series 1: Adapting OpenPI / π0.5 for 56D dual-arm dual-hand training</span><span data-lang="zh">知识链一：OpenPI / π0.5 的 56D 双臂双手改造</span> · 01/20</p>
-          <h1>训练入口与 JAX</h1>
-          <p class="article-meta"><span data-lang="en">Learning note · August 2026 · 2 min read</span><span data-lang="zh">学习记录 · 2026.08 · 约 2 分钟阅读</span></p>
-          <p class="article-deck">从 scripts/train.py 出发，梳理 JAX 编译缓存、PRNG、mesh、sharding、checkpoint 与训练循环。</p>
+          <p class="article-series"><span data-lang="en">Part 4: OpenPI / BrainCo Engineering</span><span data-lang="zh">第四卷：OpenPI / BrainCo 工程实践</span> · ENG03</p>
+          <h1>JAX 训练入口</h1>
+          <p class="article-meta"><span data-lang="en">进阶 · August 2026 · 2 min read</span><span data-lang="zh">进阶 · 2026.08 · 约 2 分钟阅读</span></p>
+          <p class="article-deck">从 scripts/train.py 出发，梳理编译缓存、PRNG、mesh、sharding、checkpoint 与训练循环。</p>
           <div class="article-content">
             <p>训练入口是 <a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/scripts/train.py"><code>scripts/train.py</code></a>。文件末尾只有一条主入口：</p>
 <pre><code class="language-python">if __name__ == &quot;__main__&quot;:
@@ -155,8 +155,8 @@ batch = next(data_iter)
 <p>下一章继续追踪 <code>_config.cli()</code> 如何构造 <code>TrainConfig</code>。</p>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <span></span>
-            <a href="02-config-system.html">02. 配置系统：从 YAML 到 DataConfig →</a>
+            <a href="03-data-pipeline-and-batch.html">← ENG02 · 从 Dataset 到 Batch</a>
+            <a href="05-train-state-jit-checkpoint.html">ENG04 · TrainState、JIT 与 Checkpoint →</a>
           </nav>
         </article>
       </main>

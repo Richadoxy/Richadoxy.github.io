@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="区分动态attention matrix与可训练参数，并用OpenCLIP、TVL、Octopi、AnyTouch和GR00T解释self/cross attention与对比学习。" />
-    <title>Attention 专题：从 OpenCLIP 到触觉模型与 GR00T | 董希越的学习之路</title>
+    <meta name="description" content="区分动态 attention matrix 与可训练参数，并系统理解 self、cross 与 joint attention。" />
+    <title>Transformer 与 Attention：从 QKV 到多模态交互 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
     <link rel="stylesheet" href="../assets/css/blog.css" />
@@ -106,13 +106,13 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Series 3: Tactile representation, VTLA, and contact-rich manipulation</span><span data-lang="zh">知识链三：触觉表征、VTLA 与接触丰富操作</span> · 19/20</p>
-          <h1>Attention 专题：从 OpenCLIP 到触觉模型与 GR00T</h1>
-          <p class="article-meta"><span data-lang="en">Learning note · September 2026 · 13 min read</span><span data-lang="zh">学习记录 · 2026.09 · 约 13 分钟阅读</span></p>
-          <p class="article-deck">区分动态attention matrix与可训练参数，并用OpenCLIP、TVL、Octopi、AnyTouch和GR00T解释self/cross attention与对比学习。</p>
+          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F02</p>
+          <h1>Transformer 与 Attention：从 QKV 到多模态交互</h1>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 13 min read</span><span data-lang="zh">入门 · 2026.09 · 约 13 分钟阅读</span></p>
+          <p class="article-deck">区分动态 attention matrix 与可训练参数，并系统理解 self、cross 与 joint attention。</p>
           <div class="article-content">
             <blockquote>
-<p>本文串联Transformer基础、OpenCLIP、TVL、Octopi、AnyTouch与GR00T，重点回答两个问题：Attention究竟在一次前向传播中改变什么？对比学习和cross-attention又有什么本质区别？</p>
+<p>本文以 OpenCLIP、触觉模型与 GR00T 为例，系统回答两个问题：Attention 在一次前向传播中改变什么？self、cross 与 joint attention 怎样区分？CLIP 和 InfoNCE 的完整基础放在下一篇《表示学习、CLIP 与对比学习》中。</p>
 </blockquote>
 <h2 id="0">0. 先给出核心结论</h2>
 <p>此前的理解已经抓住了主要方向：</p>
@@ -584,8 +584,8 @@ GR00T Action Expert
 <p>这也解释了为什么触觉VLA通常可以先学一个可独立使用的tactile encoder，再让action expert用cross-attention或joint attention读取它：<strong>先把触觉“表示清楚”，再让动作网络“按任务使用”。</strong></p>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="18-anytouch-unified-tactile-representation.html">← 18. AnyTouch 精读：统一静态—动态多传感器触觉表征</a>
-            <a href="20-beyond-sight-fuse-multimodal-policy.html">20. Beyond Sight 精读：用语言把触觉与音频接入通用机器人策略 →</a>
+            <a href="08-transformer-latent-encoder-decoder.html">← F01 · Token、Embedding、Encoder/Decoder 与 Latent</a>
+            <a href="clip-contrastive-representation-learning.html">F03 · 表示学习、CLIP 与对比学习 →</a>
           </nav>
         </article>
       </main>

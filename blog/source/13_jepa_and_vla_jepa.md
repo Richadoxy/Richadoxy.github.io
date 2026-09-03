@@ -1,5 +1,7 @@
 # 13. JEPA、World Model 与 VLA-JEPA
 
+> 建议先读：[VLA 总览](27_vla_overview.md)与[模型训练基础](22_model_training_basics.md)。本文属于进阶训练框架，不是初入 VLA 时必须先掌握的动作架构。
+
 JEPA 关注的不是重建每个未来像素，而是在 latent space 中预测目标表示。
 
 VLA-JEPA 则将这种预测监督引入 VLA，使视觉语言表示不仅能生成动作，还能表达与状态转移相关的动态信息。

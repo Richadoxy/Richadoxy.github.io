@@ -4,6 +4,8 @@
 > 正式论文：[Jones 等 - 2025 - Beyond Sight Finetuning Generalist Robot Policies with Heterogeneous Sensors via Language Grounding](<Jones 等 - 2025 - Beyond Sight Finetuning Generalist Robot Policies with Heterogeneous Sensors via Language Grounding.pdf>)<br>
 > [arXiv](https://arxiv.org/abs/2501.04693) · [项目主页](https://fuse-model.github.io/) · [开源代码](https://github.com/fuse-model/FuSe) · [Hugging Face论文页](https://huggingface.co/papers/2501.04693)
 
+> 推荐先读：[模仿学习入门](23_imitation_learning_basics.md)、[动作生成方法](25_action_generation_families.md)与 TVL。本文是触觉路线从“表征”进入“策略和动作”的收束案例。
+
 ## 0. 一句话定位
 
 Beyond Sight提出的**FuSe不是一个全新的VLA backbone**，而是一套微调已有通用机器人策略的方法：把视觉、触觉和声音都编码成token，交给同一个策略Transformer处理，再用自然语言作为公共语义监督，逼迫策略真正理解新增传感器，而不是继续只依赖预训练时熟悉的视觉和语言。

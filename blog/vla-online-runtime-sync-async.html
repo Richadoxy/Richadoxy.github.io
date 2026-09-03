@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="从端到端延迟、active/pending chunk 和 handoff 出发，建立在线部署的时间轴。" />
+    <title>VLA 在线执行：同步、异步与 Action Chunk 调度 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 一条端到端延迟链</a></li>
+<li><a href="#2">2. 同步执行</a></li>
+<li><a href="#3-naive-async">3. Naive Async</a></li>
+<li><a href="#4-active-pending-chunk">4. Active 与 Pending Chunk</a></li>
+<li><a href="#5-replan-overlap">5. Replan 与 Overlap</a></li>
+<li><a href="#6-stale-observation">6. Stale Observation</a></li>
+<li><a href="#7">7. 插值、平滑与低通滤波</a></li>
+<li><a href="#8">8. 延迟应该怎样测</a></li>
+<li><a href="#9-dataset-playback-runtime">9. Dataset Playback 不等于真实 Runtime</a></li>
+<li><a href="#10-vlash">10. 与 VLASH 的关系</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 5: Runtime and Deployment</span><span data-lang="zh">第五卷：推理与部署</span> · RUN01</p>
+          <h1>VLA 在线执行：同步、异步与 Action Chunk 调度</h1>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 2 min read</span><span data-lang="zh">入门 · 2026.09 · 约 2 分钟阅读</span></p>
+          <p class="article-deck">从端到端延迟、active/pending chunk 和 handoff 出发，建立在线部署的时间轴。</p>
+          <div class="article-content">
+            <p>模型输出正确 action 只是机器人系统的一半。另一半是：观测何时采集、推理期间机器人在做什么、新 chunk 从哪个状态开始执行。</p>
+<h2 id="1">1. 一条端到端延迟链</h2>
+<pre><code class="language-text">camera exposure
+-&gt; image decode / preprocessing
+-&gt; request serialization / network
+-&gt; server queue
+-&gt; VLM prefix computation
+-&gt; action sampling / denoising
+-&gt; response transport
+-&gt; actor receives result
+-&gt; controller handoff
+</code></pre>
+<p>真正影响动作时间对齐的是 observation timestamp 到 chunk handoff 的总延迟，而不只是一次模型 forward。</p>
+<h2 id="2">2. 同步执行</h2>
+<pre><code class="language-text">采集 observation
+-&gt; 等待 inference
+-&gt; 得到 chunk
+-&gt; 执行 chunk
+-&gt; 再采集 observation
+</code></pre>
+<p>优点是观测和规划起点关系清晰；缺点是推理期间可能停顿，动作不连续。</p>
+<h2 id="3-naive-async">3. Naive Async</h2>
+<pre><code class="language-text">t 时刻采集 observation/state
+旧 chunk 继续执行
+后台计算新 chunk
+t+Delta 时切换
+</code></pre>
+<p>如果新策略仍以 \(s_t\) 为起点规划，但真正执行时机器人已到 \(s_{t+\Delta}\)，就产生 prediction–execution misalignment。</p>
+<h2 id="4-active-pending-chunk">4. Active 与 Pending Chunk</h2>
+<p>一个最小异步 Actor 通常维护：</p>
+<pre><code class="language-text">active_chunk：当前正在执行
+active_index：已经执行到哪里
+pending_chunk：后台推理得到、等待切换的新轨迹
+request_id：防止旧响应覆盖新请求
+</code></pre>
+<p>切换应在清晰的控制边界原子完成。仅仅使用两个线程，并不自动保证时间对齐。</p>
+<h2 id="5-replan-overlap">5. Replan 与 Overlap</h2>
+<p>设预测 horizon 为 \(H\)，执行 \(K\) 步后触发下一次推理：</p>
+<pre><code class="language-text">overlap = H - K
+</code></pre>
+<p>较大的 overlap 给后台推理更多时间，但也更频繁调用模型。若推理在 active chunk 耗尽前仍未完成，系统还需要定义继续保持、重复末动作或进入安全状态的行为。</p>
+<h2 id="6-stale-observation">6. Stale Observation</h2>
+<p>异步系统中的图像、state 和 action 可能来自不同时间。每个 request 最少应携带：</p>
+<ul>
+<li>observation timestamp；</li>
+<li>state timestamp 和语义；
+-预计 handoff 时刻；</li>
+<li>active chunk identity/index；</li>
+<li>policy/control rate；</li>
+<li>request identity。</li>
+</ul>
+<p>否则即使数组 shape 完全正确，也无法判断新动作对应哪个执行起点。</p>
+<h2 id="7">7. 插值、平滑与低通滤波</h2>
+<p>需要区分：</p>
+<ul>
+<li>chunk 内从 policy rate 到 control rate 的重采样；</li>
+<li>chunk 边界的 blending；</li>
+<li>对控制命令做低通滤波。</li>
+</ul>
+<p>后两者会改变实际执行轨迹。如果 future-state estimation 基于原 active chunk，额外平滑可能使预测 handoff state 与真实状态再次偏离。</p>
+<h2 id="8">8. 延迟应该怎样测</h2>
+<p>至少记录：</p>
+<pre><code class="language-text">capture -&gt; request ready
+request -&gt; server start
+prefix prefill
+all denoising steps
+response -&gt; actor receive
+actor receive -&gt; actual handoff
+</code></pre>
+<p>报告 p50、p95、p99，而不只是平均值。异步训练覆盖范围通常要依据完整 handoff delay 的高分位数设置。</p>
+<h2 id="9-dataset-playback-runtime">9. Dataset Playback 不等于真实 Runtime</h2>
+<p>离线逐帧读取数据很容易无意中得到理想化结果：</p>
+<ul>
+<li>推理期间 dataset index 没有前进；</li>
+<li>每次都使用与 target 完美对齐的 state；</li>
+<li>没有控制器和网络延迟；</li>
+<li>没有旧 chunk 继续执行。</li>
+</ul>
+<p>若要测试异步状态机，dataset playback 也需要一套虚拟 controller clock，并明确推理期间时间如何前进。</p>
+<h2 id="10-vlash">10. 与 VLASH 的关系</h2>
+<p>本篇描述通用 runtime 问题。VLASH 的具体选择是：</p>
+<pre><code class="language-text">保留较早的视觉 observation o_t
++ 提供预计 handoff state s_hat_(t+Delta)
+-&gt; 生成从未来执行点开始的 action chunk
+</code></pre>
+<p>因此应该先理解本篇的 active/pending chunk 和时间戳，再阅读 VLASH 的 temporal-offset augmentation。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="06-action-dimensions-28d-56d.html">← ENG05 · 28D/56D 双臂双手改造案例</a>
+            <a href="12-vlash-principles-async-runtime.html">RUN02 · VLASH：Temporal Offset 与异步执行 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

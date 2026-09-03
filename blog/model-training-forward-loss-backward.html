@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="建立一次参数更新的完整闭环，并区分 freeze、LoRA、主损失、辅助损失及训练专用模块。" />
+    <title>模型训练基础：Forward、Loss、Backward 与微调 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 一次训练更新</a></li>
+<li><a href="#2-parameteractivation-gradient">2. Parameter、Activation 与 Gradient</a></li>
+<li><a href="#3-loss">3. Loss 在监督什么</a></li>
+<li><a href="#4-batchstep-epoch">4. Batch、Step 与 Epoch</a></li>
+<li><a href="#5-pretraining-fine-tuning">5. Pretraining 与 Fine-tuning</a></li>
+<li><a href="#6-freezefull-fine-tuning-lora">6. Freeze、Full Fine-tuning 与 LoRA</a><ul>
+<li><a href="#freeze">Freeze</a></li>
+<li><a href="#full-fine-tuning">Full fine-tuning</a></li>
+<li><a href="#lora">LoRA</a></li>
+</ul>
+</li>
+<li><a href="#7-main-loss-auxiliary-loss">7. Main Loss 与 Auxiliary Loss</a></li>
+<li><a href="#8-training-only-inference-time">8. Training-only 与 Inference-time</a></li>
+<li><a href="#9-checkpoint">9. Checkpoint 为什么不只是模型权重</a></li>
+<li><a href="#10">10. 阅读训练代码的顺序</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F05</p>
+          <h1>模型训练基础：Forward、Loss、Backward 与微调</h1>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 3 min read</span><span data-lang="zh">入门 · 2026.09 · 约 3 分钟阅读</span></p>
+          <p class="article-deck">建立一次参数更新的完整闭环，并区分 freeze、LoRA、主损失、辅助损失及训练专用模块。</p>
+          <div class="article-content">
+            <p>这篇文章只建立后续阅读训练代码所需的最小闭环，不绑定 PyTorch、JAX 或某个具体 VLA。</p>
+<h2 id="1">1. 一次训练更新</h2>
+<p>一次标准训练更新可以写成：</p>
+<pre><code class="language-text">batch
+  -&gt; forward
+  -&gt; prediction
+  -&gt; loss(prediction, target)
+  -&gt; backward / automatic differentiation
+  -&gt; gradients
+  -&gt; optimizer step
+  -&gt; new model parameters
+</code></pre>
+<p>Forward 更新的是当前样本的 hidden representations；optimizer step 才更新 checkpoint 中保存的模型参数。</p>
+<h2 id="2-parameteractivation-gradient">2. Parameter、Activation 与 Gradient</h2>
+<table>
+<thead>
+<tr>
+<th>对象</th>
+<th>来源</th>
+<th style="text-align: right;">是否长期保存</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>parameter</td>
+<td>模型中的可训练矩阵和向量</td>
+<td style="text-align: right;">是</td>
+</tr>
+<tr>
+<td>activation</td>
+<td>当前 batch 前向产生的中间表示</td>
+<td style="text-align: right;">通常否</td>
+</tr>
+<tr>
+<td>gradient</td>
+<td>loss 对参数的导数</td>
+<td style="text-align: right;">通常只用于当前更新</td>
+</tr>
+<tr>
+<td>optimizer state</td>
+<td>Adam 的动量、方差等</td>
+<td style="text-align: right;">继续训练时需要</td>
+</tr>
+</tbody>
+</table>
+<p>Attention matrix、Q/K/V 和 action hidden states 都是输入相关的 activation；生成它们的投影矩阵才是 parameter。</p>
+<h2 id="3-loss">3. Loss 在监督什么</h2>
+<p>Loss 定义模型输出和训练目标之间的差异，例如：</p>
+<pre><code class="language-text">分类             -&gt; cross entropy
+连续动作回归     -&gt; MSE
+语言生成         -&gt; token cross entropy
+对比学习         -&gt; InfoNCE
+Flow matching    -&gt; velocity MSE
+Latent prediction -&gt; representation distance
+</code></pre>
+<p>输入一个条件不代表它就是监督目标。图像、语言、state 和 timestep 都可以影响预测，但 loss 可能只比较动作 velocity。</p>
+<h2 id="4-batchstep-epoch">4. Batch、Step 与 Epoch</h2>
+<ul>
+<li>sample：一条训练样本；</li>
+<li>batch：一次更新共同使用的一组样本；</li>
+<li>step：通常指一次 optimizer update；</li>
+<li>epoch：完整遍历一次有限数据集。</li>
+</ul>
+<p>如果 <code>batch_size=32</code>，一次 step 会综合 32 条样本的梯度，而不是连续更新 32 次。</p>
+<p>机器人数据常按时间窗口动态采样，因此论文可能只报告 training steps，而不强调 epoch。</p>
+<h2 id="5-pretraining-fine-tuning">5. Pretraining 与 Fine-tuning</h2>
+<p>预训练学习广泛可复用的能力，微调使模型适应目标数据和任务：</p>
+<pre><code class="language-text">互联网图文 / 大规模机器人数据
+             -&gt; pretrained checkpoint
+             -&gt; 小规模目标机器人数据
+             -&gt; task-specific policy
+</code></pre>
+<p>加载 checkpoint 时需要区分：</p>
+<ul>
+<li>完全相同 shape 的参数直接恢复；</li>
+<li>新增 projector、sensor encoder 或 action head 随机初始化；</li>
+<li>action dimension 改变时，不匹配的输入/输出层需要重建。</li>
+</ul>
+<h2 id="6-freezefull-fine-tuning-lora">6. Freeze、Full Fine-tuning 与 LoRA</h2>
+<h3 id="freeze">Freeze</h3>
+<p>冻结参数仍然参与 forward，但不由当前 loss 更新。适合保留大模型能力和降低训练成本。</p>
+<h3 id="full-fine-tuning">Full fine-tuning</h3>
+<p>更新全部主体参数，适应能力强，但显存、数据量和遗忘风险更高。</p>
+<h3 id="lora">LoRA</h3>
+<p>在原矩阵旁增加低秩增量：</p>
+<p>\[
+W' = W + BA
+\]</p>
+<p>原始 \(W\) 可以冻结，只训练较小的 \(A,B\)。LoRA 是“更新哪些参数”的选择，与动作是 28D/56D、loss 是 MSE/flow 属于不同配置维度。</p>
+<h2 id="7-main-loss-auxiliary-loss">7. Main Loss 与 Auxiliary Loss</h2>
+<p>机器人策略的主目标可能是动作模仿：</p>
+<pre><code class="language-text">L = L_action
+</code></pre>
+<p>也可以加入辅助监督：</p>
+<pre><code class="language-text">L = L_action + lambda_1 L_contrastive + lambda_2 L_world_model
+</code></pre>
+<p>辅助 loss 的意义是约束中间表示。例如 FuSe 用语言对齐要求策略真正保留触觉语义；VLA-JEPA 用未来 latent 监督动态表示。</p>
+<p>需要检查：</p>
+<ul>
+<li>辅助 loss 更新哪些模块；</li>
+<li>它是否使用部署时不可见的信息；</li>
+<li>对应 head 在推理时是否保留。</li>
+</ul>
+<h2 id="8-training-only-inference-time">8. Training-only 与 Inference-time</h2>
+<p>训练框图中的模块不一定都部署：</p>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th style="text-align: right;">训练</th>
+<th style="text-align: right;">推理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>target action</td>
+<td style="text-align: right;">需要</td>
+<td style="text-align: right;">不可用</td>
+</tr>
+<tr>
+<td>dropout/augmentation</td>
+<td style="text-align: right;">常用</td>
+<td style="text-align: right;">关闭</td>
+</tr>
+<tr>
+<td>contrastive target encoder</td>
+<td style="text-align: right;">可能需要</td>
+<td style="text-align: right;">常可移除</td>
+</tr>
+<tr>
+<td>JEPA target encoder/world predictor</td>
+<td style="text-align: right;">需要</td>
+<td style="text-align: right;">标准策略中移除</td>
+</tr>
+<tr>
+<td>policy backbone/action head</td>
+<td style="text-align: right;">需要</td>
+<td style="text-align: right;">需要</td>
+</tr>
+<tr>
+<td>optimizer state</td>
+<td style="text-align: right;">需要</td>
+<td style="text-align: right;">不需要</td>
+</tr>
+</tbody>
+</table>
+<p>阅读框图时，最好给每条数据边标注 <code>train only</code>、<code>inference only</code> 或 <code>both</code>。</p>
+<h2 id="9-checkpoint">9. Checkpoint 为什么不只是模型权重</h2>
+<p>部署通常只需要模型参数、归一化统计量和配置；继续训练还需要：</p>
+<ul>
+<li>当前 step；</li>
+<li>optimizer state；</li>
+<li>learning-rate schedule 状态；</li>
+<li>可选 EMA 参数；</li>
+<li>数据和模型配置。</li>
+</ul>
+<p>所以 <code>resume training</code> 与 <code>load weights for inference</code> 是两个不同操作。</p>
+<h2 id="10">10. 阅读训练代码的顺序</h2>
+<ol>
+<li>batch 中有哪些输入和 target；</li>
+<li>forward 返回什么；</li>
+<li>loss 在哪些维度上计算；</li>
+<li>哪些参数允许求梯度；</li>
+<li>optimizer 何时更新；</li>
+<li>是否使用 gradient accumulation、clipping 或 EMA；</li>
+<li>checkpoint 保存和恢复什么。</li>
+</ol>
+<p>掌握这条闭环后，再进入具体 JAX 训练入口，会更容易区分通用机器学习概念和项目实现细节。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="09-attention-multi-expert-conditioning.html">← F04 · 多模态融合、多专家与条件注入</a>
+            <a href="imitation-learning-behavior-cloning.html">IL01 · 模仿学习与 Behavior Cloning 入门 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

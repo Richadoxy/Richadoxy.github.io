@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="比较四类动作生成目标，区分网络架构、训练 target 与推理采样方式。" />
+    <title>动作生成方法：MSE、Token、Diffusion 与 Flow Matching | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 统一问题</a></li>
+<li><a href="#2">2. 直接连续回归</a></li>
+<li><a href="#3-token">3. 离散动作 Token</a></li>
+<li><a href="#4-diffusion-action-generation">4. Diffusion Action Generation</a></li>
+<li><a href="#5-flow-matching">5. Flow Matching</a></li>
+<li><a href="#6-diffusion-flow-matching">6. Diffusion 与 Flow Matching 的关系</a></li>
+<li><a href="#7-action-network-objective">7. Action Network 与 Objective 是两个维度</a></li>
+<li><a href="#8">8. 训练与推理次数</a></li>
+<li><a href="#9">9. 怎样选择</a></li>
+<li><a href="#10">10. 后续阅读坐标</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span> · IL03</p>
+          <h1>动作生成方法：MSE、Token、Diffusion 与 Flow Matching</h1>
+          <p class="article-meta"><span data-lang="en">进阶 · September 2026 · 3 min read</span><span data-lang="zh">进阶 · 2026.09 · 约 3 分钟阅读</span></p>
+          <p class="article-deck">比较四类动作生成目标，区分网络架构、训练 target 与推理采样方式。</p>
+          <div class="article-content">
+            <p>VLA 都要从条件信息产生动作，但“Action Head”可以对应完全不同的生成目标。本篇先建立分类，再进入具体模型。</p>
+<h2 id="1">1. 统一问题</h2>
+<p>给定条件：</p>
+<p>\[
+c=(\text{image},\text{language},\text{state},\text{history})
+\]</p>
+<p>策略希望生成未来 action chunk：</p>
+<p>\[
+A\in\mathbb R^{H\times D}
+\]</p>
+<p>不同方法的核心区别是：怎样表示 \(p(A\mid c)\)，训练预测什么，推理需要多少次前向。</p>
+<h2 id="2">2. 直接连续回归</h2>
+<pre><code class="language-text">condition -&gt; Transformer/MLP -&gt; action chunk
+</code></pre>
+<p>常见 loss：</p>
+<p>\[
+\mathcal L=\lVert\hat A-A\rVert^2
+\]</p>
+<p>优点是简单、快速、通常一次前向。缺点是动作存在多种合理模式时，逐元素 MSE 可能产生平均化结果。</p>
+<p>FuSe 的公开 Octo 主实验配置就是直接 MSE Action Head。</p>
+<h2 id="3-token">3. 离散动作 Token</h2>
+<p>先将连续 action 量化或序列化：</p>
+<pre><code class="language-text">continuous action -&gt; discrete tokens
+VLM autoregressive generation -&gt; action tokens
+-&gt; decode -&gt; continuous action
+</code></pre>
+<p>训练使用 token cross-entropy，可以直接利用 LLM 的生成接口。需要额外处理量化误差、序列长度和生成延迟。</p>
+<p>RT-2、部分 PaliGemma VLA 路线可以从这个角度理解。</p>
+<h2 id="4-diffusion-action-generation">4. Diffusion Action Generation</h2>
+<p>Diffusion 训练先向真实动作逐步加噪，再让网络预测噪声、干净样本或其他参数化目标：</p>
+<p>\[
+A_t=\sqrt{\bar\alpha_t}A_0+sqrt{1-\bar\alpha_t}\epsilon
+\]</p>
+<p>一种常见目标是：</p>
+<p>\[
+\mathcal L=\lVert\epsilon-\epsilon_\theta(A_t,t,c)\rVert^2
+\]</p>
+<p>推理从随机噪声开始，重复调用网络去噪。它能表达多峰动作分布，但延迟取决于采样步数和 action network 大小。</p>
+<p>原始 Octo 和 Diffusion Policy 属于这一大类，但它们的具体动作网络并不相同。</p>
+<h2 id="5-flow-matching">5. Flow Matching</h2>
+<p>Flow matching 在噪声和真实动作之间定义连续路径，并训练速度场：</p>
+<p>\[
+x_t=(1-t)\epsilon+tA
+\]</p>
+<p>\[
+u_t=A-\epsilon
+\]</p>
+<p>模型学习：</p>
+<p>\[
+v_\theta(x_t,t,c)\approx u_t
+\]</p>
+<p>推理从噪声端对 ODE 做数值积分，逐步得到 action。PI0.5 可能采用相反的 \(t\) 方向和速度符号，但描述的是同一条路径。</p>
+<h2 id="6-diffusion-flow-matching">6. Diffusion 与 Flow Matching 的关系</h2>
+<p>两者都可以：</p>
+<ul>
+<li>从随机噪声生成连续动作；</li>
+<li>表达比单点 MSE 更丰富的分布；</li>
+<li>在推理时迭代更新 action tensor。</li>
+</ul>
+<p>但训练路径、目标参数化和采样方程不同。不能只因为模型“多步去噪”就断言它使用 flow matching，也不能把所有 DiT 都等同于同一个 loss。</p>
+<h2 id="7-action-network-objective">7. Action Network 与 Objective 是两个维度</h2>
+<p>“使用 Transformer”描述网络结构；“使用 diffusion/flow”描述训练和生成目标。可能的组合包括：</p>
+<pre><code class="language-text">MLP diffusion head
+Transformer diffusion policy
+DiT flow-matching head
+multi-expert Transformer flow head
+</code></pre>
+<p>因此阅读论文时要分别确认：</p>
+<ol>
+<li>noisy action 进入哪个网络；</li>
+<li>timestep 怎样注入；</li>
+<li>target 是 action、noise 还是 velocity；</li>
+<li>推理使用什么更新方程。</li>
+</ol>
+<h2 id="8">8. 训练与推理次数</h2>
+<p>Flow/diffusion 训练通常对每条样本随机采一个 timestep，只执行一次带噪前向：</p>
+<pre><code class="language-text">sample t -&gt; construct x_t -&gt; predict once -&gt; loss
+</code></pre>
+<p>推理时才运行多步积分或去噪。因此“推理使用 10 步”不表示每条训练样本也在内部执行 10 次网络。</p>
+<h2 id="9">9. 怎样选择</h2>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>直接回归</th>
+<th>动作 Token</th>
+<th>Diffusion / Flow</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>推理速度</td>
+<td>通常最快</td>
+<td>取决于 token 数</td>
+<td>取决于采样步数</td>
+</tr>
+<tr>
+<td>多模态分布</td>
+<td>较弱</td>
+<td>可表达</td>
+<td>较强</td>
+</tr>
+<tr>
+<td>实现复杂度</td>
+<td>低</td>
+<td>中</td>
+<td>高</td>
+</tr>
+<tr>
+<td>与 LLM 接口</td>
+<td>需独立 head</td>
+<td>自然</td>
+<td>通常独立 action expert</td>
+</tr>
+<tr>
+<td>连续精度</td>
+<td>直接</td>
+<td>受量化影响</td>
+<td>直接连续生成</td>
+</tr>
+</tbody>
+</table>
+<p>实际选择还取决于数据规模、控制频率、模型延迟和任务多解性，不能脱离 runtime 单看离线 loss。</p>
+<h2 id="10">10. 后续阅读坐标</h2>
+<ul>
+<li>PI0.5：Gemma Action Expert + flow matching；</li>
+<li>GR00T：embodiment-specific adapters + DiT + flow matching；</li>
+<li>原始 Octo：action readout condition + diffusion MLP；</li>
+<li>FuSe-Octo：MSE Action Head；</li>
+<li>FuSe-PaliGemma：离散动作 token。</li>
+</ul>
+<p>这张分类表可以避免把“VLM”“Transformer”“DiT”“diffusion”和“flow matching”当成同一层级的名词。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="robot-data-action-semantics.html">← IL02 · 机器人数据：Observation、Action 与时间窗口</a>
+            <a href="vla-overview-reading-map.html">VLA00 · 从模仿学习到 VLA：架构地图与阅读方法 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

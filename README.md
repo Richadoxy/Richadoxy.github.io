@@ -40,4 +40,12 @@ python3 -m venv .blog-build-env
 .blog-build-env/bin/python scripts/build_blog.py
 ```
 
-The script rebuilds 20 article pages, copies or reuses the original Markdown in `blog/source/`, and copies the editable diagrams into `blog/assets/diagrams/`. The bundled tactile-reading notes are kept in `blog/source/` so they remain available when the external BrainCo documentation directory is not present.
+The script rebuilds the learning-path article pages from the bundled Markdown in `blog/source/`. The bundled files are the canonical website sources, so a normal build never overwrites local edits.
+
+To explicitly refresh matching engineering notes and Draw.io diagrams from the external BrainCo documentation directory, opt in with:
+
+```bash
+.blog-build-env/bin/python scripts/build_blog.py --sync-upstream
+```
+
+The archive is organized into six dependency-first series: foundations, imitation learning, VLA architectures, engineering, runtime/deployment, and tactile VLA. Article codes such as `F01`, `IL01`, and `VLA00` express the reading path without changing the stable page URLs.

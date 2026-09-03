@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="统一 state/action 语义、episode、action chunk、horizon、控制频率、归一化和 mask。" />
+    <title>机器人数据：Observation、Action 与时间窗口 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1-episode">1. 一条 Episode 包含什么</a></li>
+<li><a href="#2-observationstate-action">2. Observation、State 与 Action</a></li>
+<li><a href="#3-action">3. 常见 Action 表示</a></li>
+<li><a href="#4-action-chunk">4. Action Chunk</a></li>
+<li><a href="#5-horizonhistory-receding-horizon">5. Horizon、History 与 Receding Horizon</a></li>
+<li><a href="#6-policy-rate-control-rate">6. Policy Rate 与 Control Rate</a></li>
+<li><a href="#7-normalize-unnormalize">7. Normalize 与 Unnormalize</a></li>
+<li><a href="#8-padding-mask">8. Padding 与 Mask</a></li>
+<li><a href="#9-episode">9. Episode 边界</a></li>
+<li><a href="#10">10. 数据合同检查表</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span> · IL02</p>
+          <h1>机器人数据：Observation、Action 与时间窗口</h1>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 2 min read</span><span data-lang="zh">入门 · 2026.09 · 约 2 分钟阅读</span></p>
+          <p class="article-deck">统一 state/action 语义、episode、action chunk、horizon、控制频率、归一化和 mask。</p>
+          <div class="article-content">
+            <p>这篇文章把机器人数据中最容易引发“shape 正确但语义错误”的概念放到一条时间轴上。</p>
+<h2 id="1-episode">1. 一条 Episode 包含什么</h2>
+<pre><code class="language-text">episode
+  ├─ observation.image[t]
+  ├─ observation.state[t]
+  ├─ instruction/task
+  ├─ action[t]
+  ├─ timestamp[t]
+  └─ episode boundary / success metadata
+</code></pre>
+<p>同样是 <code>[T,D]</code> 的数组，只有知道采样频率、坐标系、关节顺序和控制语义后才是可执行数据。</p>
+<h2 id="2-observationstate-action">2. Observation、State 与 Action</h2>
+<p>典型 VLA 样本：</p>
+<pre><code class="language-text">observation_t
+  ├─ camera images
+  ├─ language instruction
+  └─ proprioceptive state_t
+
+target
+  └─ future actions a[t:t+H]
+</code></pre>
+<p><code>state_t</code> 描述机器人在哪里，<code>action_t</code> 描述控制器下一步应该做什么。二者维度可能相同，但语义不能互换。</p>
+<h2 id="3-action">3. 常见 Action 表示</h2>
+<table>
+<thead>
+<tr>
+<th>表示</th>
+<th>示例</th>
+<th>部署端含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>absolute joint position</td>
+<td>目标关节角</td>
+<td>发送绝对目标</td>
+</tr>
+<tr>
+<td>delta joint position</td>
+<td>相对当前角度的变化</td>
+<td>与参考 state 合成</td>
+</tr>
+<tr>
+<td>EEF pose</td>
+<td>末端位姿或位姿增量</td>
+<td>需 IK 或笛卡尔控制器</td>
+</tr>
+<tr>
+<td>joint velocity</td>
+<td>关节速度</td>
+<td>与控制周期相关</td>
+</tr>
+<tr>
+<td>torque/force</td>
+<td>力矩或力</td>
+<td>对动力学和频率更敏感</td>
+</tr>
+</tbody>
+</table>
+<p>训练和部署必须在单位、坐标系、顺序、参考点和控制频率上完全一致。</p>
+<h2 id="4-action-chunk">4. Action Chunk</h2>
+<p>许多现代策略一次预测未来 \(H\) 步：</p>
+<p>\[
+A_t=[a_t,a_{t+1},\ldots,a_{t+H-1}]
+\]</p>
+<p>数据集从 episode 中切出：</p>
+<pre><code class="language-text">observation_t -&gt; action[t:t+H]
+</code></pre>
+<p>它的优势包括减少模型调用、显式建模短期轨迹一致性；代价是 chunk 后部基于更旧的观测，且运行时需要决定执行多少步后重新规划。</p>
+<h2 id="5-horizonhistory-receding-horizon">5. Horizon、History 与 Receding Horizon</h2>
+<p>三个长度不要混淆：</p>
+<ul>
+<li>observation history：模型向过去看多少帧；</li>
+<li>prediction horizon：一次预测多少步；</li>
+<li>execution horizon：新预测到来前真正执行多少步。</li>
+</ul>
+<p>例如模型可以观察最近 2 帧、预测未来 16 步，但只执行前 8 步就重新规划。这属于 receding-horizon execution。</p>
+<h2 id="6-policy-rate-control-rate">6. Policy Rate 与 Control Rate</h2>
+<pre><code class="language-text">policy rate：模型产生新动作或 chunk 的频率
+control rate：底层控制器发送命令的频率
+</code></pre>
+<p>若 policy 输出 30 Hz 轨迹而控制器运行在 1 kHz，中间可能需要插值。插值改变采样密度，但不应悄悄改变 action 的绝对/增量语义。</p>
+<h2 id="7-normalize-unnormalize">7. Normalize 与 Unnormalize</h2>
+<p>神经网络通常在归一化空间训练：</p>
+<pre><code class="language-text">raw state/action -&gt; normalize -&gt; model -&gt; normalized action -&gt; unnormalize
+</code></pre>
+<p>统计量必须对应相同的：</p>
+<ul>
+<li>action dimension；</li>
+<li>关节顺序；</li>
+<li>absolute/delta 规则；</li>
+<li>数据分布。</li>
+</ul>
+<p>改成新机器人或新动作布局后，不能继续无条件复用旧 norm stats。</p>
+<h2 id="8-padding-mask">8. Padding 与 Mask</h2>
+<p>多机器人统一模型常使用最大容量：</p>
+<pre><code class="language-text">actual action [H=16,D=56]
+-&gt; padded model tensor [H_max=40,D_max=132]
+</code></pre>
+<p>Mask 保证 padding 区域不进入有效 loss；推理后还要 slice 回真实 horizon 和 dimension。</p>
+<p>内部 <code>[40,132]</code> 不表示机器人有 132 个自由度。</p>
+<h2 id="9-episode">9. Episode 边界</h2>
+<p>构造 action chunk 时必须保证不跨 episode：</p>
+<pre><code class="language-text">t + H &lt;= episode_end
+</code></pre>
+<p>如果还要做 temporal offset：</p>
+<pre><code class="language-text">t + max_offset + H &lt;= episode_end
+</code></pre>
+<p>其他做法需要 padding 和对应 loss mask，否则下一条 episode 的动作可能被错误拼接进当前样本。</p>
+<h2 id="10">10. 数据合同检查表</h2>
+<p>在训练前为每个字段写清：</p>
+<pre><code class="language-text">name
+shape
+dtype
+unit
+coordinate frame
+joint order
+timestamp semantics
+normalization
+valid mask
+</code></pre>
+<p>数据、模型和部署三端都应遵守同一个 contract。机器人系统中，显式合同通常比只在代码里传递 shape 更重要。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="imitation-learning-behavior-cloning.html">← IL01 · 模仿学习与 Behavior Cloning 入门</a>
+            <a href="action-generation-mse-token-diffusion-flow.html">IL03 · 动作生成方法：MSE、Token、Diffusion 与 Flow Matching →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

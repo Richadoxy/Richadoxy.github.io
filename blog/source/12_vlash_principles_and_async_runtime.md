@@ -1,5 +1,7 @@
 # 12. VLASH：Temporal Offset 与异步执行
 
+> 建议先读：[VLA 在线执行](26_online_execution_runtime.md)。本篇聚焦 VLASH 如何修正 prediction–execution temporal misalignment。
+
 [`07_vlash_integration.md`](07_vlash_integration.md) 记录 BrainCo-IL 当前配置和代码范围；本章专门解释 VLASH 为什么这样设计，以及部署端发生什么。
 
 完整训练与运行时框图见 [vlash.drawio](vlash.drawio)。

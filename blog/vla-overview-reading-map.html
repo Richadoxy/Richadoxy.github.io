@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="用统一的数据流和六步检查法定位 VLM、动作头、训练目标与部署系统。" />
+    <title>从模仿学习到 VLA：架构地图与阅读方法 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1-vla">1. VLA 位于哪里</a></li>
+<li><a href="#2-vla">2. 一套通用 VLA</a></li>
+<li><a href="#3">3. 不要把不同层级放在一起比较</a></li>
+<li><a href="#4">4. 三条主要动作路线</a></li>
+<li><a href="#5-vlmaction">5. 两种典型 VLM—Action 连接</a><ul>
+<li><a href="#pi05">PI0.5</a></li>
+<li><a href="#gr00t">GR00T</a></li>
+</ul>
+</li>
+<li><a href="#6">6. 表示学习和动作学习的关系</a></li>
+<li><a href="#7">7. 训练图与部署图要分开</a></li>
+<li><a href="#8-vla">8. 阅读一篇新 VLA 的六步</a><ul>
+<li><a href="#_1">第一步：输入输出</a></li>
+<li><a href="#_2">第二步：表示</a></li>
+<li><a href="#_3">第三步：融合</a></li>
+<li><a href="#_4">第四步：监督</a></li>
+<li><a href="#_5">第五步：推理</a></li>
+<li><a href="#_6">第六步：系统边界</a></li>
+</ul>
+</li>
+<li><a href="#9">9. 本博客的推荐路线</a></li>
+<li><a href="#10">10. 最终心智模型</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 3: VLA Architectures</span><span data-lang="zh">第三卷：VLA 核心架构</span> · VLA00</p>
+          <h1>从模仿学习到 VLA：架构地图与阅读方法</h1>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 3 min read</span><span data-lang="zh">入门 · 2026.09 · 约 3 分钟阅读</span></p>
+          <p class="article-deck">用统一的数据流和六步检查法定位 VLM、动作头、训练目标与部署系统。</p>
+          <div class="article-content">
+            <p>VLA 不是一个单独网络层，而是一类把视觉、语言和机器人动作连接起来的策略。本篇是整套博客的入口地图。</p>
+<h2 id="1-vla">1. VLA 位于哪里</h2>
+<pre><code class="language-text">机器学习基础
+  -&gt; Transformer / representation learning
+  -&gt; 视觉语言模型 VLM
+  -&gt; 模仿学习与机器人数据
+  -&gt; Vision-Language-Action policy
+  -&gt; 在线闭环执行
+</code></pre>
+<p>VLM 主要回答“看到了什么、任务要求什么”；VLA 还必须回答“当前机器人应该怎样行动”。</p>
+<h2 id="2-vla">2. 一套通用 VLA</h2>
+<pre><code class="language-text">images -&gt; Vision Encoder ------┐
+                               │
+language -&gt; Tokenizer / LLM ---┼-&gt; multimodal backbone
+                               │            │
+robot state -&gt; adapter --------┘            │ condition
+                                            ▼
+noisy/action queries -&gt; Action Network -&gt; action chunk
+</code></pre>
+<p>不同论文主要在四个位置变化：</p>
+<ol>
+<li>模态怎样编码；</li>
+<li>视觉语言与动作怎样融合；</li>
+<li>动作怎样表示和生成；</li>
+<li>训练及部署时加入哪些额外约束。</li>
+</ol>
+<h2 id="3">3. 不要把不同层级放在一起比较</h2>
+<pre><code class="language-text">PI0.5、GR00T：VLA architecture
+Flow matching：动作生成 objective
+DiT、Transformer：network architecture
+VLASH：时间对齐与异步执行 framework
+VLA-JEPA：加入 latent world-model supervision 的训练 framework
+TVL、AnyTouch：可作为触觉感知前端的 representation model
+</code></pre>
+<p>“哪个更好”只有在比较对象处于同一层级、任务和运行条件一致时才有意义。</p>
+<h2 id="4">4. 三条主要动作路线</h2>
+<pre><code class="language-text">直接回归 / MSE
+离散 action tokens / autoregressive generation
+连续生成 / diffusion or flow matching
+</code></pre>
+<p>动作生成方式决定训练 target 和推理延迟；VLM backbone 则决定视觉语言表示。二者是可以组合的两个设计维度。</p>
+<h2 id="5-vlmaction">5. 两种典型 VLM—Action 连接</h2>
+<h3 id="pi05">PI0.5</h3>
+<pre><code class="language-text">image/language/state prefix
++ noisy action suffix
+-&gt; paired multi-expert joint attention
+-&gt; velocity
+</code></pre>
+<h3 id="gr00t">GR00T</h3>
+<pre><code class="language-text">image/language -&gt; VLM memory
+state/action -&gt; DiT query stream
+-&gt; cross-attention to VLM memory
+-&gt; velocity
+</code></pre>
+<p>两者都由视觉语言条件生成连续动作，但内部耦合方式不同。</p>
+<h2 id="6">6. 表示学习和动作学习的关系</h2>
+<p>CLIP、TVL、AnyTouch 等模型学习“什么输入在语义上相近”。机器人 policy 还要学习：</p>
+<ul>
+<li>当前任务需要关注什么；</li>
+<li>哪个表示与动作选择有关；</li>
+<li>机器人动作空间和 embodiment；</li>
+<li>时间连续性和接触反馈。</li>
+</ul>
+<p>因此一个强 tactile encoder 可以成为 VLA 前端，但不是完整动作策略。</p>
+<h2 id="7">7. 训练图与部署图要分开</h2>
+<p>训练中可能出现：</p>
+<ul>
+<li>target actions；</li>
+<li>future frames；</li>
+<li>frozen teacher encoder；</li>
+<li>contrastive/generation auxiliary heads；</li>
+<li>optimizer 和 data augmentation。</li>
+</ul>
+<p>它们不一定在部署时运行。最终 online graph 应单独画出，只保留实时可得输入和实际调用模块。</p>
+<h2 id="8-vla">8. 阅读一篇新 VLA 的六步</h2>
+<h3 id="_1">第一步：输入输出</h3>
+<pre><code class="language-text">哪些相机、语言、state 和 history？
+输出 position、delta、velocity 还是 torque？
+action dimension 与 horizon 是多少？
+</code></pre>
+<h3 id="_2">第二步：表示</h3>
+<pre><code class="language-text">每种模态经过哪个 encoder？
+输出 global embedding 还是 token sequence？
+原始维度与 hidden width 分别是多少？
+</code></pre>
+<h3 id="_3">第三步：融合</h3>
+<pre><code class="language-text">token concat、joint attention、cross-attention、gate 还是 AdaNorm？
+attention mask 允许哪些信息方向？
+</code></pre>
+<h3 id="_4">第四步：监督</h3>
+<pre><code class="language-text">BC MSE、token CE、diffusion、flow、contrastive 或 world-model loss？
+哪些参数被冻结或使用 LoRA？
+</code></pre>
+<h3 id="_5">第五步：推理</h3>
+<pre><code class="language-text">一次前向还是多步采样？
+一次输出几步，执行几步后 replan？
+训练辅助模块是否移除？
+</code></pre>
+<h3 id="_6">第六步：系统边界</h3>
+<pre><code class="language-text">future information 是否泄漏到部署路径？
+observation 与 action 是否时间对齐？
+真实延迟、控制频率和失败模式是什么？
+</code></pre>
+<h2 id="9">9. 本博客的推荐路线</h2>
+<pre><code class="language-text">F：基础概念
+-&gt; IL：模仿学习
+-&gt; VLA：模型架构
+-&gt; ENG：OpenPI/BrainCo 工程实践
+-&gt; RUN：在线执行与 VLASH
+-&gt; TOUCH：触觉表征和触觉 VLA
+</code></pre>
+<p>第一次阅读建议完成 F 和 IL，再选择自己关心的分支。已经熟悉 Transformer 和 BC 的读者，可以直接从 VLA00 开始。</p>
+<h2 id="10">10. 最终心智模型</h2>
+<pre><code class="language-text">原始模态
+-&gt; token / embedding / condition
+-&gt; multimodal information fusion
+-&gt; action distribution or velocity field
+-&gt; training objective
+-&gt; inference sampling
+-&gt; runtime scheduling and closed-loop execution
+</code></pre>
+<p>只要能沿这条链说明每个张量、模块和时间点，通常就已经抓住了一套 VLA 的主体结构。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="action-generation-mse-token-diffusion-flow.html">← IL03 · 动作生成方法：MSE、Token、Diffusion 与 Flow Matching</a>
+            <a href="10-flow-matching-training-inference.html">VLA01 · Flow Matching：训练、timestep 与推理 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>
