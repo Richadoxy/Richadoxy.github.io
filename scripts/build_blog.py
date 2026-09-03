@@ -92,6 +92,16 @@ POSTS = [
         published_en="September 2026",
         published_zh="2026.09",
     ),
+    Post(
+        20,
+        "20_beyond_sight_fuse_paper_reading_notes.md",
+        "20-beyond-sight-fuse-multimodal-policy",
+        "Beyond Sight 精读：用语言把触觉与音频接入通用机器人策略",
+        "从Octo与PaliGemma两类backbone出发，拆解FuSe的异构传感器token融合、action readout、语言对比与生成监督，以及真实机器人实验。",
+        "tactile",
+        published_en="September 2026",
+        published_zh="2026.09",
+    ),
 ]
 
 
