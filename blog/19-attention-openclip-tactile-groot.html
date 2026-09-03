@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="区分动态attention matrix与可训练参数，并用OpenCLIP、TVL、Octopi、AnyTouch和GR00T解释self/cross attention与对比学习。" />
+    <title>Attention 专题：从 OpenCLIP 到触觉模型与 GR00T | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#0">0. 先给出核心结论</a></li>
+<li><a href="#1-token2048">1. 一个token是“2048个向量”吗</a></li>
+<li><a href="#2-attention">2. Attention的一次前向传播到底做什么</a><ul>
+<li><a href="#21">2.1 一个极简例子</a></li>
+</ul>
+</li>
+<li><a href="#3">3. 前向“更新表示”与训练“更新参数”</a><ul>
+<li><a href="#31-forward">3.1 Forward</a></li>
+<li><a href="#32-backwardoptimizer-step">3.2 Backward与optimizer step</a></li>
+<li><a href="#33">3.3 推理时会发生什么</a></li>
+</ul>
+</li>
+<li><a href="#4-transformerhidden-statehidden-state">4. Transformer是否就是hidden state进、hidden state出</a></li>
+<li><a href="#5-self-attentioncross-attention">5. Self-attention与Cross-attention的严格区别</a><ul>
+<li><a href="#51-self-attention">5.1 Self-attention</a></li>
+<li><a href="#52-cross-attention">5.2 Cross-attention</a></li>
+<li><a href="#53-token">5.3 拼接多模态token的特殊情况</a></li>
+</ul>
+</li>
+<li><a href="#6-openclipself-attention">6. OpenCLIP视觉编码器中的Self-attention</a><ul>
+<li><a href="#61-openclip">6.1 OpenCLIP文本塔</a></li>
+</ul>
+</li>
+<li><a href="#7-gr00t-action-expertcross-attention">7. GR00T Action Expert中的Cross-attention</a><ul>
+<li><a href="#71-qk">7.1 两边宽度不同，如何做QK相似度</a></li>
+<li><a href="#72-cross-attention">7.2 这个Cross-attention在做什么</a></li>
+</ul>
+</li>
+<li><a href="#8-cross-attention">8. 对比学习与Cross-attention不是同一层级</a><ul>
+<li><a href="#81">8.1 对比学习是一种训练目标</a></li>
+<li><a href="#82-cross-attention">8.2 Cross-attention是一种前向信息融合算子</a></li>
+<li><a href="#83">8.3 核心对照</a></li>
+</ul>
+</li>
+<li><a href="#9-tvlanytouchencodercross-attention">9. 为什么TVL和AnyTouch的模态encoder之间不直接用Cross-attention</a><ul>
+<li><a href="#91">9.1 需要单模态独立推理</a></li>
+<li><a href="#92">9.2 训练数据经常缺模态</a></li>
+<li><a href="#93">9.3 配对监督往往只有样本级</a></li>
+<li><a href="#94">9.4 检索和迁移效率</a></li>
+</ul>
+</li>
+<li><a href="#10-attentiontvloctopianytouch">10. Attention在TVL、Octopi、AnyTouch中的具体位置</a><ul>
+<li><a href="#101-tvl">10.1 TVL</a></li>
+<li><a href="#102-octopi">10.2 Octopi</a></li>
+<li><a href="#103-anytouch">10.3 AnyTouch</a></li>
+</ul>
+</li>
+<li><a href="#11">11. 四类模型放在同一张表中</a></li>
+<li><a href="#12-attentionvla">12. Attention进入触觉VLA时可以怎么设计</a><ul>
+<li><a href="#121-token">12.1 全部token早期拼接</a></li>
+<li><a href="#122-action-expertcross-attention">12.2 Action Expert做Cross-attention</a></li>
+<li><a href="#123">12.3 分层或门控注入</a></li>
+</ul>
+</li>
+<li><a href="#13">13. 常见误区</a><ul>
+<li><a href="#attention-weight">误区一：Attention weight就是模型参数</a></li>
+<li><a href="#2048token2048token">误区二：一个2048宽token包含2048个token或向量</a></li>
+<li><a href="#hidden-widthcross-attention">误区三：不同hidden width无法做Cross-attention</a></li>
+<li><a href="#cross-attention">误区四：有Cross-attention就完成了模态对齐</a></li>
+<li><a href="#crossattention">误区五：没有名为CrossAttention的层，就没有跨模态交流</a></li>
+<li><a href="#transformerattention">误区六：Transformer只等于Attention</a></li>
+</ul>
+</li>
+<li><a href="#14">14. 最终记忆框架</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Series 3: Tactile representation, VTLA, and contact-rich manipulation</span><span data-lang="zh">知识链三：触觉表征、VTLA 与接触丰富操作</span> · 19/19</p>
+          <h1>Attention 专题：从 OpenCLIP 到触觉模型与 GR00T</h1>
+          <p class="article-meta"><span data-lang="en">Learning note · September 2026 · 13 min read</span><span data-lang="zh">学习记录 · 2026.09 · 约 13 分钟阅读</span></p>
+          <p class="article-deck">区分动态attention matrix与可训练参数，并用OpenCLIP、TVL、Octopi、AnyTouch和GR00T解释self/cross attention与对比学习。</p>
+          <div class="article-content">
+            <blockquote>
+<p>本文串联Transformer基础、OpenCLIP、TVL、Octopi、AnyTouch与GR00T，重点回答两个问题：Attention究竟在一次前向传播中改变什么？对比学习和cross-attention又有什么本质区别？</p>
+</blockquote>
+<h2 id="0">0. 先给出核心结论</h2>
+<p>此前的理解已经抓住了主要方向：</p>
+<ul>
+<li>self-attention的Q、K、V来自同一组token；</li>
+<li>cross-attention的Q来自一组token，K、V来自另一组memory；</li>
+<li>QK相似度决定每个query应该从哪些value读取信息。</li>
+</ul>
+<p>但“通过attention更新权重”这句话容易把两种完全不同的weight混在一起：</p>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>是什么</th>
+<th>什么时候变化</th>
+<th style="text-align: right;">是否保存在checkpoint中</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Attention weights</td>
+<td><code>softmax(QK^T)</code>得到的动态信息分配系数</td>
+<td>每次前向、每个输入都重新计算</td>
+<td style="text-align: right;">否</td>
+</tr>
+<tr>
+<td>Model weights</td>
+<td><code>W_Q</code>、<code>W_K</code>、<code>W_V</code>、MLP等可训练参数</td>
+<td>反向传播后由optimizer更新</td>
+<td style="text-align: right;">是</td>
+</tr>
+</tbody>
+</table>
+<p>因此更准确的说法是：</p>
+<blockquote>
+<p><strong>前向传播时，attention根据当前输入临时算出attention weights，并用它们更新token的hidden representations；训练时，loss再通过反向传播更新生成Q/K/V的模型参数。</strong></p>
+</blockquote>
+<hr />
+<h2 id="1-token2048">1. 一个token是“2048个向量”吗</h2>
+<p>不是。以GR00T的VLM宽度2048为例：</p>
+<pre><code class="language-text">一个token = 一个2048维向量
+          = [h_1, h_2, ..., h_2048]
+</code></pre>
+<p>其中2048个元素是标量特征，不是2048个独立向量。</p>
+<p>如果一批数据中有<code>B</code>个样本，每个样本有<code>N</code>个token，Transformer hidden state通常写成：</p>
+<p>\[
+H \in \mathbb{R}^{B\times N\times d}
+\]</p>
+<p>例如：</p>
+<pre><code class="language-text">GR00T VLM memory: [B, S, 2048]
+
+B    batch size
+S    图像和文本组成的token序列长度
+2048 每个token的hidden width
+</code></pre>
+<p><code>2048</code>描述的是每个位置能携带多少通道的信息；<code>S</code>才表示有多少个token位置。</p>
+<hr />
+<h2 id="2-attention">2. Attention的一次前向传播到底做什么</h2>
+<p>设输入hidden states为：</p>
+<p>\[
+H=[h_1,h_2,\ldots,h_N]
+\]</p>
+<p>模型使用四组已经训练好的参数做投影：</p>
+<p>\[
+Q=HW_Q,\qquad K=HW_K,\qquad V=HW_V
+\]</p>
+<p>然后计算：</p>
+<p>\[
+A=\operatorname{softmax}\left(\frac{QK^\top}{\sqrt{d_k}}\right)
+\]</p>
+<p>\[
+O=AV
+\]</p>
+<p>这里：</p>
+<ul>
+<li><code>Q</code>表示每个token当前想检索什么；</li>
+<li><code>K</code>表示每个token可以通过什么特征被检索；</li>
+<li><code>V</code>表示被选中以后真正提供的内容；</li>
+<li><code>A</code>是attention matrix；</li>
+<li><code>O</code>是聚合其他token信息后的新表示。</li>
+</ul>
+<p>经过输出投影和residual connection，可简化写成：</p>
+<p>\[
+H' = H + OW_O
+\]</p>
+<p>于是前向传播中发生的是：</p>
+<pre><code class="language-text">旧token表示 H
+  -&gt; 计算当前输入专属的检索关系 A
+  -&gt; 汇总其他token的V
+  -&gt; 得到新的token表示 H'
+</code></pre>
+<h3 id="21">2.1 一个极简例子</h3>
+<p>假设一句话只有三个token：</p>
+<pre><code class="language-text">[拿起] [红色] [杯子]
+</code></pre>
+<p>当“杯子”token作为query时，它可能对“红色”token产生较大的attention coefficient。于是更新后的“杯子”hidden state不再只表示杯子类别，也携带“要拿的是红色那个”的上下文。</p>
+<p>下次输入变成“拿起蓝色杯子”时，模型参数没变，但Q、K和attention matrix会随输入变化。</p>
+<hr />
+<h2 id="3">3. 前向“更新表示”与训练“更新参数”</h2>
+<p>把一个训练step拆开，就很清楚了。</p>
+<h3 id="31-forward">3.1 Forward</h3>
+<pre><code class="language-text">输入tokens
+  -&gt; 用当前W_Q/W_K/W_V计算Q/K/V
+  -&gt; 计算attention matrix A
+  -&gt; 生成新的hidden states
+  -&gt; 经过后续层得到预测
+  -&gt; 计算loss
+</code></pre>
+<p>这一步只是在内存中生成新的activation。<code>W_Q/W_K/W_V</code>被读取，但没有在attention算子内部自行改变。</p>
+<h3 id="32-backwardoptimizer-step">3.2 Backward与optimizer step</h3>
+<pre><code class="language-text">loss
+  -&gt; 反向传播得到 dLoss/dW_Q、dLoss/dW_K、dLoss/dW_V
+  -&gt; optimizer根据梯度更新参数
+</code></pre>
+<p>例如：</p>
+<p>\[
+W_Q \leftarrow W_Q-\eta\frac{\partial \mathcal L}{\partial W_Q}
+\]</p>
+<p>模型学到的不是某一张固定attention map，而是<strong>如何从不同输入生成有用attention map的投影规则</strong>。</p>
+<h3 id="33">3.3 推理时会发生什么</h3>
+<p>推理没有backward和optimizer，因此模型参数被冻结；但attention matrix仍会根据每次输入重新计算。于是模型仍能动态关注不同图像区域、文字或VLM memory。</p>
+<hr />
+<h2 id="4-transformerhidden-statehidden-state">4. Transformer是否就是hidden state进、hidden state出</h2>
+<p>如果只看一个Transformer block，答案基本是“对”。典型Pre-Norm block可以写成：</p>
+<p>\[
+\widetilde H_l=H_l+\operatorname{Attention}(\operatorname{Norm}(H_l))
+\]</p>
+<p>\[
+H_{l+1}=\widetilde H_l+\operatorname{MLP}(\operatorname{Norm}(\widetilde H_l))
+\]</p>
+<p>输入和输出常常具有相同shape：</p>
+<pre><code class="language-text">H_l     [B, N, d]
+  ↓ Transformer block
+H_{l+1} [B, N, d]
+</code></pre>
+<p>两个子层分工不同：</p>
+<ul>
+<li>Attention：让不同token位置之间交换信息；</li>
+<li>MLP/FFN：对每个token内部的特征通道做非线性变换。</li>
+</ul>
+<p>但“完整Transformer模型”通常还包括：</p>
+<pre><code class="language-text">原始输入
+  -&gt; tokenizer / patch embedding / action encoder
+  -&gt; 一叠Transformer blocks
+  -&gt; pooling / language head / action decoder
+  -&gt; 最终输出
+</code></pre>
+<p>因此，block是hidden-state-to-hidden-state；完整模型则可以是文本到文本、图像到embedding或噪声动作到velocity。</p>
+<hr />
+<h2 id="5-self-attentioncross-attention">5. Self-attention与Cross-attention的严格区别</h2>
+<p>命名依据是Q、K、V来自哪组hidden states，而不是“里面有几种语义模态”。</p>
+<h3 id="51-self-attention">5.1 Self-attention</h3>
+<p>\[
+Q=H W_Q,\quad K=H W_K,\quad V=H W_V
+\]</p>
+<p>Q、K、V来自同一序列。输出更新的也是这组序列。</p>
+<h3 id="52-cross-attention">5.2 Cross-attention</h3>
+<p>设query stream为<code>H_q</code>，外部memory为<code>M</code>：</p>
+<p>\[
+Q=H_q W_Q,\quad K=M W_K,\quad V=M W_V
+\]</p>
+<p>输出更新query stream，而memory主要被读取：</p>
+<pre><code class="language-text">Action tokens ──Q────┐
+                     ├─&gt; attention -&gt; 更新Action tokens
+VLM memory ───K/V────┘
+</code></pre>
+<h3 id="53-token">5.3 拼接多模态token的特殊情况</h3>
+<p>如果先把触觉token和文本token拼成一个序列，再在整个序列上做self-attention，那么从算子定义看它仍是self-attention；从功能上看，它已经发生了跨模态交流。</p>
+<p>Octopi中的Vicuna就是这种情况。不要仅凭“没有单独叫CrossAttention的模块”断言模型没有跨模态交互。</p>
+<hr />
+<h2 id="6-openclipself-attention">6. OpenCLIP视觉编码器中的Self-attention</h2>
+<p>以常见的ViT-L/14、224×224输入作为说明性例子：</p>
+<pre><code class="language-text">图像 224×224
+  -&gt; 每14×14像素形成一个patch
+  -&gt; 16×16 = 256个patch tokens
+  -&gt; 加1个CLS token
+  -&gt; 共257个tokens
+</code></pre>
+<p>每个Transformer层内，Q、K、V都来自这257个视觉token：</p>
+<pre><code class="language-text">[CLS, patch_1, ..., patch_256]
+               ↓ self-attention
+每个patch读取其他图像区域
+CLS逐层汇聚全图信息
+</code></pre>
+<p>对某个attention head而言，attention matrix的空间尺寸为：</p>
+<p>\[
+A\in\mathbb{R}^{257\times257}
+\]</p>
+<p>例如，描述杯子把手的patch可以关注杯身边缘；CLS token可以汇总形状、纹理和物体类别。最后，CLS或pooled feature经过projection进入CLIP共享embedding空间。</p>
+<p>需要注意：具体hidden width、head数量和是否采用其他pooling取决于OpenCLIP checkpoint。这里的257仅来自<code>224/14</code>这个示例，不是所有CLIP视觉塔的固定长度。</p>
+<h3 id="61-openclip">6.1 OpenCLIP文本塔</h3>
+<p>文本token也在自己的Transformer中做self-attention：</p>
+<pre><code class="language-text">“a rough red cup”
+  -&gt; text tokens
+  -&gt; causal/self-attention
+  -&gt; pooled text embedding
+</code></pre>
+<p>视觉塔和文本塔在encoder前向中各自工作，二者不做cross-attention。训练末端通过CLIP contrastive loss，使匹配图文的全局embedding接近。</p>
+<hr />
+<h2 id="7-gr00t-action-expertcross-attention">7. GR00T Action Expert中的Cross-attention</h2>
+<p>GR00T提供了与OpenCLIP完全不同的例子。VLM先处理图像和指令，产生memory：</p>
+<pre><code class="language-text">VLM memory [B, S, 2048]
+</code></pre>
+<p>这里是<code>S</code>个token，每个token宽2048。Action Expert不是直接把每个VLM token解释成动作，而是先形成自己的query stream：</p>
+<pre><code class="language-text">robot state -&gt; 1个state token  [B, 1, 1536]
+noisy action -&gt; 40个action tokens [B, 40, 1536]
+concat -&gt; [B, 41, 1536]
+</code></pre>
+<p>所以要纠正一个常见说法：<strong>进入GR00T Action Expert的VLM memory宽度是2048，但Action Expert自身的hidden width是1536。</strong></p>
+<h3 id="71-qk">7.1 两边宽度不同，如何做QK相似度</h3>
+<p>Cross-attention使用不同的线性投影把二者映射到相同的head space。以32个head、每个head 48维为例：</p>
+<pre><code class="language-text">Action hidden [B, 41, 1536]
+  -&gt; W_Q
+Q [B, 32, 41, 48]
+
+VLM memory [B, S, 2048]
+  -&gt; W_K, W_V
+K,V [B, 32, S, 48]
+</code></pre>
+<p>此时可以计算：</p>
+<p>\[
+A=\operatorname{softmax}\left(\frac{QK^\top}{\sqrt{48}}\right)
+\in\mathbb{R}^{B\times32\times41\times S}
+\]</p>
+<p>再用<code>A</code>对VLM的<code>V</code>加权，输出经过投影后回到：</p>
+<pre><code class="language-text">更新后的state/action hidden [B, 41, 1536]
+</code></pre>
+<h3 id="72-cross-attention">7.2 这个Cross-attention在做什么</h3>
+<p>假设指令是“把红色杯子放进蓝色碗中”。某个action token可以产生一个query，从VLM memory中重点读取：</p>
+<ul>
+<li>“红色杯子”的文字和视觉位置；</li>
+<li>“蓝色碗”的文字和视觉位置；</li>
+<li>当前任务阶段需要关注的目标。</li>
+</ul>
+<p>不同时间位置的action token可能得到不同的attention map：靠近杯子时关注杯子，搬运末端则更多关注碗。</p>
+<p>GR00T的AlternateVLDiT还穿插self-attention：</p>
+<pre><code class="language-text">Cross-attention：action/state从VLM memory读取任务信息
+Self-attention：state token和不同时间的action tokens彼此协调
+</code></pre>
+<p>完整结构可对照<a href="11-groot-dit-architecture.html">GR00T与DiT Action Head</a>。</p>
+<hr />
+<h2 id="8-cross-attention">8. 对比学习与Cross-attention不是同一层级</h2>
+<p>这是理解TVL和AnyTouch的关键。</p>
+<h3 id="81">8.1 对比学习是一种训练目标</h3>
+<pre><code class="language-text">Touch Encoder  -&gt; x_T
+Vision Encoder -&gt; x_V
+Text Encoder   -&gt; x_L
+
+loss约束：x_T ≈ x_V ≈ x_L
+</code></pre>
+<p>每个encoder可以独立前向。InfoNCE根据配对关系计算标量loss，再通过backward更新encoder参数。</p>
+<p>它直接塑造的是embedding space的几何结构：</p>
+<ul>
+<li>匹配样本更接近；</li>
+<li>不匹配样本更远；</li>
+<li>单一模态在推理时也能独立得到可比较的embedding。</li>
+</ul>
+<h3 id="82-cross-attention">8.2 Cross-attention是一种前向信息融合算子</h3>
+<pre><code class="language-text">Touch tokens -&gt; Q
+Vision tokens -&gt; K/V
+        ↓
+更新后的touch-conditioned-on-vision tokens
+</code></pre>
+<p>它告诉模型“如何从另一模态读取信息”，却没有自动规定正确答案是什么。要让cross-attention变得有用，仍需分类loss、生成loss、动作loss等监督。</p>
+<h3 id="83">8.3 核心对照</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>对比学习</th>
+<th>Cross-attention</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>类型</td>
+<td>loss / 训练目标</td>
+<td>网络层 / 前向算子</td>
+</tr>
+<tr>
+<td>输入</td>
+<td>通常是各模态独立得到的全局embedding</td>
+<td>两组token hidden states</td>
+</tr>
+<tr>
+<td>输出</td>
+<td>标量loss</td>
+<td>融合后的query hidden states</td>
+</tr>
+<tr>
+<td>主要作用</td>
+<td>建立共享可度量语义空间</td>
+<td>按当前任务动态读取另一模态细节</td>
+</tr>
+<tr>
+<td>推理时是否要求两种模态同时存在</td>
+<td>通常不要求</td>
+<td>通常要求memory存在</td>
+</tr>
+<tr>
+<td>粒度</td>
+<td>常见为样本级/global</td>
+<td>token级</td>
+</tr>
+<tr>
+<td>是否天然支持检索和缓存</td>
+<td>是</td>
+<td>较弱，因表示依赖另一模态</td>
+</tr>
+<tr>
+<td>是否自动保证模态对齐</td>
+<td>是其直接目标</td>
+<td>否，仍由最终loss决定</td>
+</tr>
+</tbody>
+</table>
+<p>所以两者不互斥。常见组合是：</p>
+<pre><code class="language-text">第一步：用对比学习预训练独立、可迁移的encoder
+第二步：在LLM或VLA中用joint/cross-attention完成任务相关融合
+</code></pre>
+<hr />
+<h2 id="9-tvlanytouchencodercross-attention">9. 为什么TVL和AnyTouch的模态encoder之间不直接用Cross-attention</h2>
+<p>因为它们当前阶段的目标是“对齐并获得独立可用的encoder”，而不是“给定所有模态完成一个特定下游任务”。</p>
+<h3 id="91">9.1 需要单模态独立推理</h3>
+<p>开放词汇触觉分类时，系统可能只有触觉输入；检索时，也希望提前缓存视觉或文本库的embedding。如果触觉表示必须cross-attend视觉才能生成，它就不再是独立表征。</p>
+<h3 id="92">9.2 训练数据经常缺模态</h3>
+<p>AnyTouch整合的九个数据集并非每条样本都有触觉、视觉和文本。独立encoder加pairwise loss可以自然跳过缺失模态；cross-attention通常要求另一组token真实存在。</p>
+<h3 id="93">9.3 配对监督往往只有样本级</h3>
+<p>如果只知道“一段触觉对应一张物体图”，却不知道每个触觉patch对应图像中的哪个patch，直接做细粒度cross-attention容易学习外观捷径或噪声关系。</p>
+<h3 id="94">9.4 检索和迁移效率</h3>
+<p>独立embedding可以离线编码、建立向量索引，并被不同分类器、语言模型和机器人策略复用。Cross-attention每次任务都要同时运行两个模态流，计算和耦合更强。</p>
+<p>这并不表示cross-attention不适合触觉。到了“根据当前视觉、触觉和语言生成动作”的VLA阶段，它通常非常合适；只是它解决的是下一层的<strong>条件融合</strong>问题。</p>
+<hr />
+<h2 id="10-attentiontvloctopianytouch">10. Attention在TVL、Octopi、AnyTouch中的具体位置</h2>
+<h3 id="101-tvl">10.1 TVL</h3>
+<p>TVL encoder阶段：</p>
+<pre><code class="language-text">Tactile ViT  --self-attention--&gt; x_T
+OpenCLIP ViT --self-attention--&gt; x_V
+Text Transformer --self-attention--&gt; x_L
+
+x_T, x_V, x_L --contrastive loss--&gt; 共享语义空间
+</code></pre>
+<p>三个encoder之间没有细粒度cross-attention。随后TVL-LLaMA把视觉和触觉全局特征经过projector送入LLaMA-Adapter。LLaMA文本query会读取adapter中的多模态K/V，并由零初始化的<code>tanh</code> gate控制注入强度。它可以理解为带门控的cross-attention式adapter路径，但不是触觉patch与视觉patch之间的直接cross-attention。</p>
+<p>更多背景见<a href="15-tvl-touch-vision-language-alignment.html">TVL精读：从触觉表征到LLaMA</a>。</p>
+<h3 id="102-octopi">10.2 Octopi</h3>
+<p>Octopi的CLIP ViT-L/14触觉编码器内部使用self-attention，Visual Prompt Tuning加入的prompt tokens也参与同一视觉序列的attention。</p>
+<p>触觉特征经过projector以后，被放入<code>&lt;tact_start&gt;</code>与<code>&lt;tact_end&gt;</code>之间，再和文字embedding一起送入Vicuna：</p>
+<pre><code class="language-text">[文本token, tact_start, tactile embeddings, tact_end, 文本token]
+                         ↓
+                 Vicuna causal self-attention
+</code></pre>
+<p>从模块命名看是self-attention；从语义功能看，文本与触觉token已经能在同一序列中交互。Octopi没有TVL那样正常的外部视觉输入分支，也没有单独的cross-attention模块或gate。</p>
+<p>更多背景见<a href="17-octopi-tactile-property-reasoning.html">Octopi精读：从触觉属性到大模型物理推理</a>。</p>
+<h3 id="103-anytouch">10.3 AnyTouch</h3>
+<p>AnyTouch的Touch Encoder、Vision Encoder和Text Encoder各自在内部使用self-attention，模态之间通过全局对比loss对齐。</p>
+<p>Stage 1的Touch Decoder也用Transformer处理重建任务；Stage 2的跨传感器匹配则是两个embedding逐元素相乘后进入MLP Task Head，并不是cross-attention。</p>
+<p>更多背景见<a href="18-anytouch-unified-tactile-representation.html">AnyTouch精读：统一静态—动态多传感器触觉表征</a>。</p>
+<hr />
+<h2 id="11">11. 四类模型放在同一张表中</h2>
+<table>
+<thead>
+<tr>
+<th>模型/阶段</th>
+<th>Attention发生在哪里</th>
+<th>模态如何相遇</th>
+<th>输出目的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenCLIP</td>
+<td>图像塔和文本塔分别self-attention</td>
+<td>全局embedding上做contrastive loss</td>
+<td>图文对齐与检索</td>
+</tr>
+<tr>
+<td>TVL encoder</td>
+<td>触觉、视觉、文本塔分别self-attention</td>
+<td>全局embedding上做contrastive loss</td>
+<td>触觉进入视觉—语言语义空间</td>
+</tr>
+<tr>
+<td>TVL-LLaMA</td>
+<td>LLaMA self-attention + gated adapter交互</td>
+<td>文本query读取多模态adapter K/V</td>
+<td>触觉/视觉语言生成</td>
+</tr>
+<tr>
+<td>Octopi</td>
+<td>触觉ViT self-attention；Vicuna联合序列causal self-attention</td>
+<td>投影后的触觉embedding插入文本序列</td>
+<td>属性描述与物理推理</td>
+</tr>
+<tr>
+<td>AnyTouch</td>
+<td>各模态encoder分别self-attention</td>
+<td>contrastive loss；跨传感器MLP matching</td>
+<td>通用触觉embedding</td>
+</tr>
+<tr>
+<td>GR00T Action Expert</td>
+<td>action/state self-attention与对VLM memory的cross-attention交替</td>
+<td>Action query读取视觉语言K/V</td>
+<td>连续action chunk生成</td>
+</tr>
+</tbody>
+</table>
+<p>这张表揭示了一个很实用的分层：</p>
+<pre><code class="language-text">Encoder表征层：常用self-attention + contrastive alignment
+LLM理解层：常用联合序列self-attention或adapter/cross-attention
+VLA动作层：常用action query对VLM/tactile memory做cross-attention
+</code></pre>
+<p>不是每篇论文都必须使用全部三层。</p>
+<hr />
+<h2 id="12-attentionvla">12. Attention进入触觉VLA时可以怎么设计</h2>
+<p>未来把AnyTouch或TVL接入VLA，可以有几种常见方式。</p>
+<h3 id="121-token">12.1 全部token早期拼接</h3>
+<pre><code class="language-text">[vision tokens, tactile tokens, language tokens, action tokens]
+                       ↓
+               joint self-attention
+</code></pre>
+<p>优点是模态充分交互；缺点是序列很长，计算量随token数平方增长，而且训练更耦合。</p>
+<h3 id="122-action-expertcross-attention">12.2 Action Expert做Cross-attention</h3>
+<pre><code class="language-text">vision/language/tactile encoders -&gt; multimodal memory
+action tokens -&gt; Q
+memory -&gt; K/V
+</code></pre>
+<p>这与GR00T思路接近：感知表示先形成memory，动作query按时间步读取相关信息。触觉只在发生接触以后出现，也容易通过mask或异步更新memory。</p>
+<h3 id="123">12.3 分层或门控注入</h3>
+<pre><code class="language-text">视觉语言作为主memory
+触觉adapter/residual在接触时门控增强
+</code></pre>
+<p>优点是可以从已有VLA初始化，避免触觉噪声在无接触时干扰全部动作。gate应由接触状态或学习到的可靠度控制，而不只是固定相加。</p>
+<p>无论采用哪种attention结构，仍需要动作监督、flow matching或行为克隆loss。Cross-attention本身不会凭空教会机器人“触到滑移以后应该加力”。</p>
+<hr />
+<h2 id="13">13. 常见误区</h2>
+<h3 id="attention-weight">误区一：Attention weight就是模型参数</h3>
+<p>不对。attention matrix是当前样本临时计算的activation；<code>W_Q/W_K/W_V</code>才是训练参数。</p>
+<h3 id="2048token2048token">误区二：一个2048宽token包含2048个token或向量</h3>
+<p>不对。它是一个包含2048个标量分量的向量。</p>
+<h3 id="hidden-widthcross-attention">误区三：不同hidden width无法做Cross-attention</h3>
+<p>不对。分别使用<code>W_Q</code>和<code>W_K/W_V</code>投影到共同head dimension即可。GR00T的1536宽action stream读取2048宽VLM memory就是实例。</p>
+<h3 id="cross-attention">误区四：有Cross-attention就完成了模态对齐</h3>
+<p>不对。Cross-attention只提供信息读取通道，是否学到正确关系取决于loss和数据。</p>
+<h3 id="crossattention">误区五：没有名为CrossAttention的层，就没有跨模态交流</h3>
+<p>不对。多模态token拼进同一序列后，普通self-attention也可以完成跨模态交互，Octopi/Vicuna就是例子。</p>
+<h3 id="transformerattention">误区六：Transformer只等于Attention</h3>
+<p>不对。典型block至少还有normalization、MLP/FFN、residual connection；完整模型还包含输入embedding和输出head。</p>
+<hr />
+<h2 id="14">14. 最终记忆框架</h2>
+<p>先记住四句话：</p>
+<ol>
+<li><strong>Token</strong>：一个位置对应一个<code>d</code>维hidden vector。</li>
+<li><strong>Attention forward</strong>：用固定的当前模型参数生成Q/K/V，动态计算attention matrix，再更新token representation。</li>
+<li><strong>Training backward</strong>：loss通过梯度更新<code>W_Q/W_K/W_V</code>等模型参数。</li>
+<li><strong>对比学习与cross-attention</strong>：前者塑造共享空间，后者执行条件信息融合；两者经常前后衔接，而不是相互替代。</li>
+</ol>
+<p>把两篇具体模型压缩成最后一幅数据流：</p>
+<pre><code class="language-text">OpenCLIP / TVL / AnyTouch
+  输入 -&gt; encoder self-attention -&gt; global embedding
+                              -&gt; contrastive loss建立共享空间
+
+GR00T Action Expert
+  action/state hidden -&gt; Q ───────┐
+                                  ├-&gt; cross-attention -&gt; 新action hidden
+  VLM memory -&gt; K/V ──────────────┘
+                                  -&gt; action decoder -&gt; 连续动作
+</code></pre>
+<p>这也解释了为什么触觉VLA通常可以先学一个可独立使用的tactile encoder，再让action expert用cross-attention或joint attention读取它：<strong>先把触觉“表示清楚”，再让动作网络“按任务使用”。</strong></p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="18-anytouch-unified-tactile-representation.html">← 18. AnyTouch 精读：统一静态—动态多传感器触觉表征</a>
+            <span></span>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

@@ -72,6 +72,26 @@ POSTS = [
         published_en="September 2026",
         published_zh="2026.09",
     ),
+    Post(
+        18,
+        "18_anytouch_paper_reading_notes.md",
+        "18-anytouch-unified-tactile-representation",
+        "AnyTouch 精读：统一静态—动态多传感器触觉表征",
+        "从TacQuad多传感器数据出发，拆解静态—动态统一输入、遮挡重建、跨模态对齐、Universal Sensor Token与跨传感器匹配。",
+        "tactile",
+        published_en="September 2026",
+        published_zh="2026.09",
+    ),
+    Post(
+        19,
+        "19_attention_from_embeddings_to_action_expert.md",
+        "19-attention-openclip-tactile-groot",
+        "Attention 专题：从 OpenCLIP 到触觉模型与 GR00T",
+        "区分动态attention matrix与可训练参数，并用OpenCLIP、TVL、Octopi、AnyTouch和GR00T解释self/cross attention与对比学习。",
+        "tactile",
+        published_en="September 2026",
+        published_zh="2026.09",
+    ),
 ]
 
 
