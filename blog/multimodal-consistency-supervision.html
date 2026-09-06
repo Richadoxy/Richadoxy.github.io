@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="统一跨模态对齐、时间连续性与增强或遮挡不变性，并区分 consistency、reconstruction 与 action supervision。" />
-    <title>多模态表征学习的三类一致性监督 | 董希越的学习之路</title>
+    <meta name="description" content="统一跨模态对齐、时间连续性、增强或遮挡一致性，并说明 reconstruction、future prediction 与任务监督的分工。" />
+    <title>多模态表示的监督配方 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
     <link rel="stylesheet" href="../assets/css/blog.css" />
@@ -106,14 +106,14 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F07</p>
-          <h1>多模态表征学习的三类一致性监督</h1>
-          <p class="article-meta"><span data-lang="en">进阶 · September 2026 · 11 min read</span><span data-lang="zh">进阶 · 2026.09 · 约 11 分钟阅读</span></p>
-          <p class="article-deck">统一跨模态对齐、时间连续性与增强或遮挡不变性，并区分 consistency、reconstruction 与 action supervision。</p>
+          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F03</p>
+          <h1>多模态表示的监督配方</h1>
+          <p class="article-meta"><span data-lang="en">核心 · September 2026 · 11 min read</span><span data-lang="zh">核心 · 2026.09 · 约 11 分钟阅读</span></p>
+          <p class="article-deck">统一跨模态对齐、时间连续性、增强或遮挡一致性，并说明 reconstruction、future prediction 与任务监督的分工。</p>
           <div class="article-content">
             <blockquote>
-<p>本文是学习多模态 VLM/VLA、触觉表示学习与多模态对齐的前置内容，重点解释三类反复出现的训练范式：Cross-Modal Alignment、Temporal Coherence 和 Augmentation/Mask Consistency。</p>
-<p>建议先读：<a href="multimodal-encoder-alignment-infonce.html">多模态 Encoder 对齐</a>、<a href="clip-contrastive-representation-learning.html">CLIP 与对比学习</a>和<a href="19-attention-openclip-tactile-groot.html">Attention 专题</a>。</p>
+<p>本文是学习多模态 VLM/VLA 与触觉表示的监督地图。主线是三类反复出现的一致性关系：Cross-Modal Alignment、Temporal Coherence 和 Augmentation/Mask Consistency；同时说明它们与 reconstruction、future prediction、属性标签及 action supervision 的分工。</p>
+<p>阅读位置：<a href="vla-overview-reading-map.html">统一研究范式</a> → <a href="multimodal-encoder-alignment-infonce.html">从原始模态到公共语义空间</a> → 本文 → <a href="19-attention-openclip-tactile-groot.html">从对齐表示到 Policy 融合</a>。</p>
 </blockquote>
 <h2 id="0">0. 先修正一个术语</h2>
 <p>这三类方法经常被笼统地称为“监督信号”，但不一定属于传统 supervised learning。</p>
@@ -710,8 +710,8 @@ action supervision
 </blockquote>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="multimodal-encoder-alignment-infonce.html">← F06 · 多模态 Encoder 对齐：ViT、CLIP 与 InfoNCE</a>
-            <a href="imitation-learning-behavior-cloning.html">IL01 · 模仿学习与 Behavior Cloning 入门 →</a>
+            <a href="multimodal-encoder-alignment-infonce.html">← F02 · 从原始模态到公共语义空间</a>
+            <a href="19-attention-openclip-tactile-groot.html">F04 · 从对齐表示到 Policy 融合 →</a>
           </nav>
         </article>
       </main>

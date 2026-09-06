@@ -3,12 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="用统一的数据流和六步检查法定位 VLM、动作头、训练目标与部署系统。" />
-    <title>从模仿学习到 VLA：架构地图与阅读方法 | 董希越的学习之路</title>
+    <meta name="description" content="从数据、表示、对齐、任务融合、动作生成到闭环执行，先建立阅读和研究多模态策略的总地图。" />
+    <title>多模态 VLA 与模仿学习：统一研究范式 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
     <link rel="stylesheet" href="../assets/css/blog.css" />
     <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
   </head>
   <body>
     <header class="site-header">
@@ -34,28 +35,64 @@
           <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
           <div class="toc">
 <ul>
-<li><a href="#1-vla">1. VLA 位于哪里</a></li>
-<li><a href="#2-vla">2. 一套通用 VLA</a></li>
-<li><a href="#3">3. 不要把不同层级放在一起比较</a></li>
-<li><a href="#4">4. 三条主要动作路线</a></li>
-<li><a href="#5-vlmaction">5. 两种典型 VLM—Action 连接</a><ul>
-<li><a href="#pi05">PI0.5</a></li>
-<li><a href="#gr00t">GR00T</a></li>
+<li><a href="#0">0. 先记住整条主线</a></li>
+<li><a href="#1">1. 研究对象：从专家轨迹学习条件策略</a></li>
+<li><a href="#2">2. 数据层：监督能力的上限首先由数据决定</a><ul>
+<li><a href="#21-observation-action">2.1 一条数据不只有 observation 和 action</a></li>
+<li><a href="#22">2.2 多模态数据并不总是完整</a></li>
 </ul>
 </li>
-<li><a href="#6">6. 表示学习和动作学习的关系</a></li>
-<li><a href="#7">7. 训练图与部署图要分开</a></li>
-<li><a href="#8-vla">8. 阅读一篇新 VLA 的六步</a><ul>
-<li><a href="#_1">第一步：输入输出</a></li>
-<li><a href="#_2">第二步：表示</a></li>
-<li><a href="#_3">第三步：融合</a></li>
-<li><a href="#_4">第四步：监督</a></li>
-<li><a href="#_5">第五步：推理</a></li>
-<li><a href="#_6">第六步：系统边界</a></li>
+<li><a href="#3-token">3. 表示层：先把原始信号变成模型可处理的 token</a></li>
+<li><a href="#4">4. 对齐层：建立公共坐标，但它不是所有策略的必要条件</a><ul>
+<li><a href="#41">4.1 什么是对齐</a></li>
+<li><a href="#42">4.2 锚点是什么</a></li>
+<li><a href="#43">4.3 对齐是可选的</a></li>
 </ul>
 </li>
-<li><a href="#9">9. 本博客的推荐路线</a></li>
-<li><a href="#10">10. 最终心智模型</a></li>
+<li><a href="#5">5. 表示监督层：定义什么相同、什么不同、什么必须保留</a></li>
+<li><a href="#6-fusion-policy">6. Fusion 层：对齐之后，信息还要真正进入 Policy</a><ul>
+<li><a href="#61-token-concatenation-joint-self-attention">6.1 Token concatenation + joint self-attention</a></li>
+<li><a href="#62-cross-attention">6.2 Cross-attention</a></li>
+<li><a href="#63-pooled-condition">6.3 Pooled condition 与调制</a></li>
+<li><a href="#64-gate-residual-injection">6.4 Gate 与 residual injection</a></li>
+<li><a href="#65-readout-action-head">6.5 Readout 与 Action Head</a></li>
+</ul>
+</li>
+<li><a href="#7">7. 动作层：网络架构与训练目标不要混为一谈</a></li>
+<li><a href="#8">8. 训练图和推理图必须分开画</a><ul>
+<li><a href="#81">8.1 训练时可能存在的模块</a></li>
+<li><a href="#82">8.2 推理时通常只保留</a></li>
+</ul>
+</li>
+<li><a href="#9">9. 三种常见训练组织方式</a><ul>
+<li><a href="#91-policy">9.1 独立表示预训练，再冻结接 Policy</a></li>
+<li><a href="#92-fine-tune">9.2 预训练初始化，再端到端 Fine-tune</a></li>
+<li><a href="#93">9.3 直接端到端学习</a></li>
+</ul>
+</li>
+<li><a href="#10-vla">10. 多模态 VLA 研究通常在研究什么</a><ul>
+<li><a href="#101">10.1 数据与同步</a></li>
+<li><a href="#102">10.2 通用表示</a></li>
+<li><a href="#103">10.3 缺失与异构模态</a></li>
+<li><a href="#104-policy-fusion">10.4 Policy Fusion</a></li>
+<li><a href="#105">10.5 动作与控制</a></li>
+<li><a href="#106">10.6 泛化与适应</a></li>
+<li><a href="#107">10.7 系统可部署性</a></li>
+</ul>
+</li>
+<li><a href="#11">11. 实验应该与论文声称的层级匹配</a></li>
+<li><a href="#12">12. 阅读一篇新论文的统一检查法</a><ul>
+<li><a href="#_1">第一步：定义输入输出</a></li>
+<li><a href="#_2">第二步：定位表示</a></li>
+<li><a href="#_3">第三步：定位对齐</a></li>
+<li><a href="#_4">第四步：定位融合</a></li>
+<li><a href="#_5">第五步：定位动作</a></li>
+<li><a href="#_6">第六步：分开训练与推理</a></li>
+<li><a href="#_7">第七步：检查实验闭环</a></li>
+</ul>
+</li>
+<li><a href="#13">13. 将已读触觉工作放回统一地图</a></li>
+<li><a href="#14">14. 最终心智模型</a></li>
 </ul>
 </div>
 
@@ -63,137 +100,662 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Part 3: VLA Architectures</span><span data-lang="zh">第三卷：VLA 核心架构</span> · VLA00</p>
-          <h1>从模仿学习到 VLA：架构地图与阅读方法</h1>
-          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 3 min read</span><span data-lang="zh">入门 · 2026.09 · 约 3 分钟阅读</span></p>
-          <p class="article-deck">用统一的数据流和六步检查法定位 VLM、动作头、训练目标与部署系统。</p>
+          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F01</p>
+          <h1>多模态 VLA 与模仿学习：统一研究范式</h1>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 11 min read</span><span data-lang="zh">入门 · 2026.09 · 约 11 分钟阅读</span></p>
+          <p class="article-deck">从数据、表示、对齐、任务融合、动作生成到闭环执行，先建立阅读和研究多模态策略的总地图。</p>
           <div class="article-content">
-            <p>VLA 不是一个单独网络层，而是一类把视觉、语言和机器人动作连接起来的策略。本篇是整套博客的入口地图。</p>
-<h2 id="1-vla">1. VLA 位于哪里</h2>
-<pre><code class="language-text">机器学习基础
-  -&gt; Transformer / representation learning
-  -&gt; 视觉语言模型 VLM
-  -&gt; 模仿学习与机器人数据
-  -&gt; Vision-Language-Action policy
-  -&gt; 在线闭环执行
+            <blockquote>
+<p>这一章不是从某个模型名字开始，而是先建立研究地图：一项多模态机器人工作通常怎样组织数据、训练表示、融合模态、生成动作并完成闭环验证。后续所有基础概念与论文精读都放回这张地图中理解。</p>
+<p>后续阅读顺序：<a href="multimodal-encoder-alignment-infonce.html">从原始模态到公共语义空间</a> → <a href="multimodal-consistency-supervision.html">多模态表示的监督配方</a> → <a href="19-attention-openclip-tactile-groot.html">从对齐表示到 Policy 融合</a> → <a href="imitation-learning-behavior-cloning.html">模仿学习与 Behavior Cloning</a>。</p>
+</blockquote>
+<h2 id="0">0. 先记住整条主线</h2>
+<p>多模态 VLA 或模仿学习研究通常可以拆成六层：</p>
+<pre><code class="language-text">1. Data
+   vision / language / touch / audio / state / action
+                         ↓
+2. Representation
+   tokenizer / encoder / projector → tokens or embeddings
+                         ↓
+3. Alignment（可选）
+   让不同模态进入可比较的语义或物理表示空间
+                         ↓
+4. Task-conditioned Fusion
+   concat / self-attention / cross-attention / gate / conditioning
+                         ↓
+5. Action Generation
+   MLP / autoregressive tokens / diffusion / flow matching
+                         ↓
+6. Closed-loop Execution
+   action chunk / controller / replanning / sensor feedback
 </code></pre>
-<p>VLM 主要回答“看到了什么、任务要求什么”；VLA 还必须回答“当前机器人应该怎样行动”。</p>
-<h2 id="2-vla">2. 一套通用 VLA</h2>
-<pre><code class="language-text">images -&gt; Vision Encoder ------┐
-                               │
-language -&gt; Tokenizer / LLM ---┼-&gt; multimodal backbone
-                               │            │
-robot state -&gt; adapter --------┘            │ condition
-                                            ▼
-noisy/action queries -&gt; Action Network -&gt; action chunk
+<p>一篇论文通常不会同时发明六层。它的 contribution 往往集中在其中一两层：</p>
+<ul>
+<li>新数据集或采集装置；</li>
+<li>新的触觉/音频 encoder；</li>
+<li>新的跨模态预训练目标；</li>
+<li>新的 fusion 或 routing 结构；</li>
+<li>新的 action decoder；</li>
+<li>新的控制器或在线执行框架。</li>
+</ul>
+<p>阅读时首先要定位它改了哪一层，避免把“换了 encoder”“增加一个 loss”和“提出新 VLA 架构”混为一谈。</p>
+<hr />
+<h2 id="1">1. 研究对象：从专家轨迹学习条件策略</h2>
+<p>模仿学习数据通常是一组轨迹：</p>
+<p>\[
+\tau={(o_t,a_t)}_{t=1}^{T}
+\]</p>
+<p>多模态 observation 可以写成：</p>
+<p>\[
+o_t=(I_t,L,T_t,U_t,q_t,c)
+\]</p>
+<p>其中：</p>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>\(I_t\)</td>
+<td>外部、腕部或第一视角 RGB 图像</td>
+</tr>
+<tr>
+<td>\(L\)</td>
+<td>自然语言指令或任务描述</td>
+</tr>
+<tr>
+<td>\(T_t\)</td>
+<td>触觉 RGB、深度、marker flow、力阵列或力序列</td>
+</tr>
+<tr>
+<td>\(U_t\)</td>
+<td>音频等其他传感器信号</td>
+</tr>
+<tr>
+<td>\(q_t\)</td>
+<td>关节、末端位姿、夹爪状态等 proprioception</td>
+</tr>
+<tr>
+<td>\(c\)</td>
+<td>离散任务 ID、机器人 embodiment ID 等条件</td>
+</tr>
+<tr>
+<td>\(a_t\)</td>
+<td>专家动作</td>
+</tr>
+</tbody>
+</table>
+<p>策略学习的是：</p>
+<p>\[
+\pi_\theta(a_{t:t+K-1}\mid o_{\le t})
+\]</p>
+<p>也就是根据当前或历史观测，生成未来 \(K\) 步 action chunk。</p>
+<p>“VLA”通常表示视觉和语言参与动作生成；加入触觉、音频等模态后，更准确的重点是：</p>
+<blockquote>
+<p>不同信息如何形成表示、怎样在当前任务下融合，以及最终怎样改变动作。</p>
+</blockquote>
+<hr />
+<h2 id="2">2. 数据层：监督能力的上限首先由数据决定</h2>
+<h3 id="21-observation-action">2.1 一条数据不只有 observation 和 action</h3>
+<p>多模态训练还需要明确：</p>
+<ul>
+<li>哪些模态在同一时刻同步；</li>
+<li>是否包含完整时间历史；</li>
+<li>自然语言是人工写、模板生成还是 LLM 扩写；</li>
+<li>触觉与视觉是否来自同一对象、同一位置和同一次接触；</li>
+<li>action 是关节位置、末端增量、速度、力还是混合目标；</li>
+<li>数据是人类手持示范、遥操作、机器人 rollout 还是仿真；</li>
+<li>哪些信息只在训练时存在。</li>
+</ul>
+<p>这些关系不仅是元数据，还直接构造监督信号：</p>
+<pre><code class="language-text">同一时刻的vision-touch      → cross-modal positive pair
+同一轨迹的相邻状态          → temporal positive pair
+被遮挡帧的真实图像          → reconstruction target
+专家动作                    → imitation target
+失败原因的文字              → language-generation target
 </code></pre>
-<p>不同论文主要在四个位置变化：</p>
+<h3 id="22">2.2 多模态数据并不总是完整</h3>
+<p>现实数据可能只有：</p>
+<pre><code class="language-text">Touch + Vision
+Touch + Text
+Vision + Language + Action
+Vision + Touch + Action
+</code></pre>
+<p>因此很多研究的重要问题不是“怎样把所有模态同时输入”，而是：</p>
+<ul>
+<li>缺失模态样本是否仍能用于预训练；</li>
+<li>不同数据源能否共享一个 encoder；</li>
+<li>训练时存在、推理时缺失的模态如何处理；</li>
+<li>不同采样率怎样时间对齐。</li>
+</ul>
+<hr />
+<h2 id="3-token">3. 表示层：先把原始信号变成模型可处理的 token</h2>
+<p>不同模态需要不同入口：</p>
+<pre><code class="language-text">RGB image      → ViT/CNN                  → visual tokens
+language       → tokenizer + embedding    → language tokens
+tactile RGB    → tactile ViT/CNN          → tactile tokens
+force history  → MLP/1D CNN/Transformer   → force tokens
+robot state    → linear/MLP projector      → state tokens
+</code></pre>
+<p>这里需要区分：</p>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tokenizer</td>
+<td>把原始对象切成离散或连续的输入单元</td>
+</tr>
+<tr>
+<td>Encoder</td>
+<td>根据上下文把输入单元变成表示</td>
+</tr>
+<tr>
+<td>Projector</td>
+<td>对齐维度或接口空间</td>
+</tr>
+<tr>
+<td>Patch token</td>
+<td>表示图像/触觉图像的局部区域</td>
+</tr>
+<tr>
+<td>CLS/readout token</td>
+<td>汇总一张图或一组 token 的信息</td>
+</tr>
+<tr>
+<td>Global embedding</td>
+<td>用于相似度、检索或对比学习的全局向量</td>
+</tr>
+</tbody>
+</table>
+<p>并不是所有 encoder 输出都必须先压成一个向量：</p>
+<ul>
+<li>CLIP 式对比通常比较 global embeddings；</li>
+<li>生成式 VLM/VLA 常保留多枚 patch/sensor tokens；</li>
+<li>policy 可以让 action tokens 读取完整的感知 token memory。</li>
+</ul>
+<p>更详细的接口关系见<a href="multimodal-encoder-alignment-infonce.html">从原始模态到公共语义空间</a>。</p>
+<hr />
+<h2 id="4">4. 对齐层：建立公共坐标，但它不是所有策略的必要条件</h2>
+<h3 id="41">4.1 什么是对齐</h3>
+<p>给定配对数据：</p>
+<pre><code class="language-text">Touch    → ET → zT
+Vision   → EV → zV
+Language → EL → zL
+</code></pre>
+<p>语义对齐希望：</p>
+<p>\[
+z_T\approx z_V\approx z_L
+\]</p>
+<p>这里不是逐维相等，而是让正确配对在 latent space 中相互靠近，错误配对远离，从而支持：</p>
+<ul>
+<li>跨模态检索；</li>
+<li>开放词汇分类；</li>
+<li>zero-shot 属性理解；</li>
+<li>将新传感器接入已有视觉—语言知识。</li>
+</ul>
+<h3 id="42">4.2 锚点是什么</h3>
+<p>如果冻结 CLIP 的视觉和文本 encoder，只训练 tactile encoder，那么已有视觉—语言空间就是锚点：</p>
+<pre><code class="language-text">frozen vision-language space
+              ↑
+    trainable tactile encoder
+</code></pre>
+<p>锚点也可以是：</p>
+<ul>
+<li>冻结文本 encoder；</li>
+<li>可轻微 LoRA 调整的视觉 encoder；</li>
+<li>跨传感器对应关系；</li>
+<li>属性标签；</li>
+<li>机器人 action supervision。</li>
+</ul>
+<p>不同锚点会保留不同信息。语言锚点擅长物体属性语义，时间预测擅长接触变化，动作监督擅长任务相关信息。</p>
+<h3 id="43">4.3 对齐是可选的</h3>
+<p>两种路线都可能成功：</p>
+<pre><code class="language-text">路线A：先预训练对齐
+touch ↔ vision ↔ language
+          ↓
+再接policy并fine-tune
+
+路线B：不做独立对齐
+raw sensor encoder + policy
+          ↓
+直接用action loss端到端学习
+</code></pre>
+<p>路线 A 通常有利于数据效率、开放语义和复用；路线 B 更直接地优化控制，但表示未必适合检索或跨任务迁移。</p>
+<hr />
+<h2 id="5">5. 表示监督层：定义什么相同、什么不同、什么必须保留</h2>
+<p>表示学习的常见目标可以按问题分类。</p>
+<table>
+<thead>
+<tr>
+<th>目标</th>
+<th>正样本/监督来源</th>
+<th>希望保留</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cross-modal InfoNCE</td>
+<td>同一对象/时刻的不同模态</td>
+<td>跨模态共同语义</td>
+</tr>
+<tr>
+<td>Temporal contrast</td>
+<td>同一轨迹的相邻状态</td>
+<td>时间连续性</td>
+</tr>
+<tr>
+<td>Augmentation consistency</td>
+<td>同一输入的不同增强/遮挡</td>
+<td>对无关扰动的稳定性</td>
+</tr>
+<tr>
+<td>Masked reconstruction</td>
+<td>被遮挡内容的真实值</td>
+<td>局部结构与细节</td>
+</tr>
+<tr>
+<td>Future prediction</td>
+<td>未来帧、深度或触觉变化</td>
+<td>动态演化</td>
+</tr>
+<tr>
+<td>Classification/regression</td>
+<td>属性标签或物理数值</td>
+<td>指定物理属性</td>
+</tr>
+<tr>
+<td>Language generation</td>
+<td>正确描述或推理文字</td>
+<td>可表达的语义</td>
+</tr>
+<tr>
+<td>Action loss</td>
+<td>专家动作</td>
+<td>与控制任务相关的信息</td>
+</tr>
+</tbody>
+</table>
+<p>一个常见的分阶段配方是：</p>
+<pre><code class="language-text">Stage A：模态内部结构
+reconstruction / future prediction
+                 ↓
+Stage B：跨模态语义
+InfoNCE / matching / consistency
+                 ↓
+Stage C：下游任务
+language generation / action loss
+</code></pre>
+<p>这些 loss 不一定需要人工标签。同步关系、相邻时间和不同增强本身就能构造自监督信号。详见<a href="multimodal-consistency-supervision.html">多模态表示的监督配方</a>。</p>
+<hr />
+<h2 id="6-fusion-policy">6. Fusion 层：对齐之后，信息还要真正进入 Policy</h2>
+<p>对齐只说明不同模态具有可比较表示，不意味着它们已经联合决定动作。Policy 还需要一种信息融合机制。</p>
+<h3 id="61-token-concatenation-joint-self-attention">6.1 Token concatenation + joint self-attention</h3>
+<pre><code class="language-text">[language tokens, vision tokens, tactile tokens, state tokens]
+                          ↓
+                    Transformer
+</code></pre>
+<p>同一个 attention 序列中的 token 可以按 mask 规则互相读取。</p>
+<h3 id="62-cross-attention">6.2 Cross-attention</h3>
+<pre><code class="language-text">Action tokens = Q
+Perception memory = K,V
+         ↓
+Cross-Attention
+</code></pre>
+<p>动作表示根据当前需要，从感知 memory 中检索信息。</p>
+<h3 id="63-pooled-condition">6.3 Pooled condition 与调制</h3>
+<pre><code class="language-text">sensor history → pooled vector
+                       ↓
+           FiLM / AdaLN / AdaRMS
+                       ↓
+             调节action network
+</code></pre>
+<p>条件向量不一定成为独立 token，也可以缩放或偏移网络中间激活。</p>
+<h3 id="64-gate-residual-injection">6.4 Gate 与 residual injection</h3>
+<pre><code class="language-text">X' = X + g · CrossAttn(X,M,M)
+</code></pre>
+<p>可学习 gate 控制新增模态影响强度，常用小值或零初始化，以免预训练策略在微调初期被随机新分支破坏。</p>
+<h3 id="65-readout-action-head">6.5 Readout 与 Action Head</h3>
+<pre><code class="language-text">multimodal Transformer
+          ↓
+action readout hidden states
+          ↓
+Action Head / Decoder
+          ↓
+robot action chunk
+</code></pre>
+<p>Readout token 负责从 Transformer 中汇总动作所需的信息；Action Head 才负责把 hidden states 转换为动作参数、离散 token、噪声或 flow velocity。</p>
+<p>这些结构的完整关系见<a href="19-attention-openclip-tactile-groot.html">从对齐表示到 Policy 融合</a>。</p>
+<hr />
+<h2 id="7">7. 动作层：网络架构与训练目标不要混为一谈</h2>
+<p>相同的感知与 fusion backbone 可以连接不同动作生成方法：</p>
+<table>
+<thead>
+<tr>
+<th>动作路线</th>
+<th>训练目标</th>
+<th>推理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Direct regression</td>
+<td>MSE/L1 对齐专家动作</td>
+<td>一次前向输出</td>
+</tr>
+<tr>
+<td>Discrete action token</td>
+<td>next-token cross-entropy</td>
+<td>自回归解码</td>
+</tr>
+<tr>
+<td>Diffusion</td>
+<td>预测噪声/score</td>
+<td>多步去噪</td>
+</tr>
+<tr>
+<td>Flow matching</td>
+<td>预测速度场</td>
+<td>数值积分得到动作</td>
+</tr>
+<tr>
+<td>Residual correction</td>
+<td>预测基础动作修正量</td>
+<td>基础策略后置修正</td>
+</tr>
+</tbody>
+</table>
+<p>因此：</p>
+<ul>
+<li>Transformer 不是一种 action loss；</li>
+<li>Action Expert 不一定使用 flow matching；</li>
+<li>Action Head 不一定只是一个 MLP；</li>
+<li>使用 VLM 不代表动作一定由语言 token 自回归生成。</li>
+</ul>
+<p>动作生成方法的细节放在第二卷和第三卷展开。</p>
+<hr />
+<h2 id="8">8. 训练图和推理图必须分开画</h2>
+<h3 id="81">8.1 训练时可能存在的模块</h3>
+<pre><code class="language-text">pretrained encoders
++ reconstruction decoder
++ contrastive head
++ privileged posterior
++ language generation head
++ action policy
+</code></pre>
+<p>训练中还需要 ground truth：</p>
+<ul>
+<li>未遮挡图像；</li>
+<li>未来触觉；</li>
+<li>专家 action chunk；</li>
+<li>属性或推理文本；</li>
+<li>success/failure 标签。</li>
+</ul>
+<h3 id="82">8.2 推理时通常只保留</h3>
+<pre><code class="language-text">deployable encoders
++ necessary projector/fusion modules
++ policy/action decoder
++ low-level controller
+</code></pre>
+<p>重建 decoder、matching head、privileged posterior 经常只是训练脚手架。阅读论文时需要逐项问：</p>
+<ul>
+<li>哪些网络只制造 loss？</li>
+<li>哪些参数被冻结？</li>
+<li>哪些模块部署时真正运行？</li>
+<li>训练时使用的信息在推理时是否可获得？</li>
+</ul>
+<hr />
+<h2 id="9">9. 三种常见训练组织方式</h2>
+<h3 id="91-policy">9.1 独立表示预训练，再冻结接 Policy</h3>
+<pre><code class="language-text">multimodal data
+      ↓ representation losses
+Encoder
+      ↓ freeze
+task-specific Policy
+      ↓ action loss
+</code></pre>
+<p>优点：表示可复用、任务数据需求低、训练稳定。缺点：冻结表示不一定完全适合特定动作。</p>
+<h3 id="92-fine-tune">9.2 预训练初始化，再端到端 Fine-tune</h3>
+<pre><code class="language-text">aligned/pretrained Encoder
+          ↓ initialize
+VLM/Policy/Action Expert
+          ↓ action loss updates all or part
+</code></pre>
+<p>优点：语义先验能适应控制。缺点：小数据可能破坏原有对齐，即 representation drift。</p>
+<h3 id="93">9.3 直接端到端学习</h3>
+<pre><code class="language-text">raw multimodal observation
+          ↓
+Encoder + Fusion + Policy
+          ↓ imitation loss
+</code></pre>
+<p>优点：目标直接、结构简单。缺点：模型可能忽略新增模态，数据效率与跨任务泛化也可能较弱。</p>
+<p>为了防止“接了触觉但策略不用”，研究中常加入：</p>
+<ul>
+<li>modality dropout；</li>
+<li>language grounding auxiliary loss；</li>
+<li>future/reconstruction loss；</li>
+<li>bottleneck 或 routing；</li>
+<li>matched no-sensor ablation。</li>
+</ul>
+<hr />
+<h2 id="10-vla">10. 多模态 VLA 研究通常在研究什么</h2>
+<p>可以把论文 contribution 放入下面七个问题。</p>
+<h3 id="101">10.1 数据与同步</h3>
+<ul>
+<li>如何采集真正依赖触觉/音频的专家示范？</li>
+<li>视觉 20 Hz、触觉 100 Hz、控制 50 Hz 怎样对齐？</li>
+<li>如何生成可靠的语言属性或失败分析？</li>
+</ul>
+<h3 id="102">10.2 通用表示</h3>
+<ul>
+<li>一个 encoder 能否跨对象、任务和传感器工作？</li>
+<li>静态触觉与动态触觉能否统一？</li>
+<li>触觉应对齐语言、视觉还是动作？</li>
+</ul>
+<h3 id="103">10.3 缺失与异构模态</h3>
+<ul>
+<li>不是每条数据都有全部模态，如何训练？</li>
+<li>训练与部署使用不同传感器怎么办？</li>
+<li>视觉被遮挡后，触觉能否补足状态？</li>
+</ul>
+<h3 id="104-policy-fusion">10.4 Policy Fusion</h3>
+<ul>
+<li>新模态在 input、middle layer 还是 output 端注入？</li>
+<li>使用 joint attention、cross-attention、gate 还是调制？</li>
+<li>高层语义触觉和低层连续触觉是否需要不同路径？</li>
+</ul>
+<h3 id="105">10.5 动作与控制</h3>
+<ul>
+<li>预测位置、速度、力还是混合 action？</li>
+<li>action chunk 怎样生成与在线调度？</li>
+<li>是否还需要阻抗、位置—力或 residual controller？</li>
+</ul>
+<h3 id="106">10.6 泛化与适应</h3>
+<ul>
+<li>是否泛化到未见词、物体、任务、传感器和环境？</li>
+<li>失败后能否使用触觉重规划？</li>
+<li>表示预训练是否真的改善闭环成功率？</li>
+</ul>
+<h3 id="107">10.7 系统可部署性</h3>
+<ul>
+<li>传感器频率、推理延迟和 action horizon 是否匹配？</li>
+<li>模型能否在接触快速变化时及时反应？</li>
+<li>slow reasoning 与 fast control 如何协同？</li>
+</ul>
+<hr />
+<h2 id="11">11. 实验应该与论文声称的层级匹配</h2>
+<table>
+<thead>
+<tr>
+<th>论文声称</th>
+<th>至少需要的证据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>表示对齐更好</td>
+<td>retrieval、zero-shot classification、linear probe</td>
+</tr>
+<tr>
+<td>表示保留局部/动态信息</td>
+<td>reconstruction、future prediction、contact-state probe</td>
+</tr>
+<tr>
+<td>新模态真正进入 policy</td>
+<td>sensor removal/dropout、matched architecture ablation</td>
+</tr>
+<tr>
+<td>动作预测更好</td>
+<td>held-out action error 仍不够，需闭环 rollout</td>
+</tr>
+<tr>
+<td>真实机器人更稳健</td>
+<td>多次 trial、清楚的成功标准和失败类型</td>
+</tr>
+<tr>
+<td>具有 zero-shot 泛化</td>
+<td>train/test 对象、词语、任务或环境严格隔离</td>
+</tr>
+<tr>
+<td>VLM 先验被“解锁”</td>
+<td>冻结/随机化/替换 VLM 等因果消融</td>
+</tr>
+</tbody>
+</table>
+<p>Top-1、重建 PSNR 或训练 action loss 只证明某一层能力，不能直接替代真机闭环结论。</p>
+<hr />
+<h2 id="12">12. 阅读一篇新论文的统一检查法</h2>
+<h3 id="_1">第一步：定义输入输出</h3>
+<ul>
+<li>输入有哪些模态？</li>
+<li>每种模态是单帧还是时间窗口？</li>
+<li>输出是 embedding、文本、action 还是控制目标？</li>
+</ul>
+<h3 id="_2">第二步：定位表示</h3>
+<ul>
+<li>原始信号怎样 tokenization？</li>
+<li>encoder 来自哪里，是否预训练？</li>
+<li>输出 global embedding 还是 token sequence？</li>
+</ul>
+<h3 id="_3">第三步：定位对齐</h3>
+<ul>
+<li>是否有独立 alignment stage？</li>
+<li>谁是锚点？正负样本怎样定义？</li>
+<li>使用 InfoNCE、重建、分类还是时间预测？</li>
+</ul>
+<h3 id="_4">第四步：定位融合</h3>
+<ul>
+<li>concat、joint attention、cross-attention 还是 modulation？</li>
+<li>谁是 Query，谁提供 Key/Value？</li>
+<li>有没有 gate、readout 或 multi-expert？</li>
+</ul>
+<h3 id="_5">第五步：定位动作</h3>
+<ul>
+<li>Action Head 是回归、token、diffusion 还是 flow？</li>
+<li>action space、horizon 和控制频率是什么？</li>
+<li>是否有独立低层 controller？</li>
+</ul>
+<h3 id="_6">第六步：分开训练与推理</h3>
+<ul>
+<li>每个 stage 的数据和 loss 是什么？</li>
+<li>哪些参数更新、冻结或使用 LoRA？</li>
+<li>哪些训练辅助模块推理时丢弃？</li>
+</ul>
+<h3 id="_7">第七步：检查实验闭环</h3>
+<ul>
+<li>Baseline 是否参数量和传感器接口匹配？</li>
+<li>Ablation 能否定位每个组件的贡献？</li>
+<li>表示指标是否转化为 policy rollout 提升？</li>
+</ul>
+<hr />
+<h2 id="13">13. 将已读触觉工作放回统一地图</h2>
+<table>
+<thead>
+<tr>
+<th>工作</th>
+<th>主要贡献所在层级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TVL</td>
+<td>数据 + 触觉—视觉—语言对齐 + 语言生成</td>
+</tr>
+<tr>
+<td>Octopi</td>
+<td>触觉属性 encoder + LLM 物理属性推理</td>
+</tr>
+<tr>
+<td>AnyTouch</td>
+<td>跨传感器、静态—动态统一表示</td>
+</tr>
+<tr>
+<td>Beyond Sight / FuSe</td>
+<td>策略内部的异构传感器融合与语言辅助监督</td>
+</tr>
+<tr>
+<td>VLA-Touch</td>
+<td>外挂式高层规划 + 低层触觉动作修正</td>
+</tr>
+<tr>
+<td>OmniVTLA</td>
+<td>语义对齐触觉 encoder 接入 π0</td>
+</tr>
+<tr>
+<td>Tactile-VLA</td>
+<td>触觉 token + 力动作空间 + 混合控制 + CoT 重规划</td>
+</tr>
+<tr>
+<td>VT-MUSE</td>
+<td>独立时序视触觉 memory + gated cross-attention policy</td>
+</tr>
+</tbody>
+</table>
+<p>这张表说明：“触觉进入机器人智能”不是一条单一路线，而至少包含：</p>
+<pre><code class="language-text">触觉如何表示
+触觉如何获得语义
+触觉如何与其他模态交互
+触觉如何改变动作
+触觉如何进入真实控制闭环
+</code></pre>
+<hr />
+<h2 id="14">14. 最终心智模型</h2>
+<p>以后看到任何多模态 VLA 或模仿学习系统，先画下面这张图：</p>
+<pre><code class="language-text">Raw data
+vision / language / touch / state / action
+              ↓
+Modality interfaces
+tokenizer / encoder / projector
+              ↓
+Representation objectives
+alignment / reconstruction / temporal / consistency
+              ↓
+Task-conditioned fusion
+self-attn / cross-attn / gate / modulation
+              ↓
+Action generation
+regression / token / diffusion / flow
+              ↓
+Execution system
+chunk scheduler / controller / feedback / replanning
+</code></pre>
+<p>然后问两个贯穿始终的问题：</p>
 <ol>
-<li>模态怎样编码；</li>
-<li>视觉语言与动作怎样融合；</li>
-<li>动作怎样表示和生成；</li>
-<li>训练及部署时加入哪些额外约束。</li>
+<li><strong>训练信号到底迫使模型学习了什么？</strong></li>
+<li><strong>该信息在推理时通过哪条路径真正影响动作？</strong></li>
 </ol>
-<h2 id="3">3. 不要把不同层级放在一起比较</h2>
-<pre><code class="language-text">PI0.5、GR00T：VLA architecture
-Flow matching：动作生成 objective
-DiT、Transformer：network architecture
-VLASH：时间对齐与异步执行 framework
-VLA-JEPA：加入 latent world-model supervision 的训练 framework
-TVL、AnyTouch：可作为触觉感知前端的 representation model
-</code></pre>
-<p>“哪个更好”只有在比较对象处于同一层级、任务和运行条件一致时才有意义。</p>
-<h2 id="4">4. 三条主要动作路线</h2>
-<pre><code class="language-text">直接回归 / MSE
-离散 action tokens / autoregressive generation
-连续生成 / diffusion or flow matching
-</code></pre>
-<p>动作生成方式决定训练 target 和推理延迟；VLM backbone 则决定视觉语言表示。二者是可以组合的两个设计维度。</p>
-<h2 id="5-vlmaction">5. 两种典型 VLM—Action 连接</h2>
-<h3 id="pi05">PI0.5</h3>
-<pre><code class="language-text">image/language/state prefix
-+ noisy action suffix
--&gt; paired multi-expert joint attention
--&gt; velocity
-</code></pre>
-<h3 id="gr00t">GR00T</h3>
-<pre><code class="language-text">image/language -&gt; VLM memory
-state/action -&gt; DiT query stream
--&gt; cross-attention to VLM memory
--&gt; velocity
-</code></pre>
-<p>两者都由视觉语言条件生成连续动作，但内部耦合方式不同。</p>
-<h2 id="6">6. 表示学习和动作学习的关系</h2>
-<p>CLIP、TVL、AnyTouch 等模型学习“什么输入在语义上相近”。机器人 policy 还要学习：</p>
-<ul>
-<li>当前任务需要关注什么；</li>
-<li>哪个表示与动作选择有关；</li>
-<li>机器人动作空间和 embodiment；</li>
-<li>时间连续性和接触反馈。</li>
-</ul>
-<p>因此一个强 tactile encoder 可以成为 VLA 前端，但不是完整动作策略。</p>
-<h2 id="7">7. 训练图与部署图要分开</h2>
-<p>训练中可能出现：</p>
-<ul>
-<li>target actions；</li>
-<li>future frames；</li>
-<li>frozen teacher encoder；</li>
-<li>contrastive/generation auxiliary heads；</li>
-<li>optimizer 和 data augmentation。</li>
-</ul>
-<p>它们不一定在部署时运行。最终 online graph 应单独画出，只保留实时可得输入和实际调用模块。</p>
-<h2 id="8-vla">8. 阅读一篇新 VLA 的六步</h2>
-<h3 id="_1">第一步：输入输出</h3>
-<pre><code class="language-text">哪些相机、语言、state 和 history？
-输出 position、delta、velocity 还是 torque？
-action dimension 与 horizon 是多少？
-</code></pre>
-<h3 id="_2">第二步：表示</h3>
-<pre><code class="language-text">每种模态经过哪个 encoder？
-输出 global embedding 还是 token sequence？
-原始维度与 hidden width 分别是多少？
-</code></pre>
-<h3 id="_3">第三步：融合</h3>
-<pre><code class="language-text">token concat、joint attention、cross-attention、gate 还是 AdaNorm？
-attention mask 允许哪些信息方向？
-</code></pre>
-<h3 id="_4">第四步：监督</h3>
-<pre><code class="language-text">BC MSE、token CE、diffusion、flow、contrastive 或 world-model loss？
-哪些参数被冻结或使用 LoRA？
-</code></pre>
-<h3 id="_5">第五步：推理</h3>
-<pre><code class="language-text">一次前向还是多步采样？
-一次输出几步，执行几步后 replan？
-训练辅助模块是否移除？
-</code></pre>
-<h3 id="_6">第六步：系统边界</h3>
-<pre><code class="language-text">future information 是否泄漏到部署路径？
-observation 与 action 是否时间对齐？
-真实延迟、控制频率和失败模式是什么？
-</code></pre>
-<h2 id="9">9. 本博客的推荐路线</h2>
-<pre><code class="language-text">F：基础概念
--&gt; IL：模仿学习
--&gt; VLA：模型架构
--&gt; ENG：OpenPI/BrainCo 工程实践
--&gt; RUN：在线执行与 VLASH
--&gt; TOUCH：触觉表征和触觉 VLA
-</code></pre>
-<p>第一次阅读建议完成 F 和 IL，再选择自己关心的分支。已经熟悉 Transformer 和 BC 的读者，可以直接从 VLA00 开始。</p>
-<h2 id="10">10. 最终心智模型</h2>
-<pre><code class="language-text">原始模态
--&gt; token / embedding / condition
--&gt; multimodal information fusion
--&gt; action distribution or velocity field
--&gt; training objective
--&gt; inference sampling
--&gt; runtime scheduling and closed-loop execution
-</code></pre>
-<p>只要能沿这条链说明每个张量、模块和时间点，通常就已经抓住了一套 VLA 的主体结构。</p>
+<p>只要这两个问题能回答清楚，一篇复杂多模态论文的大部分结构就不会再混乱。</p>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="action-generation-mse-token-diffusion-flow.html">← IL03 · 动作生成方法：MSE、Token、Diffusion 与 Flow Matching</a>
-            <a href="10-flow-matching-training-inference.html">VLA01 · Flow Matching：训练、timestep 与推理 →</a>
+            <span></span>
+            <a href="multimodal-encoder-alignment-infonce.html">F02 · 从原始模态到公共语义空间 →</a>
           </nav>
         </article>
       </main>

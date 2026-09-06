@@ -4,7 +4,7 @@
 > 正式论文：[Feng et al. - 2025 - AnyTouch Unified Static-Dynamic Representation across Visuo-tactile Sensors](<Feng et al. - 2025 - AnyTouch Unified Static-Dynamic Representation across Visuo-tactile Sensors.pdf>)<br>
 > [arXiv](https://arxiv.org/abs/2502.12191)
 
-> 推荐先读：[TVL](15_tvl_paper_reading_notes.md)与[表示学习、CLIP 与对比学习](21_clip_and_contrastive_learning.md)。本文重点是跨传感器、静态—动态统一表征，而不是重新讲解 CLIP 或 Attention 基础。
+> 推荐先读：[TVL](15_tvl_paper_reading_notes.md)、[从原始模态到公共语义空间](31_multimodal_encoder_alignment_and_infonce.md)与[多模态表示的监督配方](32_three_consistency_supervision_paradigms.md)。本文重点是跨传感器、静态—动态统一表征，而不是重新讲解 CLIP 或 Attention 基础。
 
 ## 0. 一句话定位
 

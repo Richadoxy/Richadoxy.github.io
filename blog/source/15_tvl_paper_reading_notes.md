@@ -4,7 +4,7 @@
 > 正式论文：[Fu et al. - 2024 - A Touch Vision and Language Dataset for Multimodal Alignment](<Fu et al. - 2024 - A Touch Vision and Language Dataset for Multimodal Alignment.pdf>)<br>
 > [项目主页](https://tactile-vlm.github.io/) · [arXiv](https://arxiv.org/abs/2402.13232)
 
-> 前置概念可先读：[表示学习、CLIP 与对比学习](21_clip_and_contrastive_learning.md)和[多模态融合与条件注入](09_attention_multi_expert_and_conditioning.md)。本文保留必要回顾，但重点是 TVL 的数据、设计选择和实验边界。
+> 前置概念可先读：[从原始模态到公共语义空间](31_multimodal_encoder_alignment_and_infonce.md)和[从对齐表示到 Policy 融合](19_attention_from_embeddings_to_action_expert.md)。本文保留必要回顾，但重点是 TVL 的数据、设计选择和实验边界。
 
 ## 0. 一句话定位
 

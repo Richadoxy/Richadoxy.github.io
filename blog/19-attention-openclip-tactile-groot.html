@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="区分动态 attention matrix 与可训练参数，并系统理解 self、cross 与 joint attention。" />
-    <title>Transformer 与 Attention：从 QKV 到多模态交互 | 董希越的学习之路</title>
+    <meta name="description" content="把 Transformer 基础放回策略数据流，系统理解 self/cross/joint attention、readout、projector、gate、AdaNorm 与 Action Head。" />
+    <title>从对齐表示到 Policy 融合 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
     <link rel="stylesheet" href="../assets/css/blog.css" />
@@ -87,6 +87,11 @@
 <li><a href="#121-token">12.1 全部token早期拼接</a></li>
 <li><a href="#122-action-expertcross-attention">12.2 Action Expert做Cross-attention</a></li>
 <li><a href="#123">12.3 分层或门控注入</a></li>
+<li><a href="#124-gate">12.4 Gate：控制新信息写入多少</a></li>
+<li><a href="#125-filmadaln-adarmscondition-token">12.5 FiLM、AdaLN 与 AdaRMS：Condition 不一定成为 Token</a></li>
+<li><a href="#126-clsreadout-action-head">12.6 CLS、Readout 与 Action Head：汇总和输出不是一回事</a></li>
+<li><a href="#127-multi-expert-moe">12.7 Multi-expert 不一定是稀疏 MoE</a></li>
+<li><a href="#128-policy-fusion">12.8 一条完整的 Policy Fusion 链路</a></li>
 </ul>
 </li>
 <li><a href="#13">13. 常见误区</a><ul>
@@ -106,13 +111,14 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F02</p>
-          <h1>Transformer 与 Attention：从 QKV 到多模态交互</h1>
-          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 13 min read</span><span data-lang="zh">入门 · 2026.09 · 约 13 分钟阅读</span></p>
-          <p class="article-deck">区分动态 attention matrix 与可训练参数，并系统理解 self、cross 与 joint attention。</p>
+          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F04</p>
+          <h1>从对齐表示到 Policy 融合</h1>
+          <p class="article-meta"><span data-lang="en">核心 · September 2026 · 15 min read</span><span data-lang="zh">核心 · 2026.09 · 约 15 分钟阅读</span></p>
+          <p class="article-deck">把 Transformer 基础放回策略数据流，系统理解 self/cross/joint attention、readout、projector、gate、AdaNorm 与 Action Head。</p>
           <div class="article-content">
             <blockquote>
-<p>本文以 OpenCLIP、触觉模型与 GR00T 为例，系统回答两个问题：Attention 在一次前向传播中改变什么？self、cross 与 joint attention 怎样区分？CLIP 和 InfoNCE 的完整基础放在下一篇《表示学习、CLIP 与对比学习》中。</p>
+<p>本文把必要的 Transformer 基础放进多模态 Policy 的真实数据流中理解：Attention 在前向传播中改变什么，self、cross 与 joint attention 怎样交换信息，CLS/readout 怎样汇总，gate、projector、AdaNorm 和 Action Head 又分别位于哪一层。</p>
+<p>阅读位置：<a href="vla-overview-reading-map.html">统一研究范式</a> → <a href="multimodal-encoder-alignment-infonce.html">公共语义空间</a> → <a href="multimodal-consistency-supervision.html">表示监督配方</a> → 本文。本文不再把 Transformer 当作孤立基础知识，而是围绕“对齐后的表示怎样真正影响动作”展开。</p>
 </blockquote>
 <h2 id="0">0. 先给出核心结论</h2>
 <p>此前的理解已经抓住了主要方向：</p>
@@ -547,6 +553,102 @@ memory -&gt; K/V
 </code></pre>
 <p>优点是可以从已有VLA初始化，避免触觉噪声在无接触时干扰全部动作。gate应由接触状态或学习到的可靠度控制，而不只是固定相加。</p>
 <p>无论采用哪种attention结构，仍需要动作监督、flow matching或行为克隆loss。Cross-attention本身不会凭空教会机器人“触到滑移以后应该加力”。</p>
+<h3 id="124-gate">12.4 Gate：控制新信息写入多少</h3>
+<p>新增触觉、音频或外部 memory 时，常见 residual injection 是：</p>
+<p>\[
+H'=H+g\cdot F(H,M)
+\]</p>
+<p>其中：</p>
+<ul>
+<li>\(H\)：原 backbone 的 hidden states；</li>
+<li>\(F(H,M)\)：adapter 或 cross-attention 读出的新模态信息；</li>
+<li>\(g\)：可学习 gate。</li>
+</ul>
+<p>如果 \(g\) 采用零或小值初始化，训练开始时模型接近原策略，随后逐渐学会使用新模态。这能降低随机初始化分支突然破坏预训练能力的风险。</p>
+<p>Gate 不是“决定某个 attention token 看谁”的 attention matrix；它控制的是整条新增信息路径对 residual stream 的贡献强度。</p>
+<h3 id="125-filmadaln-adarmscondition-token">12.5 FiLM、AdaLN 与 AdaRMS：Condition 不一定成为 Token</h3>
+<p>有些条件适合通过 token 参与 attention，例如语言、图像和触觉 patch。另一些全局条件更适合调节整层计算，例如 diffusion/flow timestep、机器人 embodiment 或全局任务向量。</p>
+<p>FiLM 的一般形式是：</p>
+<p>\[
+H'=\gamma(c)\odot H+\beta(c)
+\]</p>
+<p>Adaptive Normalization 则先归一化，再由 condition 产生 scale、shift 或 gate：</p>
+<pre><code class="language-text">timestep / embodiment / pooled condition
+                 ↓ MLP
+          scale, shift, gate
+                 ↓
+        调制Transformer block
+</code></pre>
+<ul>
+<li>AdaLN 使用 LayerNorm；</li>
+<li>AdaRMS 使用 RMSNorm；</li>
+<li>condition 本身没有序列位置，也不需要产生独立 Q/K/V。</li>
+</ul>
+<p>可以把 token condition 理解成“加入会议的参与者”，把 AdaNorm 理解成“调整整间会议室的工作模式”。</p>
+<h3 id="126-clsreadout-action-head">12.6 CLS、Readout 与 Action Head：汇总和输出不是一回事</h3>
+<p>CLS 是最经典的 readout token：</p>
+<pre><code class="language-text">[CLS, patch₁, ..., patchₙ]
+          ↓ self-attention
+hCLS汇总一张图的信息
+</code></pre>
+<p>机器人 Transformer 中的 readout 通常更任务化：</p>
+<pre><code class="language-text">observation/task tokens
++ action readout tokens
+          ↓ Transformer
+action readout hidden states
+          ↓ Action Head
+robot action chunk
+</code></pre>
+<p>需要严格区分：</p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CLS/readout token</td>
+<td>在 Transformer 中承载汇总后的 hidden representation</td>
+</tr>
+<tr>
+<td>Projector</td>
+<td>转换维度或接口空间</td>
+</tr>
+<tr>
+<td>Action Head/Decoder</td>
+<td>把 hidden states 解码成动作、动作 token、噪声或 velocity</td>
+</tr>
+</tbody>
+</table>
+<p>因此 readout 不是最终动作，Action Head 也不一定只是单层线性 projector。复杂策略中它可能是 CVAE decoder、Diffusion Transformer 或 Flow-Matching Action Expert。</p>
+<h3 id="127-multi-expert-moe">12.7 Multi-expert 不一定是稀疏 MoE</h3>
+<p>典型 sparse MoE 是：</p>
+<pre><code class="language-text">token → router → top-k experts → weighted merge
+</code></pre>
+<p>PI0/PI0.5 一类 multi-expert Transformer 则更接近：</p>
+<pre><code class="language-text">vision/language prefix → Prefix Expert参数
+state/noisy action     → Action Expert参数
+                    ↓
+       通过联合attention geometry协同
+</code></pre>
+<p>它由 token 区段固定选择参数，不一定有 router 或 top-k。阅读论文时不能看到 <code>expert</code> 就自动理解成稀疏路由 MoE。</p>
+<h3 id="128-policy-fusion">12.8 一条完整的 Policy Fusion 链路</h3>
+<p>把本章概念串起来：</p>
+<pre><code class="language-text">各模态原始输入
+   ↓ modality encoders
+vision / language / tactile tokens
+   ↓ projector到兼容宽度
+joint attention或形成perception memory
+   ↓
+action/readout tokens作为Query读取memory
+   ↓ optional gate / AdaNorm condition
+action hidden states
+   ↓ Action Head / Expert
+action chunk
+</code></pre>
+<p>对齐预训练回答“每种模态怎样被表示”；这一链路回答“这些表示在当前任务下怎样真正改变动作”。</p>
 <hr />
 <h2 id="13">13. 常见误区</h2>
 <h3 id="attention-weight">误区一：Attention weight就是模型参数</h3>
@@ -584,8 +686,8 @@ GR00T Action Expert
 <p>这也解释了为什么触觉VLA通常可以先学一个可独立使用的tactile encoder，再让action expert用cross-attention或joint attention读取它：<strong>先把触觉“表示清楚”，再让动作网络“按任务使用”。</strong></p>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="08-transformer-latent-encoder-decoder.html">← F01 · Token、Embedding、Encoder/Decoder 与 Latent</a>
-            <a href="model-training-forward-loss-backward.html">F03 · 模型训练基础：Forward、Loss、Backward 与微调 →</a>
+            <a href="multimodal-consistency-supervision.html">← F03 · 多模态表示的监督配方</a>
+            <a href="imitation-learning-behavior-cloning.html">IL01 · 模仿学习与 Behavior Cloning 入门 →</a>
           </nav>
         </article>
       </main>

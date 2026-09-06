@@ -29,17 +29,13 @@ class Post:
 
 
 POSTS = [
-    Post("F01", "08_transformer_latent_encoder_decoder.md", "08-transformer-latent-encoder-decoder", "Token、Embedding、Encoder/Decoder 与 Latent", "建立 token、hidden width、latent、encoder、decoder 和参数量之间的基础概念坐标系。", "foundations", level="入门"),
-    Post("F02", "19_attention_from_embeddings_to_action_expert.md", "19-attention-openclip-tactile-groot", "Transformer 与 Attention：从 QKV 到多模态交互", "区分动态 attention matrix 与可训练参数，并系统理解 self、cross 与 joint attention。", "foundations", published_en="September 2026", published_zh="2026.09", level="入门"),
-    Post("F03", "22_model_training_basics.md", "model-training-forward-loss-backward", "模型训练基础：Forward、Loss、Backward 与微调", "建立一次参数更新的完整闭环，并区分 freeze、LoRA、主损失、辅助损失及训练专用模块。", "foundations", published_en="September 2026", published_zh="2026.09", level="入门"),
-    Post("F04", "21_clip_and_contrastive_learning.md", "clip-contrastive-representation-learning", "表示学习、CLIP 与对比学习", "从双塔 encoder、global embedding 和 InfoNCE 出发，区分表示对齐、前向融合与下游控制。", "foundations", published_en="September 2026", published_zh="2026.09", level="入门"),
-    Post("F05", "09_attention_multi_expert_and_conditioning.md", "09-attention-multi-expert-conditioning", "多模态融合、多专家与条件注入", "比较 token concat、joint/cross attention、multi-expert 与 AdaLN/AdaRMS 条件调制。", "foundations", level="进阶"),
-    Post("F06", "31_multimodal_encoder_alignment_and_infonce.md", "multimodal-encoder-alignment-infonce", "多模态 Encoder 对齐：ViT、CLIP 与 InfoNCE", "深入解释语义锚点、projector、对齐 loss 与触觉 encoder 的通用训练范式。", "foundations", published_en="September 2026", published_zh="2026.09", level="进阶"),
-    Post("F07", "32_three_consistency_supervision_paradigms.md", "multimodal-consistency-supervision", "多模态表征学习的三类一致性监督", "统一跨模态对齐、时间连续性与增强或遮挡不变性，并区分 consistency、reconstruction 与 action supervision。", "foundations", published_en="September 2026", published_zh="2026.09", level="进阶"),
+    Post("F01", "27_vla_overview.md", "vla-overview-reading-map", "多模态 VLA 与模仿学习：统一研究范式", "从数据、表示、对齐、任务融合、动作生成到闭环执行，先建立阅读和研究多模态策略的总地图。", "foundations", published_en="September 2026", published_zh="2026.09", level="入门"),
+    Post("F02", "31_multimodal_encoder_alignment_and_infonce.md", "multimodal-encoder-alignment-infonce", "从原始模态到公共语义空间", "串联 token、encoder、ViT、CLIP、CLS/readout、projector、语义锚点与 InfoNCE，理解多模态表示怎样建立共同坐标。", "foundations", published_en="September 2026", published_zh="2026.09", level="核心"),
+    Post("F03", "32_three_consistency_supervision_paradigms.md", "multimodal-consistency-supervision", "多模态表示的监督配方", "统一跨模态对齐、时间连续性、增强或遮挡一致性，并说明 reconstruction、future prediction 与任务监督的分工。", "foundations", published_en="September 2026", published_zh="2026.09", level="核心"),
+    Post("F04", "19_attention_from_embeddings_to_action_expert.md", "19-attention-openclip-tactile-groot", "从对齐表示到 Policy 融合", "把 Transformer 基础放回策略数据流，系统理解 self/cross/joint attention、readout、projector、gate、AdaNorm 与 Action Head。", "foundations", published_en="September 2026", published_zh="2026.09", level="核心"),
     Post("IL01", "23_imitation_learning_basics.md", "imitation-learning-behavior-cloning", "模仿学习与 Behavior Cloning 入门", "从 demonstration、policy 和 BC 出发，理解离线监督、闭环 rollout 与分布偏移。", "imitation", published_en="September 2026", published_zh="2026.09", level="入门"),
     Post("IL02", "24_robot_data_action_semantics.md", "robot-data-action-semantics", "机器人数据：Observation、Action 与时间窗口", "统一 state/action 语义、episode、action chunk、horizon、控制频率、归一化和 mask。", "imitation", published_en="September 2026", published_zh="2026.09", level="入门"),
     Post("IL03", "25_action_generation_families.md", "action-generation-mse-token-diffusion-flow", "动作生成方法：MSE、Token、Diffusion 与 Flow Matching", "比较四类动作生成目标，区分网络架构、训练 target 与推理采样方式。", "imitation", published_en="September 2026", published_zh="2026.09", level="进阶"),
-    Post("VLA00", "27_vla_overview.md", "vla-overview-reading-map", "从模仿学习到 VLA：架构地图与阅读方法", "用统一的数据流和六步检查法定位 VLM、动作头、训练目标与部署系统。", "architectures", published_en="September 2026", published_zh="2026.09", level="入门"),
     Post("VLA01", "10_flow_matching_training_and_inference.md", "10-flow-matching-training-inference", "Flow Matching：训练、timestep 与推理", "从插值路径、velocity target 和 timestep condition 出发，区分训练采样与推理积分。", "architectures"),
     Post("VLA02", "04_pi05_architecture.md", "04-pi05-architecture", "PI0.5：VLM Prefix 与 Action Expert", "拆解 VLM Prefix Expert、Action Expert、联合 attention 和 flow-matching action generation。", "architectures", "pi05_structure.drawio"),
     Post("VLA03", "11_groot_dit_architecture.md", "11-groot-dit-architecture", "GR00T：VLM Memory 与 DiT Action Head", "梳理 VLM memory、state/action encoders、AlternateVLDiT、AdaLN 与 action decoder 的数据流。", "architectures", "groot_n1d7_structure.drawio"),
@@ -140,13 +136,21 @@ POSTS = [
 ]
 
 
+LEGACY_REDIRECTS = {
+    "08-transformer-latent-encoder-decoder": "multimodal-encoder-alignment-infonce",
+    "model-training-forward-loss-backward": "vla-overview-reading-map",
+    "clip-contrastive-representation-learning": "multimodal-encoder-alignment-infonce",
+    "09-attention-multi-expert-conditioning": "19-attention-openclip-tactile-groot",
+}
+
+
 CHAINS = {
     "foundations": {
         "title": "第一卷：基础概念",
         "title_en": "Part 1: Foundations",
         "label_zh": "基础概念",
         "label_en": "Foundations",
-        "description": "先统一 token、encoder、Attention、训练闭环、CLIP、多模态融合与一致性监督中的核心词汇。",
+        "description": "先建立多模态 VLA 与模仿学习的统一范式，再依次理解表示接口、公共空间、监督配方与 Policy 融合。",
     },
     "imitation": {
         "title": "第二卷：模仿学习",
@@ -463,6 +467,24 @@ def index_page(reading_times: dict[str, int]) -> str:
 """
 
 
+def redirect_page(target_slug: str) -> str:
+    """Keep links to retired foundation articles working after consolidation."""
+    target = f"{target_slug}.html"
+    return f"""<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0; url={target}" />
+    <link rel="canonical" href="{target}" />
+    <title>文章已整合</title>
+  </head>
+  <body>
+    <p>这篇基础文章已整合进新的学习路线。<a href="{target}">前往新文章</a></p>
+  </body>
+</html>
+"""
+
+
 def main() -> None:
     args = parse_args()
     source_dir = args.source.resolve()
@@ -501,6 +523,9 @@ def main() -> None:
         following = POSTS[index + 1] if index + 1 < len(POSTS) else None
         output = article_page(post, body, md.toc, diagram, previous, following, reading_times[post.code])
         (blog_dir / f"{post.slug}.html").write_text(output, encoding="utf-8")
+
+    for legacy_slug, target_slug in LEGACY_REDIRECTS.items():
+        (blog_dir / f"{legacy_slug}.html").write_text(redirect_page(target_slug), encoding="utf-8")
 
     (blog_dir / "index.html").write_text(index_page(reading_times), encoding="utf-8")
     print(f"Built {len(POSTS)} posts in {blog_dir}")

@@ -48,4 +48,4 @@ To explicitly refresh matching engineering notes and Draw.io diagrams from the e
 .blog-build-env/bin/python scripts/build_blog.py --sync-upstream
 ```
 
-The archive is organized into six dependency-first series: foundations, imitation learning, VLA architectures, engineering, runtime/deployment, and tactile VLA. Article codes such as `F01`, `IL01`, and `VLA00` express the reading path without changing the stable page URLs.
+The archive is organized into six dependency-first series: foundations, imitation learning, VLA architectures, engineering, runtime/deployment, and tactile VLA. Article codes such as `F01`, `IL01`, and `VLA01` express the reading path while legacy foundation URLs redirect to their consolidated replacements.

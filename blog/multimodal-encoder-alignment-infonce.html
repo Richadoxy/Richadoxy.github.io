@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="深入解释语义锚点、projector、对齐 loss 与触觉 encoder 的通用训练范式。" />
-    <title>多模态 Encoder 对齐：ViT、CLIP 与 InfoNCE | 董希越的学习之路</title>
+    <meta name="description" content="串联 token、encoder、ViT、CLIP、CLS/readout、projector、语义锚点与 InfoNCE，理解多模态表示怎样建立共同坐标。" />
+    <title>从原始模态到公共语义空间 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
     <link rel="stylesheet" href="../assets/css/blog.css" />
@@ -35,101 +35,77 @@
           <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
           <div class="toc">
 <ul>
-<li><a href="#0">0. 核心结论</a></li>
-<li><a href="#1-vit">1. ViT 是什么</a><ul>
-<li><a href="#11-vit-encoder">1.1 ViT 是 Encoder 架构</a></li>
-<li><a href="#12-vit">1.2 为什么触觉也经常使用 ViT</a></li>
+<li><a href="#0">0. 一张总图</a></li>
+<li><a href="#1-token">1. 从原始信号到 Token</a><ul>
+<li><a href="#11">1.1 不同触觉输入不是同一种数据</a></li>
+<li><a href="#12-tokenizerembedding-encoder">1.2 Tokenizer、Embedding 和 Encoder</a></li>
+<li><a href="#13-token-hidden-width">1.3 一个 Token 与 Hidden Width</a></li>
 </ul>
 </li>
-<li><a href="#2-clip-vit">2. CLIP 与 ViT 的关系</a><ul>
-<li><a href="#21-clip-vit">2.1 CLIP 不是 ViT 的同义词</a></li>
-<li><a href="#22">2.2 几个名称的层级</a></li>
-<li><a href="#23-clip-encoder">2.3 CLIP 权重为什么能初始化触觉 Encoder</a></li>
+<li><a href="#2-vit-encoder">2. ViT：常见的图像与视触觉 Encoder</a><ul>
+<li><a href="#21-vit">2.1 ViT 做什么</a></li>
+<li><a href="#22-cls-token">2.2 CLS Token</a></li>
+<li><a href="#23-clsmean-pooling-readout">2.3 CLS、Mean Pooling 与 Readout</a></li>
+<li><a href="#24-vit">2.4 为什么 ViT 能处理触觉</a></li>
 </ul>
 </li>
-<li><a href="#3-encodertokenglobal-embedding-projector">3. Encoder、Token、Global Embedding 与 Projector</a><ul>
-<li><a href="#31-encoder">3.1 Encoder 输出通常不只一个向量</a></li>
-<li><a href="#32-projector">3.2 为什么需要 Projector</a></li>
-<li><a href="#33-projector">3.3 Projector 不等于完成了对齐</a></li>
+<li><a href="#3-clip-vit">3. CLIP 与 ViT 不是同一层级</a><ul>
+<li><a href="#31-clip-encoder">3.1 CLIP 是双 Encoder 训练体系</a></li>
+<li><a href="#32-clip-vlm">3.2 CLIP 不是生成式 VLM</a></li>
+<li><a href="#33-clip-vit">3.3 为什么使用 CLIP 权重初始化触觉 ViT</a></li>
 </ul>
 </li>
-<li><a href="#4">4. 什么是多模态对齐</a></li>
-<li><a href="#5">5. 什么是“锚点”</a><ul>
-<li><a href="#51-clip">5.1 冻结的 CLIP 视觉—语言空间</a></li>
-<li><a href="#52">5.2 为什么经常以语言为锚点</a></li>
-<li><a href="#53">5.3 为什么视觉也经常是锚点</a></li>
-<li><a href="#54">5.4 锚点不一定完全冻结</a></li>
+<li><a href="#4-projector">4. Projector：对齐接口，不负责自动对齐语义</a></li>
+<li><a href="#5">5. 公共语义空间到底是什么</a><ul>
+<li><a href="#51-global-embedding">5.1 对齐通常发生在 Global Embedding</a></li>
 </ul>
 </li>
-<li><a href="#6-infonce-loss">6. InfoNCE：最常见的对齐 Loss</a><ul>
-<li><a href="#61">6.1 正样本与负样本</a></li>
-<li><a href="#62">6.2 为什么通常双向计算</a></li>
-<li><a href="#63-temperature">6.3 Temperature 的作用</a></li>
-<li><a href="#64-mse">6.4 为什么不只用 MSE 拉近正样本</a></li>
-<li><a href="#65-infonce">6.5 InfoNCE 的局限</a></li>
+<li><a href="#6">6. 锚点：谁定义公共空间的坐标</a><ul>
+<li><a href="#61">6.1 固定视觉—语言锚点</a></li>
+<li><a href="#62">6.2 锚点不一定是语言</a></li>
+<li><a href="#63">6.3 锚点也可能缓慢移动</a></li>
 </ul>
 </li>
-<li><a href="#7-encoder-loss">7. 常见 Encoder 训练 Loss 家族</a><ul>
-<li><a href="#71">7.1 跨模态对齐</a></li>
-<li><a href="#72">7.2 属性分类监督</a></li>
-<li><a href="#73-masked-reconstruction">7.3 Masked Reconstruction</a></li>
-<li><a href="#74">7.4 时间预测与时间对比</a></li>
-<li><a href="#75">7.5 下游任务监督</a></li>
+<li><a href="#7-infonce">7. InfoNCE 怎样完成对齐</a><ul>
+<li><a href="#71">7.1 正样本与负样本</a></li>
+<li><a href="#72-infonce">7.2 单向 InfoNCE</a></li>
+<li><a href="#73-infonce">7.3 双向与三模态 InfoNCE</a></li>
+<li><a href="#74-temperature">7.4 Temperature</a></li>
+<li><a href="#75">7.5 为什么不能只拉近正样本</a></li>
 </ul>
 </li>
-<li><a href="#8-alignment-fusion">8. Alignment 与 Fusion 的区别</a><ul>
-<li><a href="#81-alignment">8.1 Alignment：建立可比较的坐标系</a></li>
-<li><a href="#82-fusion">8.2 Fusion：完成任务时交换信息</a></li>
-<li><a href="#83">8.3 对齐不等于融合</a></li>
-<li><a href="#84">8.4 融合也不保证通用对齐</a></li>
+<li><a href="#8">8. 正负样本定义比公式名字更重要</a></li>
+<li><a href="#9">9. 缺失模态和星形对齐</a><ul>
+<li><a href="#91">9.1 三元组不是必要条件</a></li>
+<li><a href="#92">9.2 星形对齐</a></li>
 </ul>
 </li>
-<li><a href="#9-encoder">9. 多模态 Encoder 训练的通用范式</a><ul>
-<li><a href="#91">9.1 选择输入表示</a></li>
-<li><a href="#92">9.2 先学习模态内部结构</a></li>
-<li><a href="#93">9.3 选择锚点或参照关系</a></li>
-<li><a href="#94">9.4 映射到公共空间</a></li>
-<li><a href="#95">9.5 定义正样本</a></li>
-<li><a href="#96">9.6 定义负样本</a></li>
-<li><a href="#97">9.7 组合辅助目标</a></li>
-<li><a href="#98">9.8 丢弃训练脚手架并接入下游</a></li>
+<li><a href="#10">10. 哪些参数更新</a><ul>
+<li><a href="#101">10.1 只训练新模态</a></li>
+<li><a href="#102">10.2 部分适配锚点</a></li>
+<li><a href="#103">10.3 端到端共同训练</a></li>
+<li><a href="#104-policy">10.4 预训练后接 Policy</a></li>
 </ul>
 </li>
-<li><a href="#10">10. 已读论文的路线对照</a></li>
-<li><a href="#11-tvl">11. TVL：最标准的语义锚点路线</a></li>
-<li><a href="#12-octopiclip-clip">12. Octopi：CLIP 初始化不等于 CLIP 对齐</a></li>
-<li><a href="#13-anytouch">13. AnyTouch：低层结构与高层语义分阶段训练</a></li>
-<li><a href="#14-beyond-sight-policy">14. Beyond Sight：对齐发生在 Policy 内部</a></li>
-<li><a href="#15-omnivtla">15. OmniVTLA：对齐初始化之后再做动作学习</a></li>
-<li><a href="#16-tactile-vla">16. Tactile-VLA：没有独立对齐阶段</a></li>
-<li><a href="#17-vt-muse-stage-i">17. VT-MUSE Stage I：模态、时间和遮挡三种一致性</a><ul>
-<li><a href="#171">17.1 同步跨模态一致性</a></li>
-<li><a href="#172">17.2 相邻时间一致性</a></li>
-<li><a href="#173">17.3 遮挡不变性</a></li>
+<li><a href="#11_1">11. 对齐成功应该怎样验证</a><ul>
+<li><a href="#111-retrieval">11.1 Retrieval</a></li>
+<li><a href="#112-zero-shot-classification">11.2 Zero-shot Classification</a></li>
+<li><a href="#113-linear-probe">11.3 Linear Probe</a></li>
+<li><a href="#114-policy">11.4 下游 Policy</a></li>
 </ul>
 </li>
-<li><a href="#18">18. 为什么常见方案会采用“两阶段”</a></li>
-<li><a href="#19">19. 不同监督目标决定表示保留什么</a></li>
-<li><a href="#20">20. 根据下游任务选择路线</a><ul>
-<li><a href="#_1">开放词汇触觉理解</a></li>
-<li><a href="#encoder">跨传感器通用 Encoder</a></li>
-<li><a href="#_2">接触丰富机器人控制</a></li>
-<li><a href="#_3">同时追求语义与动作泛化</a></li>
+<li><a href="#12">12. 已读论文的对齐路线</a></li>
+<li><a href="#13">13. 常见误区</a><ul>
+<li><a href="#clip-vit">误区一：CLIP 就是 ViT</a></li>
+<li><a href="#projector">误区二：Projector 完成语义对齐</a></li>
+<li><a href="#embedding">误区三：三个 Embedding 必须数值完全相同</a></li>
+<li><a href="#_1">误区四：有语言就是以语言为锚点</a></li>
+<li><a href="#clip-clip-style">误区五：CLIP 初始化就是 CLIP-style 对齐</a></li>
+<li><a href="#_2">误区六：对齐以后自然能输出动作</a></li>
 </ul>
 </li>
-<li><a href="#21-encoder">21. 阅读 Encoder 论文时的检查清单</a><ul>
-<li><a href="#_4">输入是什么</a></li>
-<li><a href="#encoder_1">Encoder 是什么</a></li>
-<li><a href="#_5">用什么全局表示</a></li>
-<li><a href="#_6">谁是锚点</a></li>
-<li><a href="#_7">正负样本怎样定义</a></li>
-<li><a href="#loss">Loss 属于哪一层</a></li>
-<li><a href="#_8">哪些参数更新</a></li>
-<li><a href="#_9">推理时保留什么</a></li>
-<li><a href="#_10">最终实验真的证明了什么</a></li>
-</ul>
-</li>
-<li><a href="#22_1">22. 最终统一知识图</a></li>
+<li><a href="#14-encoderalignment">14. 阅读 Encoder/Alignment 工作的检查表</a></li>
+<li><a href="#15">15. 最终记忆框架</a></li>
 </ul>
 </div>
 
@@ -137,388 +113,400 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F06</p>
-          <h1>多模态 Encoder 对齐：ViT、CLIP 与 InfoNCE</h1>
-          <p class="article-meta"><span data-lang="en">进阶 · September 2026 · 18 min read</span><span data-lang="zh">进阶 · 2026.09 · 约 18 分钟阅读</span></p>
-          <p class="article-deck">深入解释语义锚点、projector、对齐 loss 与触觉 encoder 的通用训练范式。</p>
+          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F02</p>
+          <h1>从原始模态到公共语义空间</h1>
+          <p class="article-meta"><span data-lang="en">核心 · September 2026 · 11 min read</span><span data-lang="zh">核心 · 2026.09 · 约 11 分钟阅读</span></p>
+          <p class="article-deck">串联 token、encoder、ViT、CLIP、CLS/readout、projector、语义锚点与 InfoNCE，理解多模态表示怎样建立共同坐标。</p>
           <div class="article-content">
             <blockquote>
-<p>本文从触觉论文中反复出现的 encoder 预训练出发，统一解释 ViT、CLIP、公共 latent space、语义锚点、InfoNCE、对齐与融合，并比较 TVL、Octopi、AnyTouch、Beyond Sight、OmniVTLA、Tactile-VLA、VLA-Touch 与 VT-MUSE 的训练路线。</p>
-<p>建议先读：<a href="08-transformer-latent-encoder-decoder.html">Token、Encoder 与 Latent</a>、<a href="model-training-forward-loss-backward.html">模型训练基础</a>、<a href="19-attention-openclip-tactile-groot.html">Attention 专题</a>、<a href="clip-contrastive-representation-learning.html">CLIP 与对比学习</a>和<a href="09-attention-multi-expert-conditioning.html">多模态融合</a>。TVL、AnyTouch、OmniVTLA 等论文在本文后半部分作为对照案例，不要求提前读完。</p>
+<p>本文承接统一研究范式，聚焦数据进入 Policy 之前的表示层与对齐层：原始信号怎样成为 token，ViT 与 CLIP 是什么关系，CLS/readout 与 projector 做什么，以及 InfoNCE 如何用锚点和正负样本塑造公共空间。</p>
+<p>阅读位置：<a href="vla-overview-reading-map.html">统一研究范式</a> → 本文 → <a href="multimodal-consistency-supervision.html">多模态表示的监督配方</a> → <a href="19-attention-openclip-tactile-groot.html">从对齐表示到 Policy 融合</a>。</p>
 </blockquote>
-<h2 id="0">0. 核心结论</h2>
-<p>触觉论文中反复出现的 encoder 训练可以概括为：</p>
-<pre><code class="language-text">原始模态
-  ↓
-各自的Encoder
-  ↓
-Projector映射到相同维度
-  ↓
-根据配对关系构造正负样本
-  ↓
-用对比、重建、分类或时间预测Loss组织latent space
-  ↓
-得到可供检索、理解或控制使用的多模态表示
-  ↓
-再通过concat / self-attention / cross-attention接入下游任务
+<h2 id="0">0. 一张总图</h2>
+<pre><code class="language-text">Raw inputs
+image / tactile image / force sequence / text
+                        ↓
+Modality-specific interface
+tokenizer / patch embedding / MLP
+                        ↓
+Encoder
+ViT / CNN / text Transformer / temporal Transformer
+                        ↓
+Local tokens + global CLS/readout
+                        ↓
+Projector + normalization
+                        ↓
+Shared embedding space
+                        ↓
+InfoNCE / retrieval / zero-shot classification
 </code></pre>
-<p>其中最容易混淆的是五个不同层级：</p>
+<p>这条链路回答的是：</p>
+<blockquote>
+<p>每种模态怎样得到独立、可比较、可复用的表示？</p>
+</blockquote>
+<p>它还没有回答：</p>
+<blockquote>
+<p>多种模态怎样在一次 forward 中联合生成动作？</p>
+</blockquote>
+<p>后一个问题属于 F04 的 Policy Fusion。</p>
+<hr />
+<h2 id="1-token">1. 从原始信号到 Token</h2>
+<h3 id="11">1.1 不同触觉输入不是同一种数据</h3>
+<p>触觉论文中的输入可能是：</p>
 <table>
 <thead>
 <tr>
-<th>概念</th>
-<th>回答的问题</th>
+<th>输入</th>
+<th>例子</th>
+<th>常见入口</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>ViT</td>
-<td>图像或触觉图像如何被 Transformer 编码？</td>
+<td>视触觉 RGB</td>
+<td>DIGIT、GelSight 内部相机</td>
+<td>CNN/ViT</td>
 </tr>
 <tr>
-<td>CLIP</td>
-<td>图像和文本 encoder 如何通过对比学习共同训练？</td>
+<td>深度或表面法向</td>
+<td>由触觉图像重建的几何</td>
+<td>CNN/ViT</td>
 </tr>
 <tr>
-<td>InfoNCE</td>
-<td>正确配对如何靠近，错误配对如何远离？</td>
+<td>Marker displacement/flow</td>
+<td>标记点位移</td>
+<td>CNN/ViT/显式特征</td>
 </tr>
 <tr>
-<td>Alignment</td>
-<td>不同模态是否使用可比较的语义坐标？</td>
+<td>二维力阵列</td>
+<td>Paxini force field</td>
+<td>reshape/stitch 后用 ViT</td>
 </tr>
 <tr>
-<td>Fusion</td>
-<td>完成任务时，多种模态如何交换并联合使用信息？</td>
+<td>数值力序列</td>
+<td>normal/shear/6D wrench</td>
+<td>MLP、1D CNN、时序 Transformer</td>
+</tr>
+<tr>
+<td>触觉视频</td>
+<td>按压、滑动的连续帧</td>
+<td>Video Transformer/temporal pooling</td>
 </tr>
 </tbody>
 </table>
-<p>需要先修正两个常见概括：</p>
-<ol>
-<li>不是所有触觉论文都有视觉—触觉—语言三模态，也不是都以语言为锚点；</li>
-<li>对齐和融合不是同一件事，既可以只对齐不融合，也可以直接融合而不建立通用公共空间。</li>
-</ol>
-<hr />
-<h2 id="1-vit">1. ViT 是什么</h2>
-<h3 id="11-vit-encoder">1.1 ViT 是 Encoder 架构</h3>
-<p>ViT，全称 Vision Transformer，是一种用 Transformer 编码二维图像的通用架构。</p>
-<pre><code class="language-text">224×224 RGB图像
-      ↓ 切分patch
-[patch₁, patch₂, ..., patchₙ]
-      ↓ 线性投影并加入CLS、位置编码
-[CLS, patch₁, patch₂, ..., patchₙ]
-      ↓ 多层Transformer block
-输出一组hidden states
-</code></pre>
-<p>每个 Transformer block 的主体仍是：</p>
-<pre><code class="language-text">hidden states
-    ↓ self-attention
-hidden states
-    ↓ MLP
-new hidden states
-</code></pre>
-<p>最终可以使用：</p>
+<p>不能只看到 <code>tactile encoder</code> 就认为输入形式相同。输入形式决定 encoder 能利用哪些结构：</p>
 <ul>
-<li>patch tokens：保存不同局部区域的信息；</li>
-<li>CLS token：汇总整张输入；</li>
-<li>mean pooling：对所有 patch token 求平均得到全局表示。</li>
+<li>图像和力阵列具有二维空间邻域；</li>
+<li>视频和力历史具有时间顺序；</li>
+<li>单一全局力值没有局部接触位置。</li>
 </ul>
-<p>ViT 只规定网络如何计算，没有规定用什么数据和 loss 训练。同一个 ViT 可以成为：</p>
-<ul>
-<li>ImageNet 图像分类器；</li>
-<li>CLIP 图像 encoder；</li>
-<li>MAE masked reconstruction encoder；</li>
-<li>视触觉图像 encoder；</li>
-<li>机器人策略的视觉 encoder。</li>
-</ul>
-<h3 id="12-vit">1.2 为什么触觉也经常使用 ViT</h3>
-<p>DIGIT、GelSight 等视触觉传感器的输出本身就是 RGB 图像：</p>
-<pre><code class="language-text">弹性体接触形变RGB
-        ↓
-切成patch
-        ↓
-ViT
-        ↓
-tactile tokens / tactile embedding
+<h3 id="12-tokenizerembedding-encoder">1.2 Tokenizer、Embedding 和 Encoder</h3>
+<p>三者处于不同位置：</p>
+<pre><code class="language-text">原始输入
+  ↓ tokenizer / patchify
+输入单元
+  ↓ embedding / input projection
+初始hidden vectors
+  ↓ encoder blocks
+上下文化tokens
 </code></pre>
-<p>力阵列也可以先排布成二维伪图像，再送入 ViT。ViT 本身不知道输入是自然图像、触觉形变图还是力场；训练数据和监督目标决定它最后学到什么。</p>
-<hr />
-<h2 id="2-clip-vit">2. CLIP 与 ViT 的关系</h2>
-<h3 id="21-clip-vit">2.1 CLIP 不是 ViT 的同义词</h3>
-<p>CLIP 通常包含两个 encoder：</p>
-<pre><code class="language-text">图像 → Image Encoder → zV
-文本 → Text Encoder  → zL
-</code></pre>
-<p>再使用大量图文配对数据进行对比学习，使正确图文表示接近：</p>
+<p>文本 tokenizer 把字符串变成 token IDs；ViT patchify 把图像分块。它们负责划分输入单元，不等于已经理解内容。</p>
+<p>Encoder 通过多层网络让每个 token 结合上下文，输出 hidden representations。</p>
+<h3 id="13-token-hidden-width">1.3 一个 Token 与 Hidden Width</h3>
+<p>如果模型宽度为 \(d=2048\)，一个 token 的 hidden state 是：</p>
 <p>\[
-z_V\approx z_L
+h_i\in\mathbb R^{2048}
 \]</p>
-<p>CLIP 的 Image Encoder 可以是：</p>
+<p>这表示一个 token 由 2048 个标量组成，不是“2048 个 token”。一组 \(N\) 个 token 才写成：</p>
+<p>\[
+H\in\mathbb R^{N\times2048}
+\]</p>
+<hr />
+<h2 id="2-vit-encoder">2. ViT：常见的图像与视触觉 Encoder</h2>
+<h3 id="21-vit">2.1 ViT 做什么</h3>
+<p>以 \(224\times224\) 图像和 \(14\times14\) patch 为例：</p>
+<pre><code class="language-text">224×224 image
+   ↓ 切成14×14 patches
+16×16 = 256 patches
+   ↓ 线性投影
+256 patch tokens
+   ↓ 加CLS与position embedding
+257 tokens
+   ↓ Transformer self-attention blocks
+contextual visual/tactile tokens
+</code></pre>
+<p>ViT 是网络架构，不规定预训练方式。同一个 ViT 可以使用：</p>
 <ul>
-<li>ResNet；</li>
-<li>ViT；</li>
-<li>其他视觉网络。</li>
+<li>ImageNet 分类；</li>
+<li>CLIP 图文对比；</li>
+<li>MAE masked reconstruction；</li>
+<li>触觉属性标签；</li>
+<li>机器人 action loss。</li>
 </ul>
-<p>现在常见的 <code>CLIP ViT-L/14</code> 表示：</p>
-<blockquote>
-<p>网络结构是 ViT-L/14，参数使用 CLIP 图文对比目标进行预训练。</p>
-</blockquote>
-<h3 id="22">2.2 几个名称的层级</h3>
+<h3 id="22-cls-token">2.2 CLS Token</h3>
+<p>CLS 是一个可学习的特殊输入位置：</p>
+<pre><code class="language-text">[CLS, patch₁, patch₂, ..., patch₂₅₆]
+                 ↓ self-attention
+hCLS逐层读取patch信息
+</code></pre>
+<p>初始 CLS embedding 对所有样本相同；经过 Transformer 后，最终 \(h_{CLS}\) 会随输入改变，可用作整张图的 global representation。</p>
+<h3 id="23-clsmean-pooling-readout">2.3 CLS、Mean Pooling 与 Readout</h3>
+<p>全局表示可以来自：</p>
+<ul>
+<li>CLS token；</li>
+<li>所有 patch token 的均值；</li>
+<li>attention pooling；</li>
+<li>learnable readout/query tokens。</li>
+</ul>
+<p>CLS 可以视为经典的 readout token，但机器人 Policy 中的 action readout 通常更加任务化。CLS 总结一张输入，action readout 则汇总生成动作所需的信息。</p>
+<h3 id="24-vit">2.4 为什么 ViT 能处理触觉</h3>
+<p>ViT 不要求输入一定是互联网照片。只要触觉信号能形成二维 patch，就能使用同一计算结构：</p>
+<pre><code class="language-text">GelSight/DIGIT RGB       → patches → tactile ViT
+stitched force field     → patches → force ViT
+tactile frame sequence   → spatial + temporal tokens
+</code></pre>
+<p>但使用相同架构不代表自然图像和触觉已经对齐。训练目标仍需要克服 domain gap。</p>
+<hr />
+<h2 id="3-clip-vit">3. CLIP 与 ViT 不是同一层级</h2>
+<h3 id="31-clip-encoder">3.1 CLIP 是双 Encoder 训练体系</h3>
+<pre><code class="language-text">Image → Image Encoder → global image embedding zV
+Text  → Text Encoder  → global text embedding zL
+</code></pre>
+<p>正确图文配对被拉近，不匹配图文被推远。</p>
+<p>CLIP 的 image encoder 可以是 ResNet 或 ViT；现代 checkpoint 常使用 ViT。因此：</p>
 <table>
 <thead>
 <tr>
 <th>名称</th>
-<th>层级</th>
+<th>含义</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>Transformer</td>
-<td>通用序列神经网络架构</td>
+<td>通用网络架构</td>
 </tr>
 <tr>
 <td>ViT</td>
-<td>使用 Transformer 处理图像的 encoder</td>
+<td>图像 Transformer encoder</td>
 </tr>
 <tr>
 <td>CLIP</td>
-<td>图像—文本双 encoder 及其对比学习体系</td>
+<td>图像—文本双塔与对比学习方法</td>
 </tr>
 <tr>
-<td>CLIP ViT</td>
-<td>经过 CLIP 图文训练的 ViT 图像 encoder</td>
+<td>CLIP ViT-L/14</td>
+<td>用 CLIP 目标训练的 ViT-L/14 图像塔</td>
 </tr>
 <tr>
 <td>OpenCLIP</td>
-<td>CLIP 的开源实现、训练代码和权重集合</td>
+<td>CLIP 的开源训练实现和模型集合</td>
 </tr>
 </tbody>
 </table>
-<p>最简单的记忆方式是：</p>
+<p>一句话：</p>
 <blockquote>
-<p>ViT 是发动机结构；CLIP 是把视觉发动机与文本发动机放在一起训练的方法。</p>
+<p>ViT 规定视觉 encoder 怎样计算；CLIP 规定图像与文本表示怎样共同训练。</p>
 </blockquote>
-<h3 id="23-clip-encoder">2.3 CLIP 权重为什么能初始化触觉 Encoder</h3>
-<p>常见做法是：</p>
-<pre><code class="language-text">CLIP Vision ViT weights
-           ↓ 初始化
-      Tactile ViT
-           ↓ 触觉数据继续训练
-   tactile encoder
+<h3 id="32-clip-vlm">3.2 CLIP 不是生成式 VLM</h3>
+<p>CLIP 的典型输出是用于相似度的 global embeddings：</p>
+<pre><code class="language-text">image/text → embedding → cosine similarity
 </code></pre>
-<p>这种初始化提供了：</p>
-<ul>
-<li>局部边缘与纹理特征；</li>
-<li>空间结构先验；</li>
-<li>已经形成的视觉语义；</li>
-<li>相比从头训练更稳定的参数起点。</li>
-</ul>
-<p>但自然图像与触觉图像存在 domain gap，因此只复制权重不等于模型已经理解触觉，仍需要触觉数据进行适配。</p>
+<p>它本身不负责长文本生成。LLaMA、Vicuna、Gemma 等语言模型则处理 token sequence 并生成文本。把触觉接入 LLM 时，通常还需要 projector、adapter 或多模态 connector。</p>
+<h3 id="33-clip-vit">3.3 为什么使用 CLIP 权重初始化触觉 ViT</h3>
+<pre><code class="language-text">CLIP Vision ViT
+      ↓ copy/init weights
+Tactile ViT
+      ↓ tactile adaptation
+tactile encoder
+</code></pre>
+<p>这种初始化能提供通用纹理、边缘、空间和视觉语义先验，但不能自动消除自然 RGB 与触觉成像之间的域差异。</p>
+<p>使用 <code>CLIP backbone</code> 也不等于后续一定继续做 CLIP 对齐。例如 Octopi 使用 CLIP ViT 初始化，但其 encoder 适配主要由物理属性分类监督。</p>
 <hr />
-<h2 id="3-encodertokenglobal-embedding-projector">3. Encoder、Token、Global Embedding 与 Projector</h2>
-<h3 id="31-encoder">3.1 Encoder 输出通常不只一个向量</h3>
-<p>ViT 内部输出一组 token：</p>
-<p>\[
-H=[h_{\mathrm{CLS}},h_1,h_2,\ldots,h_N]
-\]</p>
-<p>其中：</p>
-<ul>
-<li>\(h_i\)：第 \(i\) 个图像 patch 的表示；</li>
-<li>\(h_{\mathrm{CLS}}\)：整张输入的汇总表示。</li>
-</ul>
-<p>进行 CLIP 式对齐时，通常不会把所有 patch token 两两比较，而是取一个全局表示：</p>
-<pre><code class="language-text">CLS token
-或 mean pooled patch tokens
-或专门的readout token
-       ↓
-global embedding
-</code></pre>
-<h3 id="32-projector">3.2 为什么需要 Projector</h3>
+<h2 id="4-projector">4. Projector：对齐接口，不负责自动对齐语义</h2>
 <p>不同 encoder 的输出宽度可能不同：</p>
-<pre><code class="language-text">Tactile ViT  → 768维
-Vision ViT   → 1024维
-Text Encoder → 512维
+<pre><code class="language-text">Touch Encoder  → 768D
+Vision Encoder → 1024D
+Text Encoder   → 512D
 </code></pre>
-<p>要计算跨模态相似度，通常先用 projector 映射到共同维度：</p>
+<p>为计算相似度，使用各自 projector：</p>
 <p>\[
-z_T=P_T(E_T(T)),\qquad
-z_V=P_V(E_V(V)),\qquad
+z_T=P_T(E_T(T)),\quad
+z_V=P_V(E_V(V)),\quad
 z_L=P_L(E_L(L))
 \]</p>
-<p>例如统一成 512 维：</p>
-<pre><code class="language-text">Touch    → Encoder → Projector → 512D
-Vision   → Encoder → Projector → 512D
-Language → Encoder → Projector → 512D
-</code></pre>
-<p>然后进行 L2 normalization：</p>
+<p>映射到统一维度后再归一化：</p>
 <p>\[
 \bar z=\frac{z}{|z|_2}
 \]</p>
-<p>归一化后的点积就是余弦相似度：</p>
+<p>归一化后的点积等价于余弦相似度：</p>
 <p>\[
-\operatorname{sim}(z_i,z_j)
-=
-\bar z_i^\top \bar z_j
+\operatorname{sim}(z_i,z_j)=\bar z_i^\top\bar z_j
 \]</p>
-<h3 id="33-projector">3.3 Projector 不等于完成了对齐</h3>
-<p>Projector 只解决：</p>
-<ul>
-<li>向量维度不一致；</li>
-<li>不同 encoder 输出尺度不同；</li>
-<li>需要一个适合对比学习的映射空间。</li>
-</ul>
-<p>真正让空间产生跨模态结构的是训练 loss。</p>
-<hr />
-<h2 id="4">4. 什么是多模态对齐</h2>
-<p>假设数据集中每条样本包含：</p>
-<p>\[
-(T_i,V_i,L_i)
-\]</p>
-<p>分别经过 encoder：</p>
-<pre><code class="language-text">Touch    → Tactile Encoder → zT
-Vision   → Vision Encoder  → zV
-Language → Text Encoder    → zL
-</code></pre>
-<p>对齐学习希望同一对象或事件的不同模态在公共 latent space 中互相靠近：</p>
-<p>\[
-z_T\approx z_V\approx z_L
-\]</p>
-<p>这不是要求三个向量逐维完全相等，而是希望它们：</p>
-<ul>
-<li>余弦相似度较高；</li>
-<li>能够互相检索；</li>
-<li>具有相似的邻域结构；</li>
-<li>同时与不匹配样本保持距离。</li>
-</ul>
-<p>例如：</p>
-<pre><code class="language-text">柔软海绵的触觉
-        ↕ 靠近
-柔软海绵的视觉
-        ↕ 靠近
-“soft porous sponge”
-
-同时远离：
-“hard metal cube”
-</code></pre>
-<p>所以语言或视觉 embedding 并不是传统意义上逐维回归的 ground truth，而是共同定义 latent space 几何关系的参照。</p>
-<hr />
-<h2 id="5">5. 什么是“锚点”</h2>
-<p>“锚点”不是一定出现在网络图中的模块，而是理解训练设计的一种方式。</p>
-<h3 id="51-clip">5.1 冻结的 CLIP 视觉—语言空间</h3>
-<p>假设已经有一个预训练 OpenCLIP：</p>
-<pre><code class="language-text">Vision Encoder → 已有视觉语义空间
-Text Encoder   → 已有语言语义空间
-</code></pre>
-<p>冻结这两个 encoder，只训练 Tactile Encoder：</p>
-<pre><code class="language-text">                  frozen CLIP space
-               ┌─────────────────────┐
-vision ───────→ │ zV                  │
-language ─────→ │ zL                  │
-touch ─encoder→ │ zT ← 被拉进已有空间 │
-               └─────────────────────┘
-</code></pre>
-<p>此时视觉和语言空间基本固定，可以称为触觉 encoder 的语义锚点。</p>
-<h3 id="52">5.2 为什么经常以语言为锚点</h3>
-<p>语言天然适合表达：</p>
-<ul>
-<li>soft / hard；</li>
-<li>rough / smooth；</li>
-<li>slippery；</li>
-<li>fragile；</li>
-<li>metallic；</li>
-<li>elastic。</li>
-</ul>
-<p>如果只使用物体类别标签，模型可能知道“这是海绵”；对齐自然语言后，模型有机会获得更开放的属性语义。</p>
-<p>语言锚点的限制是：很多控制相关细节难以被一句标签表达。例如两帧触觉都可以叫 <code>hard contact</code>，但其中一帧可能已经发生微小滑移，需要完全不同的控制动作。</p>
-<h3 id="53">5.3 为什么视觉也经常是锚点</h3>
-<p>视觉数据更丰富、同步采集更容易，并且能提供：</p>
-<ul>
-<li>对象身份；</li>
-<li>几何和空间关系；</li>
-<li>接触位置；</li>
-<li>材料和外观线索。</li>
-</ul>
-<p>但视觉不一定看得出真实硬度、摩擦力和内部接触状态。</p>
-<h3 id="54">5.4 锚点不一定完全冻结</h3>
+<p>Projector 只解决接口问题。真正塑造公共空间的是 loss 和配对数据。</p>
+<p>还需要区分两个用途：</p>
 <table>
 <thead>
 <tr>
-<th>训练设置</th>
-<th>对“锚点”的理解</th>
+<th>Projector 用途</th>
+<th>目标空间</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>冻结 vision/text encoder</td>
-<td>稳定的固定语义坐标</td>
+<td>Contrastive projector</td>
+<td>CLIP/InfoNCE 共享 embedding space</td>
 </tr>
 <tr>
-<td>vision 使用 LoRA，text 冻结</td>
-<td>语言较稳定，视觉允许有限 domain adaptation</td>
-</tr>
-<tr>
-<td>三个 encoder 全部更新</td>
-<td>没有绝对固定坐标，三个空间共同演化</td>
+<td>LLM/VLA connector</td>
+<td>LLM 或 Policy 的 hidden width</td>
 </tr>
 </tbody>
 </table>
-<p>因此，“语言是锚点”通常表示训练希望保留语言语义结构，不一定表示语言 encoder 的每个参数都绝对不更新。</p>
+<p>二者都叫 projector，但目标完全不同。</p>
 <hr />
-<h2 id="6-infonce-loss">6. InfoNCE：最常见的对齐 Loss</h2>
-<p>论文里经常出现的不是 <code>inforce loss</code>，而是 <strong>InfoNCE loss</strong>，全称 Information Noise-Contrastive Estimation。</p>
-<h3 id="61">6.1 正样本与负样本</h3>
-<p>假设一个 batch 包含 \(N\) 组三模态样本：</p>
-<pre><code class="language-text">(T₁,V₁,L₁)
-(T₂,V₂,L₂)
-...
-(Tₙ,Vₙ,Lₙ)
+<h2 id="5">5. 公共语义空间到底是什么</h2>
+<p>给定三模态样本 \((T_i,V_i,L_i)\)：</p>
+<pre><code class="language-text">Touch    → ET → zT
+Vision   → EV → zV
+Language → EL → zL
 </code></pre>
-<p>对于触觉 \(T_i\)：</p>
-<ul>
-<li>\(V_i\) 是同步的正确视觉，即正样本；</li>
-<li>batch 中其他 \(V_j,j\ne i\) 是负样本。</li>
-</ul>
-<p>首先计算相似度：</p>
+<p>对齐希望：</p>
 <p>\[
-s_{ij}
-=
-\frac{\bar z_{T_i}^{\top}\bar z_{V_j}}{\tau}
+z_T\approx z_V\approx z_L
 \]</p>
-<p>其中 \(\tau\) 是 temperature。</p>
-<p>触觉检索视觉的 InfoNCE 为：</p>
+<p>“约等于”表示：</p>
+<ul>
+<li>匹配样本余弦相似度高；</li>
+<li>不匹配样本相似度低；</li>
+<li>可以进行 touch-to-text、touch-to-vision 检索；</li>
+<li>相似物体或属性形成相近邻域。</li>
+</ul>
+<p>它不表示：</p>
+<ul>
+<li>三个 encoder 的内部结构相同；</li>
+<li>patch tokens 逐位置相等；</li>
+<li>所有物理信息都被保留；</li>
+<li>对齐后已经学会机器人动作。</li>
+</ul>
+<h3 id="51-global-embedding">5.1 对齐通常发生在 Global Embedding</h3>
+<pre><code class="language-text">patch/token sequence
+      ↓ CLS/pooling
+global representation
+      ↓ projector + normalize
+contrastive embedding
+</code></pre>
+<p>因此全局检索成功，不代表局部触觉区域与视觉位置已经精确对应。细粒度 token alignment 需要更强的空间标注或专门匹配结构。</p>
+<hr />
+<h2 id="6">6. 锚点：谁定义公共空间的坐标</h2>
+<h3 id="61">6.1 固定视觉—语言锚点</h3>
+<p>最清楚的设置是：</p>
+<pre><code class="language-text">frozen CLIP Vision Encoder ─→ zV
+frozen CLIP Text Encoder   ─→ zL
+trainable Tactile Encoder  ─→ zT
+</code></pre>
+<p>已有 \(z_V,z_L\) 的几何结构基本不动，触觉表示被拉入该空间。</p>
+<h3 id="62">6.2 锚点不一定是语言</h3>
+<table>
+<thead>
+<tr>
+<th>锚点或监督</th>
+<th>更容易获得</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Language</td>
+<td>开放词汇属性与对象语义</td>
+</tr>
+<tr>
+<td>Vision</td>
+<td>对象身份、几何、位置与外观</td>
+</tr>
+<tr>
+<td>Cross-sensor pair</td>
+<td>设备不变的触觉属性</td>
+</tr>
+<tr>
+<td>Temporal relation</td>
+<td>接触状态的连续性</td>
+</tr>
+<tr>
+<td>Reconstruction target</td>
+<td>局部结构与高信息量细节</td>
+</tr>
+<tr>
+<td>Robot action</td>
+<td>对控制任务有用的表示</td>
+</tr>
+</tbody>
+</table>
+<p>语言是常用锚点，但不是天然最优锚点。它可能压缩无法被文字充分描述、却对控制关键的滑移和瞬时力变化。</p>
+<h3 id="63">6.3 锚点也可能缓慢移动</h3>
+<table>
+<thead>
+<tr>
+<th>参数策略</th>
+<th>空间行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>text/vision 全冻结</td>
+<td>稳定固定锚点</td>
+</tr>
+<tr>
+<td>text 冻结、vision LoRA</td>
+<td>以语言为主，视觉适应新 domain</td>
+</tr>
+<tr>
+<td>三个 encoder 都训练</td>
+<td>各模态共同形成新空间</td>
+</tr>
+</tbody>
+</table>
+<p>如果所有 encoder 都更新，就没有绝对固定的坐标原点；“锚点”只是哪个预训练结构被更强地保留。</p>
+<hr />
+<h2 id="7-infonce">7. InfoNCE 怎样完成对齐</h2>
+<h3 id="71">7.1 正样本与负样本</h3>
+<p>一个 batch 有 \(N\) 组同步 touch-vision 数据：</p>
+<p>\[
+(T_1,V_1),\ldots,(T_N,V_N)
+\]</p>
+<p>对于 \(T_i\)：</p>
+<ul>
+<li>\(V_i\) 是正样本；</li>
+<li>其他 \(V_j,j\ne i\) 通常作为 batch 内负样本。</li>
+</ul>
+<p>相似度为：</p>
+<p>\[
+s_{ij}=\frac{\bar z_{T_i}^{\top}\bar z_{V_j}}{\tau}
+\]</p>
+<h3 id="72-infonce">7.2 单向 InfoNCE</h3>
 <p>\[
 \mathcal L_{T\rightarrow V}
 =
--\frac{1}{N}
-\sum_{i=1}^{N}
+-\frac{1}{N}\sum_{i=1}^{N}
 \log
 \frac{\exp(s_{ii})}
 {\sum_{j=1}^{N}\exp(s_{ij})}
 \]</p>
-<p>它可以被理解成一个 batch 内 \(N\) 分类问题：</p>
+<p>它相当于：</p>
 <blockquote>
-<p>给定触觉 \(T_i\)，从 batch 中的 \(N\) 张视觉图里找出正确的 \(V_i\)。</p>
+<p>给定 \(T_i\)，在 batch 的 \(N\) 个视觉候选中分类出正确的 \(V_i\)。</p>
 </blockquote>
-<h3 id="62">6.2 为什么通常双向计算</h3>
-<p>触觉找到视觉是一种方向：</p>
-<p>\[
-\mathcal L_{T\rightarrow V}
-\]</p>
-<p>视觉找到触觉是另一个方向：</p>
-<p>\[
-\mathcal L_{V\rightarrow T}
-\]</p>
-<p>对称损失通常写成：</p>
+<h3 id="73-infonce">7.3 双向与三模态 InfoNCE</h3>
+<p>通常对称计算：</p>
 <p>\[
 \mathcal L_{TV}
 =
 \frac{
 \mathcal L_{T\rightarrow V}
 +
-\mathcal L_{V\rightarrow T}
-}{2}
+\mathcal L_{V\rightarrow T}}
+{2}
 \]</p>
-<p>三模态可以形成三条边：</p>
+<p>三模态可以组合三条边：</p>
 <p>\[
 \mathcal L_{\mathrm{align}}
 =
@@ -532,647 +520,251 @@ s_{ij}
 Touch  ↔ Language
 Vision ↔ Language
 </code></pre>
-<p>如果视觉—语言 encoder 已经由 CLIP 对齐，训练时也可以重点优化包含触觉的两条边。</p>
-<h3 id="63-temperature">6.3 Temperature 的作用</h3>
-<p>\[
-s_{ij}=\frac{\cos(z_i,z_j)}{\tau}
-\]</p>
+<h3 id="74-temperature">7.4 Temperature</h3>
+<p>\(\tau\) 控制 softmax 的尖锐程度：</p>
 <ul>
-<li>\(\tau\) 较小：softmax 更尖锐，更在意最相似与次相似的差异；</li>
-<li>\(\tau\) 较大：分布更平滑，对相似度差异不那么敏感。</li>
+<li>小 \(\tau\)：更严格区分最相似候选；</li>
+<li>大 \(\tau\)：相似度分布更平滑。</li>
 </ul>
-<p>它控制对比分类的严格程度，可以是超参数，也可以作为可学习参数。</p>
-<h3 id="64-mse">6.4 为什么不只用 MSE 拉近正样本</h3>
-<p>如果只使用：</p>
+<h3 id="75">7.5 为什么不能只拉近正样本</h3>
+<p>如果两个可训练 encoder 只优化：</p>
 <p>\[
-\mathcal L=|z_T-z_V|_2^2
+|z_T-z_V|_2^2
 \]</p>
-<p>而两个 encoder 都能自由更新，那么一个退化解是：</p>
-<pre><code class="language-text">所有输入都输出同一个向量
-</code></pre>
-<p>所有正样本距离都变成零，但 embedding 没有任何区分能力，这叫 representation collapse。</p>
-<p>InfoNCE 同时完成：</p>
-<pre><code class="language-text">正确配对靠近
-+
-错误配对远离
-</code></pre>
-<p>因此能维持样本之间的判别结构。</p>
-<h3 id="65-infonce">6.5 InfoNCE 的局限</h3>
-<p>InfoNCE 并不是天然完美：</p>
-<ul>
-<li>batch 中可能出现实际语义相同的“假负样本”；</li>
-<li>batch 太小会导致负样本不足；</li>
-<li>只对齐全局 embedding 可能忽略局部接触对应；</li>
-<li>容易保留对象身份，未必保留细微力变化；</li>
-<li>配对数据噪声会直接污染空间结构。</li>
-</ul>
-<p>因此新的方法常加入多正样本、hard negatives、局部 token 对齐、重建、分类或时间预测。</p>
+<p>所有输入输出同一个常数向量也能使 loss 很低，这叫 representation collapse。</p>
+<p>InfoNCE 同时拉近正确配对、推远错误配对，因此保存判别结构。非对比方法则需要 stop-gradient、teacher–student、variance regularization 或 reconstruction 等其他防坍塌机制。</p>
 <hr />
-<h2 id="7-encoder-loss">7. 常见 Encoder 训练 Loss 家族</h2>
-<p>不同论文的公式很多，但大体可以分成五类。</p>
-<h3 id="71">7.1 跨模态对齐</h3>
-<p>目标是让不同模态表达同一对象或状态。</p>
-<p>常见形式：</p>
-<ul>
-<li>InfoNCE；</li>
-<li>cosine consistency；</li>
-<li>triplet loss；</li>
-<li>matching BCE。</li>
-</ul>
-<p>例如跨传感器匹配：</p>
-<p>\[
-\mathcal L_{\mathrm{match}}
-=
-\operatorname{BCE}(\hat y,y)
-\]</p>
-<p>模型判断两份触觉是否来自同一物体、同一接触位置。</p>
-<h3 id="72">7.2 属性分类监督</h3>
-<p>例如 hardness、roughness、bumpiness 分类：</p>
-<p>\[
-\mathcal L_{\mathrm{cls}}
-=
--\sum_k y_k\log \hat y_k
-\]</p>
-<p>分类可以使 embedding 保留指定物理属性，但不等于建立完整的触觉—视觉—语言公共空间。</p>
-<h3 id="73-masked-reconstruction">7.3 Masked Reconstruction</h3>
-<pre><code class="language-text">masked tactile image
-        ↓
-Encoder + Decoder
-        ↓
-reconstructed tactile image
-</code></pre>
-<p>通常采用像素 MSE：</p>
-<p>\[
-\mathcal L_{\mathrm{rec}}
-=
-|\hat X-X|_2^2
-\]</p>
-<p>它更有利于学习：</p>
-<ul>
-<li>局部纹理；</li>
-<li>接触形变；</li>
-<li>空间结构；</li>
-<li>传感器成像规律。</li>
-</ul>
-<p>这属于单模态 self-supervised representation learning，不是语义对齐。</p>
-<h3 id="74">7.4 时间预测与时间对比</h3>
-<p>常见形式包括：</p>
-<ul>
-<li>预测下一触觉帧；</li>
-<li>预测 tactile depth change；</li>
-<li>让同一轨迹的相邻状态接近；</li>
-<li>区分不同轨迹或相隔较远的状态。</li>
-</ul>
-<p>例如：</p>
-<p>\[
-\mathcal L_{\mathrm{temp}}
-=
-\sum_i
-\mathcal L_{\mathrm{NCE}}(s_i,s_{i+1})
-\]</p>
-<p>它希望 encoder 学到接触状态如何随时间演化，而不是只识别单帧物体属性。</p>
-<h3 id="75">7.5 下游任务监督</h3>
-<p>包括：</p>
-<ul>
-<li>action MSE/L1；</li>
-<li>action classification；</li>
-<li>diffusion/flow matching；</li>
-<li>language generation cross-entropy；</li>
-<li>success/failure classification。</li>
-</ul>
-<p>它们可以端到端训练 sensor encoder，但形成的是 task-oriented representation，不一定是可跨任务检索的通用对齐空间。</p>
-<hr />
-<h2 id="8-alignment-fusion">8. Alignment 与 Fusion 的区别</h2>
-<p>这是理解多模态论文最重要的分界之一。</p>
-<h3 id="81-alignment">8.1 Alignment：建立可比较的坐标系</h3>
-<pre><code class="language-text">Touch Encoder  → zT
-Vision Encoder → zV
-Text Encoder   → zL
-
-Loss层比较zT、zV、zL
-</code></pre>
-<p>训练完成后，即使三个 encoder 分别运行，它们的 global embedding 也能直接计算相似度。</p>
-<p>Alignment 常用于：</p>
-<ul>
-<li>跨模态检索；</li>
-<li>开放词汇分类；</li>
-<li>zero-shot 属性判断；</li>
-<li>将新模态接入已有语义空间。</li>
-</ul>
-<h3 id="82-fusion">8.2 Fusion：完成任务时交换信息</h3>
-<p>Joint self-attention：</p>
-<pre><code class="language-text">[Touch tokens, Vision tokens, Language tokens]
-                    ↓
-              Transformer
-</code></pre>
-<p>Cross-attention：</p>
-<pre><code class="language-text">Action tokens作为Q
-MUSE memory作为K/V
-        ↓
-Cross-Attention
-</code></pre>
-<p>Fusion 常用于：</p>
-<ul>
-<li>生成语言描述；</li>
-<li>物理推理；</li>
-<li>预测机器人动作；</li>
-<li>根据触觉反馈调整控制。</li>
-</ul>
-<h3 id="83">8.3 对齐不等于融合</h3>
-<p>\[
-z_T\approx z_V\approx z_L
-\]</p>
-<p>只表示三个模态在公共空间表达相似语义，不会自动产生一个同时包含三者全部细节的新表示。</p>
-<h3 id="84">8.4 融合也不保证通用对齐</h3>
-<p>把 token 拼起来进入 Transformer，并用 action loss 训练：</p>
-<pre><code class="language-text">[T,V,L] → Transformer → action loss
-</code></pre>
-<p>只要能预测动作，网络就可能形成任务专用表示，但不保证单独取出的 \(z_T,z_V,z_L\) 可以互相检索。</p>
-<p>因此：</p>
-<blockquote>
-<p>Alignment 关心“不同模态是否使用可比较的语义坐标”；Fusion 关心“当前任务中如何联合使用这些信息”。</p>
-</blockquote>
-<hr />
-<h2 id="9-encoder">9. 多模态 Encoder 训练的通用范式</h2>
-<h3 id="91">9.1 选择输入表示</h3>
-<pre><code class="language-text">Vision：普通RGB
-Touch：触觉RGB / depth / marker flow / force map / 数值力
-Text：自然语言描述、属性词或任务指令
-</code></pre>
-<p>输入形式决定适合的 tokenizer 和 encoder：</p>
-<ul>
-<li>图像式触觉常用 CNN/ViT；</li>
-<li>数值力序列常用 MLP、1D CNN 或时序 Transformer；</li>
-<li>文本常用 CLIP text encoder、T5 或 LLM embedding。</li>
-</ul>
-<h3 id="92">9.2 先学习模态内部结构</h3>
-<pre><code class="language-text">触觉图像 → masked reconstruction
-触觉视频 → frame prediction
-力序列   → temporal modeling
-</code></pre>
-<p>这一步回答：</p>
-<blockquote>
-<p>触觉自身的局部结构和动态是什么？</p>
-</blockquote>
-<h3 id="93">9.3 选择锚点或参照关系</h3>
-<p>常见选择：</p>
-<pre><code class="language-text">CLIP视觉—语言空间
-冻结的text encoder
-视觉encoder
-物理属性label
-跨传感器配对
-机器人action监督
-</code></pre>
-<p>锚点决定 latent 更强调语义、空间、触觉属性还是动作相关信息。</p>
-<h3 id="94">9.4 映射到公共空间</h3>
-<pre><code class="language-text">Encoder → global pooling/CLS → Projector → normalize
-</code></pre>
-<p>对齐通常发生在 global embedding 上，不一定是所有 patch token 的逐位置对齐。</p>
-<h3 id="95">9.5 定义正样本</h3>
-<p>正样本可以是：</p>
-<ul>
-<li>同一对象的视觉—触觉；</li>
-<li>同一时刻的视觉—触觉；</li>
-<li>触觉与对应文本；</li>
-<li>同一接触位置的不同传感器；</li>
-<li>同一轨迹的相邻状态；</li>
-<li>同一输入的不同 masking/augmentation。</li>
-</ul>
-<h3 id="96">9.6 定义负样本</h3>
-<p>负样本可以是：</p>
-<ul>
-<li>batch 中其他物体；</li>
-<li>不同接触位置；</li>
-<li>不匹配文本；</li>
-<li>不同任务；</li>
-<li>不同轨迹或距离较远的状态。</li>
-</ul>
-<p>正负样本如何定义往往比 InfoNCE 公式本身更重要，因为它直接规定模型认为什么应该相同、什么必须区分。</p>
-<h3 id="97">9.7 组合辅助目标</h3>
-<p>一个成熟的触觉预训练方案通常不会只使用一个 InfoNCE，而会组合：</p>
-<pre><code class="language-text">跨模态对齐
-+ 模态内部重建
-+ 时间预测
-+ 跨传感器匹配
-+ 下游任务监督
-</code></pre>
-<h3 id="98">9.8 丢弃训练脚手架并接入下游</h3>
-<pre><code class="language-text">预训练：
-Encoder + Projector + Decoder + Task Head
-
-部署：
-Encoder → classifier / LLM / policy
-</code></pre>
-<p>重建 decoder、matching head、privileged posterior 等通常只负责制造训练信号，部署时可以丢弃。</p>
-<hr />
-<h2 id="10">10. 已读论文的路线对照</h2>
+<h2 id="8">8. 正负样本定义比公式名字更重要</h2>
+<p>跨模态研究真正困难的是定义“相同”：</p>
 <table>
 <thead>
 <tr>
-<th>论文</th>
-<th>是否有独立 Encoder 对齐</th>
-<th>主要方法</th>
-<th>锚点或监督</th>
+<th>正样本定义</th>
+<th>学到的关系</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>同一物体</td>
+<td>对象身份和材料共性</td>
+</tr>
+<tr>
+<td>同一时间点</td>
+<td>视觉变化与当前接触同步</td>
+</tr>
+<tr>
+<td>同一接触位置</td>
+<td>局部几何对应</td>
+</tr>
+<tr>
+<td>同一属性描述</td>
+<td>开放词汇物理语义</td>
+</tr>
+<tr>
+<td>同一位置、不同传感器</td>
+<td>跨设备不变性</td>
+</tr>
+</tbody>
+</table>
+<p>负样本也可能有问题：两块不同海绵虽然是不同实例，却共享 <code>soft/porous</code> 语义。如果机械地当成负样本，会制造 false negatives。</p>
+<p>阅读论文时应优先问：</p>
+<ol>
+<li>正样本按对象、时间还是接触位置配对？</li>
+<li>batch 内其他样本是否真的是负样本？</li>
+<li>配对是否严格同步？</li>
+<li>文本描述是实测属性、人工标注还是 LLM 推测？</li>
+</ol>
+<hr />
+<h2 id="9">9. 缺失模态和星形对齐</h2>
+<h3 id="91">9.1 三元组不是必要条件</h3>
+<p>如果数据分别包含：</p>
+<pre><code class="language-text">Touch + Vision → 计算TV loss
+Touch + Text   → 计算TL loss
+Vision + Text  → 计算VL loss
+</code></pre>
+<p>可以按样本存在的模态选择 loss，而不必丢弃不完整数据。</p>
+<h3 id="92">9.2 星形对齐</h3>
+<p>以视觉作为中心：</p>
+<pre><code class="language-text">                 Text
+                   ↑
+Audio ←──────── Vision ────────→ Touch
+                   ↓
+                 Depth
+</code></pre>
+<p>即使 Touch 与 Text 没有直接配对，也期待它们通过共同视觉锚点间接接近。这能降低数据采集成本，但传递关系不保证非中心模态精确对齐。</p>
+<p>拥有完整 touch-vision-language 三元组时，可以直接增加 \(TL\) 边，减少间接对齐误差。</p>
+<hr />
+<h2 id="10">10. 哪些参数更新</h2>
+<p>常见策略包括：</p>
+<h3 id="101">10.1 只训练新模态</h3>
+<pre><code class="language-text">Vision Encoder  ❄
+Text Encoder    ❄
+Tactile Encoder 🔥
+Projector       🔥
+</code></pre>
+<p>优点是稳定保留原语义空间；缺点是所有 domain adaptation 压力都落在触觉侧。</p>
+<h3 id="102">10.2 部分适配锚点</h3>
+<pre><code class="language-text">Text Encoder             ❄
+Vision Encoder LoRA/top blocks 🔥
+Tactile Encoder          🔥
+</code></pre>
+<p>让视觉适应机器人或触觉采集 domain，同时限制语义空间漂移。</p>
+<h3 id="103">10.3 端到端共同训练</h3>
+<p>灵活性最高，但需要更多数据和正则，否则可能遗忘预训练知识或破坏已有视觉—语言对齐。</p>
+<h3 id="104-policy">10.4 预训练后接 Policy</h3>
+<p>对齐 encoder 可以：</p>
+<ul>
+<li>在 Policy 训练时冻结；</li>
+<li>使用小学习率或 LoRA；</li>
+<li>与 Action Expert 一起 full fine-tune。</li>
+</ul>
+<p>后两种可能产生 representation drift，因此不能默认预训练的对齐性质在 action fine-tuning 后完整保留。</p>
+<hr />
+<h2 id="11_1">11. 对齐成功应该怎样验证</h2>
+<h3 id="111-retrieval">11.1 Retrieval</h3>
+<pre><code class="language-text">Touch → 从候选Text/Vision中找正确配对
+</code></pre>
+<p>Top-1 表示第一名正确，Top-5 表示正确答案出现在前五名。</p>
+<h3 id="112-zero-shot-classification">11.2 Zero-shot Classification</h3>
+<p>把类别写成文本 prompt：</p>
+<pre><code class="language-text">“a soft object”
+“a hard object”
+</code></pre>
+<p>选择与触觉 embedding 最相似的文本类别。</p>
+<h3 id="113-linear-probe">11.3 Linear Probe</h3>
+<p>冻结 encoder，只训练轻量线性分类器。如果性能良好，说明所需属性已较容易从 embedding 中读取。</p>
+<h3 id="114-policy">11.4 下游 Policy</h3>
+<p>将 encoder 接入策略并测量闭环成功率。只有这一层才能回答表示是否真正帮助机器人控制。</p>
+<p>需要避免跨层结论：</p>
+<ul>
+<li>retrieval 好不等于 action 好；</li>
+<li>reconstruction 好不等于控制好；</li>
+<li>action loss 低不等于闭环 rollout 稳健。</li>
+</ul>
+<hr />
+<h2 id="12">12. 已读论文的对齐路线</h2>
+<table>
+<thead>
+<tr>
+<th>工作</th>
+<th>Encoder/初始化</th>
+<th>是否显式建立公共空间</th>
+<th>主要监督</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>TVL</td>
-<td>是</td>
-<td>三模态 CLIP/InfoNCE</td>
-<td>OpenCLIP 视觉—语言空间</td>
+<td>新 tactile ViT + OpenCLIP V/T</td>
+<td>是，直接三边对齐</td>
+<td>Touch–Vision–Language InfoNCE</td>
 </tr>
 <tr>
 <td>Octopi</td>
-<td>不属于典型三模态对齐</td>
-<td>CLIP ViT + visual prompts + 属性分类</td>
-<td>hardness、roughness、bumpiness 标签</td>
+<td>CLIP ViT + prompt tuning</td>
+<td>不是典型三模态对齐</td>
+<td>三个物理属性分类</td>
 </tr>
 <tr>
 <td>AnyTouch</td>
+<td>OpenCLIP-based touch encoder</td>
 <td>是</td>
-<td>重建/预测 + 三模态 InfoNCE + 跨传感器匹配</td>
-<td>视觉、文本、跨传感器配对</td>
+<td>重建、三模态 InfoNCE、跨传感器 matching</td>
 </tr>
 <tr>
-<td>Beyond Sight / FuSe</td>
-<td>部分有，发生在策略内部</td>
-<td>language readout 与 T5 对比，同时生成传感器描述</td>
-<td>冻结 T5 和文本标注</td>
+<td>Beyond Sight/FuSe</td>
+<td>复用 TVL touch encoder</td>
+<td>策略 readout 与文本对齐</td>
+<td>T5 对比 + 语言生成 + action loss</td>
 </tr>
 <tr>
 <td>OmniVTLA</td>
-<td>是</td>
-<td>AnyTouch 式三模态对齐与跨传感器匹配</td>
-<td>视觉、文本、触觉配对</td>
+<td>Pretrained ViT + SA-ViT</td>
+<td>SA-ViT 显式对齐</td>
+<td>三模态 InfoNCE + cross-sensor matching</td>
 </tr>
 <tr>
 <td>Tactile-VLA</td>
-<td>没有独立对齐阶段</td>
-<td>tactile MLP 与 VLA 用 action CFM 端到端训练</td>
-<td>专家位置—力动作</td>
+<td>数值力历史 MLP</td>
+<td>没有独立对齐</td>
+<td>position-force action CFM</td>
 </tr>
 <tr>
 <td>VLA-Touch</td>
+<td>Octopi + 外挂 controller</td>
 <td>没有统一对齐阶段</td>
-<td>Octopi 高层反馈 + 外部低层控制</td>
-<td>规划和控制任务</td>
+<td>高层规划与低层动作修正</td>
 </tr>
 <tr>
 <td>VT-MUSE Stage I</td>
-<td>是，但只有视觉—触觉</td>
-<td>跨模态 InfoNCE + 时间对比 + mask consistency</td>
-<td>同步视触觉、相邻时间、同窗口不同遮挡</td>
-</tr>
-<tr>
-<td>VT-MUSE Stage II</td>
-<td>更偏时序融合与生成表征</td>
-<td>Temporal Transformer、cross-attention、重建、conditional VAE</td>
-<td>masked RGB、tactile depth change、privileged posterior</td>
+<td>两个独立 pretrained ViT</td>
+<td>只对齐 Vision–Touch</td>
+<td>Cross-modal、temporal、mask consistency</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="11-tvl">11. TVL：最标准的语义锚点路线</h2>
-<p>TVL 基本符合下面的直觉：</p>
-<pre><code class="language-text">OpenCLIP Vision Encoder ─→ zV ─┐
-OpenCLIP Text Encoder   ─→ zL ─┼→ CLIP/InfoNCE
-Tactile ViT             ─→ zT ─┘
-</code></pre>
-<p>它保留 OpenCLIP 已有的视觉—语言语义结构，训练触觉 encoder 进入该空间，并直接优化：</p>
-<p>\[
-\mathcal L
-=
-\mathcal L_{TV}
-+
-\mathcal L_{TL}
-+
-\mathcal L_{VL}
-\]</p>
-<p>它最直接地回答：</p>
+<p>这张表强调：</p>
 <blockquote>
-<p>触觉能否进入一个已有的开放词汇视觉—语言语义空间？</p>
-</blockquote>
-<p>因此其检索实验是 encoder 对齐的诊断，而不是机器人闭环控制实验。</p>
-<hr />
-<h2 id="12-octopiclip-clip">12. Octopi：CLIP 初始化不等于 CLIP 对齐</h2>
-<p>Octopi 使用：</p>
-<pre><code class="language-text">GelSight tactile video
-        ↓
-CLIP ViT-L/14 backbone
-+ Visual Prompt Tuning
-        ↓
-hardness / roughness / bumpiness heads
-</code></pre>
-<p>它复用 CLIP 视觉网络的参数，但 encoder 适配阶段主要由三个物理属性分类标签监督。</p>
-<p>因此不能仅因为使用了 CLIP backbone，就认为 Octopi 显式完成了：</p>
-<p>\[
-z_T\approx z_V\approx z_L
-\]</p>
-<p>它更接近：</p>
-<blockquote>
-<p>利用 CLIP 的视觉初始化，通过属性分类把触觉视频表示调整为适合物理属性理解的表示，再经 projector 接入 Vicuna。</p>
+<p>使用 ViT 或 CLIP 权重不等于做了跨模态对齐；只有数据配对和 loss 明确约束公共空间时，才能称为 alignment stage。</p>
 </blockquote>
 <hr />
-<h2 id="13-anytouch">13. AnyTouch：低层结构与高层语义分阶段训练</h2>
-<p>AnyTouch 将两类能力分开：</p>
-<pre><code class="language-text">Stage 1：
-masked reconstruction + dynamic frame prediction
-        ↓
-局部触觉结构与接触动态
-
-Stage 2：
-Touch ↔ Vision ↔ Text
-+ cross-sensor matching
-        ↓
-高层语义与传感器不变性
-</code></pre>
-<p>这体现了一个重要规律：</p>
-<blockquote>
-<p>语言对齐擅长提供语义，但不一定保存低层接触细节；重建和时间预测能补充这些细节。</p>
-</blockquote>
-<p>AnyTouch 还通过 sensor-specific token 与 universal sensor token，让同一个 encoder 既能适应设备差异，也能学习跨设备共性。</p>
+<h2 id="13">13. 常见误区</h2>
+<h3 id="clip-vit">误区一：CLIP 就是 ViT</h3>
+<p>ViT 是架构，CLIP 是双模态训练体系。</p>
+<h3 id="projector">误区二：Projector 完成语义对齐</h3>
+<p>Projector 只做映射；loss 和数据关系塑造语义。</p>
+<h3 id="embedding">误区三：三个 Embedding 必须数值完全相同</h3>
+<p>对齐要求相对相似性和邻域结构，不是逐维复制。</p>
+<h3 id="_1">误区四：有语言就是以语言为锚点</h3>
+<p>还需要看 text encoder 是否冻结、语言 loss 权重以及其他模态是否共同更新。</p>
+<h3 id="clip-clip-style">误区五：CLIP 初始化就是 CLIP-style 对齐</h3>
+<p>网络可以用 CLIP 权重初始化，随后只做属性分类或 action learning。</p>
+<h3 id="_2">误区六：对齐以后自然能输出动作</h3>
+<p>对齐只建立表示接口，还需要 Policy Fusion 与 action supervision。</p>
 <hr />
-<h2 id="14-beyond-sight-policy">14. Beyond Sight：对齐发生在 Policy 内部</h2>
-<p>Beyond Sight/FuSe 不只关心原始 tactile encoder 是否与语言对齐，而是让策略看过所有传感器后形成的 language readout 与冻结 T5 表示对齐：</p>
-<pre><code class="language-text">vision / touch / audio
-        ↓
-Octo Transformer
-        ↓
-language readout
-        ↕ contrastive loss
-frozen T5 text embedding
-</code></pre>
-<p>同时加入 sensory-grounded language generation loss，要求策略不只是“选对文本”，还要能说出感知到的物理属性。</p>
-<p>因此 FuSe 的目标更接近：</p>
-<blockquote>
-<p>确保新增传感器的信息真的进入策略高层表示，并能影响动作，而不是只预训练一个好看的触觉 embedding。</p>
-</blockquote>
-<hr />
-<h2 id="15-omnivtla">15. OmniVTLA：对齐初始化之后再做动作学习</h2>
-<p>OmniVTLA 的 SA-ViT 使用触觉、视觉和文本配对数据，复用 AnyTouch 式对齐方法：</p>
-<pre><code class="language-text">ObjTac及其他数据
-       ↓
-Touch ↔ Vision ↔ Text对齐
-+ cross-sensor matching
-       ↓
-SA-ViT初始化
-       ↓
-接入π0并使用flow-matching action loss微调
-</code></pre>
-<p>这里需要区分两个阶段：</p>
+<h2 id="14-encoderalignment">14. 阅读 Encoder/Alignment 工作的检查表</h2>
 <ol>
-<li>对齐预训练告诉 tactile encoder 物体属性与视觉/语言语义；</li>
-<li>action fine-tuning 告诉 VLA 这些触觉 token 怎样用于动作。</li>
+<li>原始输入是 RGB、depth、marker flow、force field 还是数值序列？</li>
+<li>Encoder 使用什么结构和预训练权重？</li>
+<li>输出完整 token sequence 还是 global embedding？</li>
+<li>Global representation 来自 CLS、pooling 还是 readout？</li>
+<li>Projector 映射到对比空间还是 LLM/Policy hidden space？</li>
+<li>谁是锚点，哪些参数冻结？</li>
+<li>正样本按对象、时间还是接触位置定义？</li>
+<li>负样本是否存在 false negatives？</li>
+<li>对齐是双模态、三角形还是星形？</li>
+<li>缺失模态数据如何使用？</li>
+<li>对齐效果用 retrieval、probe 还是闭环 policy 评价？</li>
+<li>Policy fine-tuning 后，对齐空间是否会漂移？</li>
 </ol>
-<p>好的对齐初始化不等于已经学会控制机器人。</p>
 <hr />
-<h2 id="16-tactile-vla">16. Tactile-VLA：没有独立对齐阶段</h2>
-<p>Tactile-VLA 的触觉输入是法向力和剪切力历史：</p>
-<pre><code class="language-text">force history → MLP → tactile token
-                      ↓
-vision + language + tactile prefix
-                      ↓
-π0-style Action Expert
-                      ↓
-position-force action
-</code></pre>
-<p>它没有先优化 CLIP/InfoNCE 式的：</p>
-<p>\[
-z_T\approx z_V\approx z_L
-\]</p>
-<p>触觉 MLP 与整个策略由 action Conditional Flow Matching 端到端更新。它得到的是 task-oriented tactile representation，而不是专门用于跨模态检索的通用 embedding。</p>
-<hr />
-<h2 id="17-vt-muse-stage-i">17. VT-MUSE Stage I：模态、时间和遮挡三种一致性</h2>
-<p>VT-MUSE Stage I 只有视觉与触觉，没有语言。两个预训练 ViT 分别输出 Visual CLS 和 Tactile CLS，并优化三类关系。</p>
-<h3 id="171">17.1 同步跨模态一致性</h3>
-<pre><code class="language-text">Visual_t ↔ Tactile_t
-</code></pre>
-<p>用双向 InfoNCE 对齐同一时间点的视觉和触觉。</p>
-<h3 id="172">17.2 相邻时间一致性</h3>
-<pre><code class="language-text">State_t ↔ State_t+1
-</code></pre>
-<p>把同步的 Visual/Tactile 表示组成多模态状态，再通过 temporal InfoNCE 让相邻状态在 latent space 中保持连续。</p>
-<h3 id="173">17.3 遮挡不变性</h3>
-<pre><code class="language-text">同一历史 + visual mask A
-同一历史 + visual mask B
-</code></pre>
-<p>用 cosine consistency 使两种表示接近，提高视觉缺失时的稳健性。</p>
-<p>因此 Stage I 学到三种不变性：</p>
-<ol>
-<li>模态改变但交互状态不变；</li>
-<li>相邻时刻的交互状态连续；</li>
-<li>部分视觉被遮挡时，核心状态表示仍然稳定。</li>
-</ol>
-<p>这时主要是在适配视觉和触觉 ViT。Figure 2(b) 的完整 sequential memory、conditional VAE 与重建 decoder 属于 Stage II。</p>
-<hr />
-<h2 id="18">18. 为什么常见方案会采用“两阶段”</h2>
-<p>只使用语言或视觉对齐可能损失低层物理细节；只使用重建又可能得到缺乏语义的像素表示。因此很多方法采用：</p>
-<pre><code class="language-text">第一层：模态内部学习
-重建 / 预测 / 时序建模
-        ↓
-学习纹理、形变、接触动态
+<h2 id="15">15. 最终记忆框架</h2>
+<pre><code class="language-text">ViT
+  = 图像或触觉图像的Transformer Encoder架构
 
-第二层：跨模态语义学习
-视觉 / 文本 / 跨传感器对比
-        ↓
-学习对象、材料、属性和设备不变性
+CLIP
+  = 图像与文本双Encoder + 对比学习体系
 
-第三层：下游任务学习
-language generation / action loss
-        ↓
-学习怎样使用这些表示完成任务
+CLS / Pooling / Readout
+  = 从token sequence得到全局表示
+
+Projector
+  = 将不同输出映射到兼容接口
+
+Anchor
+  = 希望保留的已有空间或监督参照
+
+InfoNCE
+  = 正确配对相对靠近、错误配对相对远离
+
+Alignment
+  = 建立可比较、可检索、可迁移的表示空间
 </code></pre>
-<p>不同论文不一定严格按这个顺序，但大多数目标都可以放到这三个层级中。</p>
-<hr />
-<h2 id="19">19. 不同监督目标决定表示保留什么</h2>
-<table>
-<thead>
-<tr>
-<th>监督目标</th>
-<th>表示更可能保留</th>
-<th>可能忽略</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Language alignment</td>
-<td>材料、硬度、粗糙度等可语言化语义</td>
-<td>微小滑移、瞬时力变化</td>
-</tr>
-<tr>
-<td>Vision alignment</td>
-<td>对象身份、形状、空间与外观</td>
-<td>视觉不可见的内部接触</td>
-</tr>
-<tr>
-<td>Pixel reconstruction</td>
-<td>局部纹理、形变与传感器细节</td>
-<td>高层语义和任务相关性</td>
-</tr>
-<tr>
-<td>Temporal prediction</td>
-<td>接触演化与变化趋势</td>
-<td>开放词汇语义</td>
-</tr>
-<tr>
-<td>Cross-sensor matching</td>
-<td>设备无关的触觉属性</td>
-<td>设备特有且可能有用的信息</td>
-</tr>
-<tr>
-<td>Attribute classification</td>
-<td>指定的物理标签</td>
-<td>标签没有覆盖的其他性质</td>
-</tr>
-<tr>
-<td>Action loss</td>
-<td>当前机器人任务真正需要的信息</td>
-<td>与当前任务无关的通用语义</td>
-</tr>
-<tr>
-<td>Language generation</td>
-<td>足以明确表达属性的信息</td>
-<td>高频控制细节</td>
-</tr>
-</tbody>
-</table>
-<p>不存在唯一最好的触觉表示。最佳训练目标取决于下游需求。</p>
-<hr />
-<h2 id="20">20. 根据下游任务选择路线</h2>
-<h3 id="_1">开放词汇触觉理解</h3>
-<pre><code class="language-text">优先：Touch-Language Alignment
-补充：Touch-Vision Alignment
-</code></pre>
-<p>典型代表：TVL。</p>
-<h3 id="encoder">跨传感器通用 Encoder</h3>
-<pre><code class="language-text">优先：Cross-Sensor Matching
-+ Universal Sensor Token
-+ Reconstruction
-</code></pre>
-<p>典型代表：AnyTouch。</p>
-<h3 id="_2">接触丰富机器人控制</h3>
-<pre><code class="language-text">优先：Temporal Modeling
-+ Action Supervision
-+ Current Tactile Feedback
-</code></pre>
-<p>典型代表：VT-MUSE、Tactile-VLA。</p>
-<h3 id="_3">同时追求语义与动作泛化</h3>
-<pre><code class="language-text">先做多模态语义预训练
-        ↓
-再用机器人示范fine-tune policy
-</code></pre>
-<p>典型代表：OmniVTLA。</p>
-<hr />
-<h2 id="21-encoder">21. 阅读 Encoder 论文时的检查清单</h2>
-<p>以后看到一篇新的触觉 encoder 论文，可以依次问：</p>
-<h3 id="_4">输入是什么</h3>
-<ul>
-<li>RGB 触觉图像？</li>
-<li>depth map？</li>
-<li>marker displacement？</li>
-<li>force array？</li>
-<li>连续视频还是单帧？</li>
-</ul>
-<h3 id="encoder_1">Encoder 是什么</h3>
-<ul>
-<li>CNN、ViT、时序 Transformer 还是 MLP？</li>
-<li>从头训练还是从 CLIP/ImageNet/MAE 初始化？</li>
-<li>不同传感器共享参数吗？</li>
-</ul>
-<h3 id="_5">用什么全局表示</h3>
-<ul>
-<li>CLS token？</li>
-<li>mean pooling？</li>
-<li>learnable readout tokens？</li>
-<li>所有 patch tokens？</li>
-</ul>
-<h3 id="_6">谁是锚点</h3>
-<ul>
-<li>冻结文本 encoder？</li>
-<li>CLIP 视觉—语言空间？</li>
-<li>可训练视觉 encoder？</li>
-<li>属性 label？</li>
-<li>动作轨迹？</li>
-</ul>
-<h3 id="_7">正负样本怎样定义</h3>
-<ul>
-<li>同物体？</li>
-<li>同时刻？</li>
-<li>同接触位置？</li>
-<li>同一段描述？</li>
-<li>同一轨迹相邻状态？</li>
-</ul>
-<h3 id="loss">Loss 属于哪一层</h3>
-<ul>
-<li>语义对齐？</li>
-<li>模态内部重建？</li>
-<li>时间预测？</li>
-<li>跨设备匹配？</li>
-<li>下游 action/language supervision？</li>
-</ul>
-<h3 id="_8">哪些参数更新</h3>
-<ul>
-<li>anchor 是否冻结？</li>
-<li>tactile encoder 全量更新还是 LoRA/prompt tuning？</li>
-<li>projector 是否训练？</li>
-<li>pretrained backbone 是否会漂移？</li>
-</ul>
-<h3 id="_9">推理时保留什么</h3>
-<ul>
-<li>只保留 encoder？</li>
-<li>projector 是否保留？</li>
-<li>reconstruction decoder 是否丢弃？</li>
-<li>task head 是否只是训练辅助？</li>
-</ul>
-<h3 id="_10">最终实验真的证明了什么</h3>
-<ul>
-<li>检索和 linear probing 只能证明表示质量；</li>
-<li>caption 能证明语言表达能力；</li>
-<li>action loss 与真机 rollout 才能证明控制作用；</li>
-<li>如果同时改变 encoder、policy 和 controller，不能把所有提升都归因于 alignment。</li>
-</ul>
-<hr />
-<h2 id="22_1">22. 最终统一知识图</h2>
-<pre><code class="language-text">                         ┌──────────────────────────┐
-                         │   原始多模态配对数据     │
-                         │ Touch / Vision / Text    │
-                         └────────────┬─────────────┘
-                                      ↓
-                   ┌──────────────────────────────────┐
-                   │       Modality-specific Encoder  │
-                   │  ViT / CNN / MLP / Transformer   │
-                   └────────────────┬─────────────────┘
-                                    ↓
-                   ┌──────────────────────────────────┐
-                   │ CLS / Pooling / Readout Token    │
-                   │       + Projector + Normalize    │
-                   └────────────────┬─────────────────┘
-                                    ↓
-          ┌─────────────────────────┼──────────────────────────┐
-          ↓                         ↓                          ↓
-  Cross-modal Alignment       Intra-modal Learning       Task Supervision
-  InfoNCE / Matching          Reconstruction / Time      Action / Language
-          │                         │                          │
-          └─────────────────────────┼──────────────────────────┘
-                                    ↓
-                     learned multimodal representation
-                                    ↓
-             ┌──────────────────────┴──────────────────────┐
-             ↓                                             ↓
-       Representation Use                             Task Fusion
-  retrieval / classification             concat / joint attention / cross-attn
-                                                           ↓
-                                              caption / reasoning / action
-</code></pre>
-<p>整个体系可以压缩成一句话：</p>
-<blockquote>
-<p><strong>ViT 决定 encoder 怎样计算；CLIP/InfoNCE 决定不同模态怎样在 latent space 中建立相对位置；重建和时间预测决定表示保留哪些低层物理细节；attention 决定下游任务怎样动态读取和融合这些表示；action 或 language loss 最终决定这些表示是否真正对任务有用。</strong></p>
-</blockquote>
+<p>本章回答了“怎样把不同模态表示清楚”。下一章继续回答：除了跨模态 InfoNCE，时间、遮挡、重建和任务监督分别规定表示必须保留什么。</p>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="09-attention-multi-expert-conditioning.html">← F05 · 多模态融合、多专家与条件注入</a>
-            <a href="multimodal-consistency-supervision.html">F07 · 多模态表征学习的三类一致性监督 →</a>
+            <a href="vla-overview-reading-map.html">← F01 · 多模态 VLA 与模仿学习：统一研究范式</a>
+            <a href="multimodal-consistency-supervision.html">F03 · 多模态表示的监督配方 →</a>
           </nav>
         </article>
       </main>

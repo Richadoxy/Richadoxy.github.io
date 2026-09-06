@@ -1,6 +1,6 @@
 # 13. JEPA、World Model 与 VLA-JEPA
 
-> 建议先读：[VLA 总览](27_vla_overview.md)与[模型训练基础](22_model_training_basics.md)。本文属于进阶训练框架，不是初入 VLA 时必须先掌握的动作架构。
+> 建议先读：[多模态 VLA 统一研究范式](27_vla_overview.md)与[多模态表示的监督配方](32_three_consistency_supervision_paradigms.md)。本文属于进阶训练框架，不是初入 VLA 时必须先掌握的动作架构。
 
 JEPA 关注的不是重建每个未来像素，而是在 latent space 中预测目标表示。
 

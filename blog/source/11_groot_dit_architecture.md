@@ -1,6 +1,6 @@
 # 11. GR00T 与 DiT Action Head
 
-> 建议先读：[VLA 总览](27_vla_overview.md)、[多模态融合与条件注入](09_attention_multi_expert_and_conditioning.md)以及 PI0.5 架构。本文重点放在 GR00T 与 PI0.5 的结构差异。
+> 建议先读：[多模态 VLA 统一研究范式](27_vla_overview.md)、[从对齐表示到 Policy 融合](19_attention_from_embeddings_to_action_expert.md)以及 PI0.5 架构。本文重点放在 GR00T 与 PI0.5 的结构差异。
 
 GR00T 和 PI0.5 都使用视觉语言条件生成连续 action chunk，但二者的 VLM–Action 连接方式不同。
 

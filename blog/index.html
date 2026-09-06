@@ -42,7 +42,7 @@
         </header>
         <div class="series-grid"><a class="series-card" href="#foundations">
           <span class="series-card-label"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span></span>
-          <span>先统一 token、encoder、Attention、训练闭环、CLIP、多模态融合与一致性监督中的核心词汇。</span>
+          <span>先建立多模态 VLA 与模仿学习的统一范式，再依次理解表示接口、公共空间、监督配方与 Policy 融合。</span>
         </a><a class="series-card" href="#imitation">
           <span class="series-card-label"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span></span>
           <span>从 demonstration 和 Behavior Cloning 出发，理解机器人数据、action chunk 与不同动作生成目标。</span>
@@ -65,42 +65,27 @@
         </div>
         <section class="archive-year archive-series" id="foundations" data-series="foundations" aria-labelledby="heading-foundations">
           <h2 id="heading-foundations"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span></h2>
-          <p class="archive-series-description">先统一 token、encoder、Attention、训练闭环、CLIP、多模态融合与一致性监督中的核心词汇。</p>
+          <p class="archive-series-description">先建立多模态 VLA 与模仿学习的统一范式，再依次理解表示接口、公共空间、监督配方与 Policy 融合。</p>
           <div class="archive-list"><article class="archive-post" data-category="foundations">
-              <h3><a href="08-transformer-latent-encoder-decoder.html"><span class="archive-category">F01</span> Token、Embedding、Encoder/Decoder 与 Latent</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">入门 · 5 min read</span><span data-lang="zh">入门 · 阅读约 5 分钟</span></p>
-              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
-              <p class="archive-summary">建立 token、hidden width、latent、encoder、decoder 和参数量之间的基础概念坐标系。</p>
-            </article><article class="archive-post" data-category="foundations">
-              <h3><a href="19-attention-openclip-tactile-groot.html"><span class="archive-category">F02</span> Transformer 与 Attention：从 QKV 到多模态交互</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">入门 · 13 min read</span><span data-lang="zh">入门 · 阅读约 13 分钟</span></p>
+              <h3><a href="vla-overview-reading-map.html"><span class="archive-category">F01</span> 多模态 VLA 与模仿学习：统一研究范式</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">入门 · 11 min read</span><span data-lang="zh">入门 · 阅读约 11 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
-              <p class="archive-summary">区分动态 attention matrix 与可训练参数，并系统理解 self、cross 与 joint attention。</p>
+              <p class="archive-summary">从数据、表示、对齐、任务融合、动作生成到闭环执行，先建立阅读和研究多模态策略的总地图。</p>
             </article><article class="archive-post" data-category="foundations">
-              <h3><a href="model-training-forward-loss-backward.html"><span class="archive-category">F03</span> 模型训练基础：Forward、Loss、Backward 与微调</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">入门 · 3 min read</span><span data-lang="zh">入门 · 阅读约 3 分钟</span></p>
+              <h3><a href="multimodal-encoder-alignment-infonce.html"><span class="archive-category">F02</span> 从原始模态到公共语义空间</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">核心 · 11 min read</span><span data-lang="zh">核心 · 阅读约 11 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
-              <p class="archive-summary">建立一次参数更新的完整闭环，并区分 freeze、LoRA、主损失、辅助损失及训练专用模块。</p>
+              <p class="archive-summary">串联 token、encoder、ViT、CLIP、CLS/readout、projector、语义锚点与 InfoNCE，理解多模态表示怎样建立共同坐标。</p>
             </article><article class="archive-post" data-category="foundations">
-              <h3><a href="clip-contrastive-representation-learning.html"><span class="archive-category">F04</span> 表示学习、CLIP 与对比学习</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">入门 · 4 min read</span><span data-lang="zh">入门 · 阅读约 4 分钟</span></p>
+              <h3><a href="multimodal-consistency-supervision.html"><span class="archive-category">F03</span> 多模态表示的监督配方</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">核心 · 11 min read</span><span data-lang="zh">核心 · 阅读约 11 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
-              <p class="archive-summary">从双塔 encoder、global embedding 和 InfoNCE 出发，区分表示对齐、前向融合与下游控制。</p>
+              <p class="archive-summary">统一跨模态对齐、时间连续性、增强或遮挡一致性，并说明 reconstruction、future prediction 与任务监督的分工。</p>
             </article><article class="archive-post" data-category="foundations">
-              <h3><a href="09-attention-multi-expert-conditioning.html"><span class="archive-category">F05</span> 多模态融合、多专家与条件注入</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">进阶 · 4 min read</span><span data-lang="zh">进阶 · 阅读约 4 分钟</span></p>
-              <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
-              <p class="archive-summary">比较 token concat、joint/cross attention、multi-expert 与 AdaLN/AdaRMS 条件调制。</p>
-            </article><article class="archive-post" data-category="foundations">
-              <h3><a href="multimodal-encoder-alignment-infonce.html"><span class="archive-category">F06</span> 多模态 Encoder 对齐：ViT、CLIP 与 InfoNCE</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">进阶 · 18 min read</span><span data-lang="zh">进阶 · 阅读约 18 分钟</span></p>
+              <h3><a href="19-attention-openclip-tactile-groot.html"><span class="archive-category">F04</span> 从对齐表示到 Policy 融合</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">核心 · 15 min read</span><span data-lang="zh">核心 · 阅读约 15 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
-              <p class="archive-summary">深入解释语义锚点、projector、对齐 loss 与触觉 encoder 的通用训练范式。</p>
-            </article><article class="archive-post" data-category="foundations">
-              <h3><a href="multimodal-consistency-supervision.html"><span class="archive-category">F07</span> 多模态表征学习的三类一致性监督</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">进阶 · 11 min read</span><span data-lang="zh">进阶 · 阅读约 11 分钟</span></p>
-              <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
-              <p class="archive-summary">统一跨模态对齐、时间连续性与增强或遮挡不变性，并区分 consistency、reconstruction 与 action supervision。</p>
+              <p class="archive-summary">把 Transformer 基础放回策略数据流，系统理解 self/cross/joint attention、readout、projector、gate、AdaNorm 与 Action Head。</p>
             </article></div>
         </section><section class="archive-year archive-series" id="imitation" data-series="imitation" aria-labelledby="heading-imitation">
           <h2 id="heading-imitation"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span></h2>
@@ -125,11 +110,6 @@
           <h2 id="heading-architectures"><span data-lang="en">Part 3: VLA Architectures</span><span data-lang="zh">第三卷：VLA 核心架构</span></h2>
           <p class="archive-series-description">使用统一坐标拆解 Flow Matching、PI0.5、GR00T、VLASH 和 VLA-JEPA。</p>
           <div class="archive-list"><article class="archive-post" data-category="architectures">
-              <h3><a href="vla-overview-reading-map.html"><span class="archive-category">VLA00</span> 从模仿学习到 VLA：架构地图与阅读方法</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">入门 · 3 min read</span><span data-lang="zh">入门 · 阅读约 3 分钟</span></p>
-              <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
-              <p class="archive-summary">用统一的数据流和六步检查法定位 VLM、动作头、训练目标与部署系统。</p>
-            </article><article class="archive-post" data-category="architectures">
               <h3><a href="10-flow-matching-training-inference.html"><span class="archive-category">VLA01</span> Flow Matching：训练、timestep 与推理</a></h3>
               <p class="archive-reading-time"><span data-lang="en">进阶 · 4 min read</span><span data-lang="zh">进阶 · 阅读约 4 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>

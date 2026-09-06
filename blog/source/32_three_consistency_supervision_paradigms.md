@@ -1,8 +1,8 @@
-# 多模态表征学习的三类一致性监督：跨模态、时间与增强不变性
+# 多模态表示的监督配方：对齐、时间、遮挡、重建与任务监督
 
-> 本文是学习多模态 VLM/VLA、触觉表示学习与多模态对齐的前置内容，重点解释三类反复出现的训练范式：Cross-Modal Alignment、Temporal Coherence 和 Augmentation/Mask Consistency。
+> 本文是学习多模态 VLM/VLA 与触觉表示的监督地图。主线是三类反复出现的一致性关系：Cross-Modal Alignment、Temporal Coherence 和 Augmentation/Mask Consistency；同时说明它们与 reconstruction、future prediction、属性标签及 action supervision 的分工。
 
-> 建议先读：[多模态 Encoder 对齐](31_multimodal_encoder_alignment_and_infonce.md)、[CLIP 与对比学习](21_clip_and_contrastive_learning.md)和[Attention 专题](19_attention_from_embeddings_to_action_expert.md)。
+> 阅读位置：[统一研究范式](27_vla_overview.md) → [从原始模态到公共语义空间](31_multimodal_encoder_alignment_and_infonce.md) → 本文 → [从对齐表示到 Policy 融合](19_attention_from_embeddings_to_action_expert.md)。
 
 ## 0. 先修正一个术语
 

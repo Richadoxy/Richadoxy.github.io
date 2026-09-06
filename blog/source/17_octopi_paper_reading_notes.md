@@ -4,7 +4,7 @@
 > 正式论文：[Yu et al. - 2024 - Octopi Object Property Reasoning with Large Tactile-Language Models](<Yu et al. - 2024 - Octopi Object Property Reasoning with Large Tactile-Language Models.pdf>)<br>
 > [RSS Proceedings](https://roboticsproceedings.org/rss20/p066.html) · [arXiv](https://arxiv.org/abs/2405.02794) · [代码与数据](https://github.com/clear-nus/octopi)
 
-> 推荐先读：[TVL](15_tvl_paper_reading_notes.md)、[表示学习、CLIP 与对比学习](21_clip_and_contrastive_learning.md)和[多模态融合与条件注入](09_attention_multi_expert_and_conditioning.md)。本文重点是触觉属性接口与语言推理。
+> 推荐先读：[TVL](15_tvl_paper_reading_notes.md)、[从原始模态到公共语义空间](31_multimodal_encoder_alignment_and_infonce.md)和[从对齐表示到 Policy 融合](19_attention_from_embeddings_to_action_expert.md)。本文重点是触觉属性接口与语言推理。
 
 ## 0. 一句话定位
 
