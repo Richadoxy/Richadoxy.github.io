@@ -42,7 +42,7 @@
         </header>
         <div class="series-grid"><a class="series-card" href="#foundations">
           <span class="series-card-label"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span></span>
-          <span>先统一 token、encoder、Attention、CLIP、多模态融合和训练过程中的核心词汇。</span>
+          <span>先统一 token、encoder、Attention、训练闭环、CLIP、多模态融合与一致性监督中的核心词汇。</span>
         </a><a class="series-card" href="#imitation">
           <span class="series-card-label"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span></span>
           <span>从 demonstration 和 Behavior Cloning 出发，理解机器人数据、action chunk 与不同动作生成目标。</span>
@@ -57,7 +57,7 @@
           <span>理解在线延迟、同步与异步执行、chunk handoff，以及 VLASH 的时间对齐方法。</span>
         </a><a class="series-card" href="#tactile">
           <span class="series-card-label"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span></span>
-          <span>从 TVL 与 AnyTouch 的触觉表征，进入 Octopi 的语言推理和 FuSe 的动作决策。</span>
+          <span>从 TVL、AnyTouch 的表征和 Octopi 的推理，进入 FuSe、VLA-Touch、OmniVTLA 与 Tactile-VLA 的动作和控制。</span>
         </a></div>
         <div class="archive-filters" role="group" aria-label="按知识链筛选文章">
           <button class="archive-filter is-active" type="button" data-filter="all" aria-pressed="true"><span data-lang="en">All</span><span data-lang="zh">全部</span></button>
@@ -65,7 +65,7 @@
         </div>
         <section class="archive-year archive-series" id="foundations" data-series="foundations" aria-labelledby="heading-foundations">
           <h2 id="heading-foundations"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span></h2>
-          <p class="archive-series-description">先统一 token、encoder、Attention、CLIP、多模态融合和训练过程中的核心词汇。</p>
+          <p class="archive-series-description">先统一 token、encoder、Attention、训练闭环、CLIP、多模态融合与一致性监督中的核心词汇。</p>
           <div class="archive-list"><article class="archive-post" data-category="foundations">
               <h3><a href="08-transformer-latent-encoder-decoder.html"><span class="archive-category">F01</span> Token、Embedding、Encoder/Decoder 与 Latent</a></h3>
               <p class="archive-reading-time"><span data-lang="en">入门 · 5 min read</span><span data-lang="zh">入门 · 阅读约 5 分钟</span></p>
@@ -77,20 +77,30 @@
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
               <p class="archive-summary">区分动态 attention matrix 与可训练参数，并系统理解 self、cross 与 joint attention。</p>
             </article><article class="archive-post" data-category="foundations">
-              <h3><a href="clip-contrastive-representation-learning.html"><span class="archive-category">F03</span> 表示学习、CLIP 与对比学习</a></h3>
+              <h3><a href="model-training-forward-loss-backward.html"><span class="archive-category">F03</span> 模型训练基础：Forward、Loss、Backward 与微调</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">入门 · 3 min read</span><span data-lang="zh">入门 · 阅读约 3 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
+              <p class="archive-summary">建立一次参数更新的完整闭环，并区分 freeze、LoRA、主损失、辅助损失及训练专用模块。</p>
+            </article><article class="archive-post" data-category="foundations">
+              <h3><a href="clip-contrastive-representation-learning.html"><span class="archive-category">F04</span> 表示学习、CLIP 与对比学习</a></h3>
               <p class="archive-reading-time"><span data-lang="en">入门 · 4 min read</span><span data-lang="zh">入门 · 阅读约 4 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
               <p class="archive-summary">从双塔 encoder、global embedding 和 InfoNCE 出发，区分表示对齐、前向融合与下游控制。</p>
             </article><article class="archive-post" data-category="foundations">
-              <h3><a href="09-attention-multi-expert-conditioning.html"><span class="archive-category">F04</span> 多模态融合、多专家与条件注入</a></h3>
+              <h3><a href="09-attention-multi-expert-conditioning.html"><span class="archive-category">F05</span> 多模态融合、多专家与条件注入</a></h3>
               <p class="archive-reading-time"><span data-lang="en">进阶 · 4 min read</span><span data-lang="zh">进阶 · 阅读约 4 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
               <p class="archive-summary">比较 token concat、joint/cross attention、multi-expert 与 AdaLN/AdaRMS 条件调制。</p>
             </article><article class="archive-post" data-category="foundations">
-              <h3><a href="model-training-forward-loss-backward.html"><span class="archive-category">F05</span> 模型训练基础：Forward、Loss、Backward 与微调</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">入门 · 3 min read</span><span data-lang="zh">入门 · 阅读约 3 分钟</span></p>
+              <h3><a href="multimodal-encoder-alignment-infonce.html"><span class="archive-category">F06</span> 多模态 Encoder 对齐：ViT、CLIP 与 InfoNCE</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">进阶 · 18 min read</span><span data-lang="zh">进阶 · 阅读约 18 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
-              <p class="archive-summary">建立一次参数更新的完整闭环，并区分 freeze、LoRA、主损失、辅助损失及训练专用模块。</p>
+              <p class="archive-summary">深入解释语义锚点、projector、对齐 loss 与触觉 encoder 的通用训练范式。</p>
+            </article><article class="archive-post" data-category="foundations">
+              <h3><a href="multimodal-consistency-supervision.html"><span class="archive-category">F07</span> 多模态表征学习的三类一致性监督</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">进阶 · 11 min read</span><span data-lang="zh">进阶 · 阅读约 11 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
+              <p class="archive-summary">统一跨模态对齐、时间连续性与增强或遮挡不变性，并区分 consistency、reconstruction 与 action supervision。</p>
             </article></div>
         </section><section class="archive-year archive-series" id="imitation" data-series="imitation" aria-labelledby="heading-imitation">
           <h2 id="heading-imitation"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span></h2>
@@ -195,7 +205,7 @@
             </article></div>
         </section><section class="archive-year archive-series" id="tactile" data-series="tactile" aria-labelledby="heading-tactile">
           <h2 id="heading-tactile"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span></h2>
-          <p class="archive-series-description">从 TVL 与 AnyTouch 的触觉表征，进入 Octopi 的语言推理和 FuSe 的动作决策。</p>
+          <p class="archive-series-description">从 TVL、AnyTouch 的表征和 Octopi 的推理，进入 FuSe、VLA-Touch、OmniVTLA 与 Tactile-VLA 的动作和控制。</p>
           <div class="archive-list"><article class="archive-post" data-category="tactile">
               <h3><a href="16-tactile-vla-reading-guide.html"><span class="archive-category">TOUCH00</span> 触觉 VLA 与模仿学习阅读地图</a></h3>
               <p class="archive-reading-time"><span data-lang="en">入门 · 11 min read</span><span data-lang="zh">入门 · 阅读约 11 分钟</span></p>
@@ -221,6 +231,21 @@
               <p class="archive-reading-time"><span data-lang="en">进阶 · 21 min read</span><span data-lang="zh">进阶 · 阅读约 21 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
               <p class="archive-summary">从Octo与PaliGemma两类backbone出发，拆解FuSe的异构传感器token融合、action readout、语言对比与生成监督，以及真实机器人实验。</p>
+            </article><article class="archive-post" data-category="tactile">
+              <h3><a href="vla-touch-dual-level-tactile-feedback.html"><span class="archive-category">TOUCH05</span> VLA-Touch 精读：高层触觉规划与低层动作修正</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">前沿 · 18 min read</span><span data-lang="zh">前沿 · 阅读约 18 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
+              <p class="archive-summary">拆解外挂在 RDT 外部的双层触觉反馈：结构化触觉辅助 GPT-4o 规划，连续触觉通过 Interpolant Controller 修正动作。</p>
+            </article><article class="archive-post" data-category="tactile">
+              <h3><a href="omnivtla-semantic-aligned-tactile-sensing.html"><span class="archive-category">TOUCH06</span> OmniVTLA 精读：语义对齐触觉感知接入 π0</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">前沿 · 18 min read</span><span data-lang="zh">前沿 · 阅读约 18 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
+              <p class="archive-summary">从 ObjTac 和 SA-ViT 预训练出发，分析双触觉 encoder、prefix token 融合、flow matching 与多种机器人本体实验。</p>
+            </article><article class="archive-post" data-category="tactile">
+              <h3><a href="tactile-vla-physical-knowledge-force-control.html"><span class="archive-category">TOUCH07</span> Tactile-VLA 精读：物理知识、力动作与混合控制</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">前沿 · 20 min read</span><span data-lang="zh">前沿 · 阅读约 20 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
+              <p class="archive-summary">分析触觉历史 token、Tactile-Aware Action Expert、位置—力混合控制，以及 CoT 纠错循环的能力与边界。</p>
             </article></div>
         </section>
         <p class="archive-empty" hidden><span data-lang="en">There are no posts in this category yet.</span><span data-lang="zh">这个分类下暂时还没有文章。</span></p>

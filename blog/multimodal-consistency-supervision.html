@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="统一跨模态对齐、时间连续性与增强或遮挡不变性，并区分 consistency、reconstruction 与 action supervision。" />
+    <title>多模态表征学习的三类一致性监督 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#0">0. 先修正一个术语</a></li>
+<li><a href="#1">1. 统一视角：先定义什么应该相同</a></li>
+<li><a href="#2-cross-modal-alignment">2. 范式一：Cross-Modal Alignment</a><ul>
+<li><a href="#21">2.1 它解决什么问题</a></li>
+<li><a href="#22">2.2 正负样本怎样构造</a></li>
+<li><a href="#23-clipinfonce">2.3 CLIP/InfoNCE 公式</a></li>
+<li><a href="#24">2.4 它学到什么</a></li>
+<li><a href="#25">2.5 常见陷阱</a><ul>
+<li><a href="#_1">假负样本</a></li>
+<li><a href="#_2">只对齐对象身份</a></li>
+<li><a href="#_3">配对不精确</a></li>
+<li><a href="#_4">全局对齐忽略局部信息</a></li>
+</ul>
+</li>
+<li><a href="#26">2.6 常见程度</a></li>
+</ul>
+</li>
+<li><a href="#3-temporal-coherence">3. 范式二：Temporal Coherence</a><ul>
+<li><a href="#31">3.1 它解决什么问题</a></li>
+<li><a href="#32">3.2 基本构造</a></li>
+<li><a href="#33-temporal-infonce">3.3 Temporal InfoNCE</a></li>
+<li><a href="#34-latent-space">3.4 它在 latent space 中产生什么</a></li>
+<li><a href="#35">3.5 与下一帧预测的区别</a></li>
+<li><a href="#36">3.6 常见陷阱</a><ul>
+<li><a href="#_5">过度平滑</a></li>
+<li><a href="#_6">采样间隔不合适</a></li>
+<li><a href="#_7">时间负样本定义不合理</a></li>
+<li><a href="#action">忽略 action</a></li>
+</ul>
+</li>
+<li><a href="#37">3.7 常见程度</a></li>
+</ul>
+</li>
+<li><a href="#4-augmentationmask-consistency">4. 范式三：Augmentation/Mask Consistency</a><ul>
+<li><a href="#41">4.1 它解决什么问题</a></li>
+<li><a href="#42-cosine-consistency">4.2 Cosine Consistency</a></li>
+<li><a href="#43-mask-consistency">4.3 Mask Consistency 的特殊意义</a></li>
+<li><a href="#44-consistency-reconstruction">4.4 Consistency 与 Reconstruction 不一样</a></li>
+<li><a href="#45-collapse">4.5 Collapse 风险</a></li>
+<li><a href="#46">4.6 常见程度</a></li>
+</ul>
+</li>
+<li><a href="#5">5. 三类范式之间的关系</a><ul>
+<li><a href="#cross-modal-alignment">Cross-Modal Alignment</a></li>
+<li><a href="#temporal-coherence">Temporal Coherence</a></li>
+<li><a href="#augmentationmask-consistency">Augmentation/Mask Consistency</a></li>
+</ul>
+</li>
+<li><a href="#6-vt-muse-stage-i">6. VT-MUSE Stage I 是怎样组合三者的</a><ul>
+<li><a href="#mathinlineopen42l_mathrmcrossmathinlineclose42">MATHINLINEOPEN42L_{\mathrm{cross}}MATHINLINECLOSE42</a></li>
+<li><a href="#mathinlineopen42l_mathrmtempmathinlineclose42">MATHINLINEOPEN42L_{\mathrm{temp}}MATHINLINECLOSE42</a></li>
+<li><a href="#mathinlineopen42l_mathrmconsmathinlineclose42">MATHINLINEOPEN42L_{\mathrm{cons}}MATHINLINECLOSE42</a></li>
+</ul>
+</li>
+<li><a href="#7">7. 三种范式分别适合什么场景</a></li>
+<li><a href="#8">8. 它们为什么属于通用范式，而不是某篇论文的发明</a></li>
+<li><a href="#9">9. 阅读相关论文时的检查清单</a><ul>
+<li><a href="#cross-modal-alignment_1">Cross-Modal Alignment</a></li>
+<li><a href="#temporal-coherence_1">Temporal Coherence</a></li>
+<li><a href="#consistency-learning">Consistency Learning</a></li>
+<li><a href="#_8">实验是否充分</a></li>
+</ul>
+</li>
+<li><a href="#10">10. 最终记忆框架</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F07</p>
+          <h1>多模态表征学习的三类一致性监督</h1>
+          <p class="article-meta"><span data-lang="en">进阶 · September 2026 · 11 min read</span><span data-lang="zh">进阶 · 2026.09 · 约 11 分钟阅读</span></p>
+          <p class="article-deck">统一跨模态对齐、时间连续性与增强或遮挡不变性，并区分 consistency、reconstruction 与 action supervision。</p>
+          <div class="article-content">
+            <blockquote>
+<p>本文是学习多模态 VLM/VLA、触觉表示学习与多模态对齐的前置内容，重点解释三类反复出现的训练范式：Cross-Modal Alignment、Temporal Coherence 和 Augmentation/Mask Consistency。</p>
+<p>建议先读：<a href="multimodal-encoder-alignment-infonce.html">多模态 Encoder 对齐</a>、<a href="clip-contrastive-representation-learning.html">CLIP 与对比学习</a>和<a href="19-attention-openclip-tactile-groot.html">Attention 专题</a>。</p>
+</blockquote>
+<h2 id="0">0. 先修正一个术语</h2>
+<p>这三类方法经常被笼统地称为“监督信号”，但不一定属于传统 supervised learning。</p>
+<p>传统监督学习依赖人工标签：</p>
+<pre><code class="language-text">输入：一张触觉图像
+标签：hard / soft
+Loss：分类Cross-Entropy
+</code></pre>
+<p>本文讨论的三类方法通常不需要人工逐条标注，而是从数据自身构造监督关系：</p>
+<pre><code class="language-text">同步采集     → 跨模态正样本
+时间相邻     → 时间正样本
+同一输入增强 → 一致性正样本
+</code></pre>
+<p>因此更准确的名称是：</p>
+<ul>
+<li>self-supervised representation learning；</li>
+<li>weakly supervised alignment；</li>
+<li>consistency regularization；</li>
+<li>contrastive learning。</li>
+</ul>
+<p>它们共同回答一个问题：</p>
+<blockquote>
+<p>哪些输入虽然表面形式不同，但在 latent space 中应该被看作“同一个状态”或“相关状态”？</p>
+</blockquote>
+<hr />
+<h2 id="1">1. 统一视角：先定义什么应该相同</h2>
+<p>三类监督都可以写成：</p>
+<pre><code class="language-text">输入A → Encoder → zA
+输入B → Encoder → zB
+
+已知A和B表达同一个或相关状态
+               ↓
+要求zA与zB接近
+</code></pre>
+<p>它们的区别只在于 A 和 B 如何构造：</p>
+<table>
+<thead>
+<tr>
+<th>范式</th>
+<th>输入 A</th>
+<th>输入 B</th>
+<th>希望学习的不变性</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cross-Modal Alignment</td>
+<td>同一状态的视觉</td>
+<td>同一状态的触觉/语言</td>
+<td>模态变化不改变核心语义</td>
+</tr>
+<tr>
+<td>Temporal Coherence</td>
+<td>时刻 \(t\) 的状态</td>
+<td>相邻时刻 \(t+1\) 的状态</td>
+<td>状态随时间连续演化</td>
+</tr>
+<tr>
+<td>Augmentation/Mask Consistency</td>
+<td>输入的一种增强或遮挡</td>
+<td>同一输入的另一种增强或遮挡</td>
+<td>非关键扰动不改变核心表示</td>
+</tr>
+</tbody>
+</table>
+<p>可以将它们记成三条等价关系：</p>
+<pre><code class="language-text">同一事件，不同模态       → 应该相似
+同一过程，相邻时间       → 应该相关
+同一输入，不同扰动       → 应该稳定
+</code></pre>
+<hr />
+<h2 id="2-cross-modal-alignment">2. 范式一：Cross-Modal Alignment</h2>
+<h3 id="21">2.1 它解决什么问题</h3>
+<p>同一个物理状态可以由不同模态观测：</p>
+<pre><code class="language-text">Vision：看到海绵被压缩
+Touch：感受到柔软形变
+Text：“soft and deformable sponge”
+</code></pre>
+<p>三个 encoder 原本可能产生完全不同的坐标系：</p>
+<pre><code class="language-text">Vision Encoder → zV
+Touch Encoder  → zT
+Text Encoder   → zL
+</code></pre>
+<p>跨模态对齐希望：</p>
+<p>\[
+z_V\approx z_T\approx z_L
+\]</p>
+<p>这里的“约等于”不是逐维完全一致，而是：</p>
+<ul>
+<li>正确配对相似度更高；</li>
+<li>可以跨模态检索；</li>
+<li>表达相同语义的样本具有相近邻域；</li>
+<li>不匹配样本相互远离。</li>
+</ul>
+<h3 id="22">2.2 正负样本怎样构造</h3>
+<p>假设 batch 中有 \(N\) 组同步视觉—触觉样本：</p>
+<p>\[
+(V_1,T_1),(V_2,T_2),\ldots,(V_N,T_N)
+\]</p>
+<p>对于 \(T_i\)：</p>
+<ul>
+<li>\(V_i\)：同一对象或同一时刻的视觉，是正样本；</li>
+<li>\(V_j,j\ne i\)：batch 中其他视觉，通常作为负样本。</li>
+</ul>
+<h3 id="23-clipinfonce">2.3 CLIP/InfoNCE 公式</h3>
+<p>先将 encoder 输出投影并归一化：</p>
+<p>\[
+z_V=\operatorname{norm}(P_V(E_V(V))),\qquad
+z_T=\operatorname{norm}(P_T(E_T(T)))
+\]</p>
+<p>相似度为：</p>
+<p>\[
+s_{ij}=\frac{z_{T_i}^{\top}z_{V_j}}{\tau}
+\]</p>
+<p>触觉检索视觉的 InfoNCE：</p>
+<p>\[
+\mathcal L_{T\rightarrow V}
+=
+-\frac{1}{N}\sum_{i=1}^{N}
+\log
+\frac{\exp(s_{ii})}
+{\sum_{j=1}^{N}\exp(s_{ij})}
+\]</p>
+<p>通常还会反向计算：</p>
+<p>\[
+\mathcal L_{VT}
+=
+\frac{1}{2}
+\left(
+\mathcal L_{T\rightarrow V}
++
+\mathcal L_{V\rightarrow T}
+\right)
+\]</p>
+<p>三模态时可以组合：</p>
+<p>\[
+\mathcal L_{\mathrm{cross}}
+=
+\alpha_{VT}\mathcal L_{VT}
++
+\alpha_{TL}\mathcal L_{TL}
++
+\alpha_{VL}\mathcal L_{VL}
+\]</p>
+<h3 id="24">2.4 它学到什么</h3>
+<p>跨模态对齐更容易保留：</p>
+<ul>
+<li>对象身份；</li>
+<li>材料和物理属性；</li>
+<li>可以被语言描述的语义；</li>
+<li>不同传感器之间的共同信息。</li>
+</ul>
+<p>但它不一定保留：</p>
+<ul>
+<li>高频接触变化；</li>
+<li>微小滑移；</li>
+<li>瞬时力波动；</li>
+<li>对具体机器人动作最重要、但难以语言化的细节。</li>
+</ul>
+<h3 id="25">2.5 常见陷阱</h3>
+<h4 id="_1">假负样本</h4>
+<p>batch 中两条数据可能来自不同实例，但实际语义相同。例如两块相似海绵可能被当作负样本。</p>
+<h4 id="_2">只对齐对象身份</h4>
+<p>模型可能主要识别“这是海绵”，却没有理解当前接触是轻压、重压还是滑动。</p>
+<h4 id="_3">配对不精确</h4>
+<p>不同传感器依次触摸同一个位置时，真实接触位置和力度可能存在误差。</p>
+<h4 id="_4">全局对齐忽略局部信息</h4>
+<p>只比较 CLS/global embedding，不能保证视觉 patch 和触觉局部区域具有精细对应关系。</p>
+<h3 id="26">2.6 常见程度</h3>
+<p>这是成熟、广泛使用的多模态学习范式，不是某篇触觉论文首次提出。CLIP、ImageBind、TVL、AnyTouch、OmniVTLA 和 Beyond Sight 都采用了这一思想的不同版本。</p>
+<hr />
+<h2 id="3-temporal-coherence">3. 范式二：Temporal Coherence</h2>
+<h3 id="31">3.1 它解决什么问题</h3>
+<p>接触不是静态属性，而是一个连续过程：</p>
+<pre><code class="language-text">接近物体
+  ↓
+刚刚接触
+  ↓
+逐渐施力
+  ↓
+发生形变
+  ↓
+出现滑移或卡住
+</code></pre>
+<p>如果逐帧独立编码，模型可能看不出：</p>
+<ul>
+<li>力正在增大还是减小；</li>
+<li>当前是刚接触还是即将脱离；</li>
+<li>滑移是突然发生还是持续加剧；</li>
+<li>插接件是正常进入还是逐渐卡住。</li>
+</ul>
+<p>Temporal Coherence 假设：</p>
+<blockquote>
+<p>在合理采样频率下，同一轨迹的相邻状态通常共享大量信息，并应在 latent space 中形成连续轨迹。</p>
+</blockquote>
+<h3 id="32">3.2 基本构造</h3>
+<p>对于一段历史：</p>
+<p>\[
+s_1,s_2,\ldots,s_L
+\]</p>
+<p>将相邻状态定义为正样本：</p>
+<p>\[
+(s_i,s_{i+1})
+\]</p>
+<p>不同轨迹、不同样本或不对应的状态作为负样本。</p>
+<h3 id="33-temporal-infonce">3.3 Temporal InfoNCE</h3>
+<p>常见形式是：</p>
+<p>\[
+\mathcal L_{\mathrm{temp}}
+=
+\frac{1}{L-1}
+\sum_{i=1}^{L-1}
+\mathcal L_{\mathrm{NCE}}(s_i,s_{i+1})
+\]</p>
+<p>其中每个 \(s_i\) 可以是：</p>
+<ul>
+<li>单一视觉表示；</li>
+<li>单一触觉表示；</li>
+<li>视觉和触觉的平均或融合表示；</li>
+<li>robot state、action 和 sensor 的联合表示。</li>
+</ul>
+<p>例如 VT-MUSE Stage I 先构造同步多模态状态：</p>
+<p>\[
+s_i
+=
+\operatorname{Normalize}
+\left(
+\frac{z_{V_i}+z_{T_i}}{2}
+\right)
+\]</p>
+<p>再对相邻的 \(s_i,s_{i+1}\) 做 InfoNCE。</p>
+<h3 id="34-latent-space">3.4 它在 latent space 中产生什么</h3>
+<p>理想状态下：</p>
+<pre><code class="language-text">s₁ —— s₂ —— s₃ —— s₄ —— s₅
+</code></pre>
+<p>而不是把同一段轨迹的状态随机散落：</p>
+<pre><code class="language-text">s₁             s₃
+
+        s₅
+
+   s₂                 s₄
+</code></pre>
+<p>它强调的是相对连续性，不要求相邻状态完全相同。</p>
+<h3 id="35">3.5 与下一帧预测的区别</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>训练要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Temporal contrast</td>
+<td>相邻状态的 latent 应该相关</td>
+</tr>
+<tr>
+<td>Next-frame prediction</td>
+<td>根据当前表示生成下一帧像素或特征</td>
+</tr>
+<tr>
+<td>Forward dynamics</td>
+<td>根据当前状态和 action 预测未来状态</td>
+</tr>
+<tr>
+<td>World model</td>
+<td>对较长未来观测、状态或奖励建模</td>
+</tr>
+</tbody>
+</table>
+<p>Temporal contrast 的监督更轻，不要求精确恢复未来；下一帧预测和 dynamics model 对表示的信息量要求更高。</p>
+<h3 id="36">3.6 常见陷阱</h3>
+<h4 id="_5">过度平滑</h4>
+<p>接触、碰撞和滑移可能突然发生。机械地拉近所有相邻状态，可能模糊关键事件边界。</p>
+<h4 id="_6">采样间隔不合适</h4>
+<ul>
+<li>stride 太小：相邻帧几乎相同，任务过于简单；</li>
+<li>stride 太大：相邻帧已经发生状态跳变，不再适合作为正样本。</li>
+</ul>
+<h4 id="_7">时间负样本定义不合理</h4>
+<p>不同轨迹可能处于相同接触阶段，却被错误当成负样本。</p>
+<h4 id="action">忽略 action</h4>
+<p>相同状态在不同 action 下可能产生不同未来。只学习状态连续性，不一定足以学习可控动力学。</p>
+<h3 id="37">3.7 常见程度</h3>
+<p>Temporal Coherence、Temporal Contrastive Learning 和 Predictive Coding 都是成熟范式，广泛用于视频、语音、传感器、机器人和强化学习。VT-MUSE 没有首次发明这种思想，其特点是把它用于同步视觉—触觉的多模态状态。</p>
+<hr />
+<h2 id="4-augmentationmask-consistency">4. 范式三：Augmentation/Mask Consistency</h2>
+<h3 id="41">4.1 它解决什么问题</h3>
+<p>同一输入经过不改变核心语义的扰动后，encoder 不应该产生完全不同的表示。</p>
+<pre><code class="language-text">同一个输入x
+├─ augmentation/mask A → z¹
+└─ augmentation/mask B → z²
+
+要求：z¹ ≈ z²
+</code></pre>
+<p>常见扰动包括：</p>
+<ul>
+<li>随机 crop；</li>
+<li>颜色变化；</li>
+<li>遮挡部分 patch；</li>
+<li>传感器噪声；</li>
+<li>不同 dropout；</li>
+<li>缺失部分模态；</li>
+<li>不同相机视角。</li>
+</ul>
+<h3 id="42-cosine-consistency">4.2 Cosine Consistency</h3>
+<p>最简单的表示一致性损失为：</p>
+<p>\[
+\mathcal L_{\mathrm{cons}}
+=
+1-cos(z^{(1)},z^{(2)})
+\]</p>
+<p>对于 batch 和时间窗口：</p>
+<p>\[
+\mathcal L_{\mathrm{cons}}
+=
+1-
+\frac{1}{BL}
+\sum_{b=1}^{B}
+\sum_{i=1}^{L}
+\cos
+\left(
+s_{b,i}^{(1)},s_{b,i}^{(2)}
+\right)
+\]</p>
+<p>也可以使用：</p>
+<ul>
+<li>MSE consistency；</li>
+<li>KL divergence；</li>
+<li>teacher–student targets；</li>
+<li>stop-gradient prediction loss；</li>
+<li>contrastive loss。</li>
+</ul>
+<h3 id="43-mask-consistency">4.3 Mask Consistency 的特殊意义</h3>
+<p>在视觉—触觉任务中，可以对同一视觉历史生成两种遮挡：</p>
+<pre><code class="language-text">原始视觉：[V₁,V₂,V₃,V₄,V₅]
+
+Mask A： [V₁,MASK,V₃,V₄,MASK]
+Mask B： [MASK,V₂,V₃,MASK,V₅]
+
+触觉：   [T₁,T₂,T₃,T₄,T₅]，保持完整
+</code></pre>
+<p>要求两种输入得到相似的交互状态表示，会迫使模型：</p>
+<ul>
+<li>不过度依赖某一张视觉帧；</li>
+<li>利用完整触觉补偿视觉缺失；</li>
+<li>从时间历史中恢复稳定状态；</li>
+<li>对遮挡和视觉损坏更稳健。</li>
+</ul>
+<h3 id="44-consistency-reconstruction">4.4 Consistency 与 Reconstruction 不一样</h3>
+<p>Consistency：</p>
+<pre><code class="language-text">Mask A → representation A
+Mask B → representation B
+
+要求A ≈ B
+</code></pre>
+<p>它不要求模型知道被遮挡区域的具体像素。</p>
+<p>Reconstruction：</p>
+<pre><code class="language-text">masked input → Encoder/Decoder → 重建原图
+</code></pre>
+<p>要求输出被遮挡内容：</p>
+<p>\[
+\mathcal L_{\mathrm{rec}}=|\hat X-X|_2^2
+\]</p>
+<p>因此：</p>
+<table>
+<thead>
+<tr>
+<th>目标</th>
+<th>更强调什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consistency</td>
+<td>扰动前后语义稳定</td>
+</tr>
+<tr>
+<td>Reconstruction</td>
+<td>保留足以恢复细节的信息</td>
+</tr>
+</tbody>
+</table>
+<p>两者经常一起使用，但作用不同。</p>
+<h3 id="45-collapse">4.5 Collapse 风险</h3>
+<p>如果只要求：</p>
+<p>\[
+z^{(1)}=z^{(2)}
+\]</p>
+<p>最简单的作弊方式是所有输入都输出同一个常数。因此 consistency 方法通常需要至少一种防坍塌机制：</p>
+<ul>
+<li>batch negatives；</li>
+<li>contrastive objective；</li>
+<li>teacher–student；</li>
+<li>stop-gradient；</li>
+<li>variance/covariance regularization；</li>
+<li>重建或分类等其他目标；</li>
+<li>冻结的预训练 encoder。</li>
+</ul>
+<p>VT-MUSE 将 \(L_{\mathrm{cons}}\) 与 \(L_{\mathrm{cross}}\)、\(L_{\mathrm{temp}}\) 和预训练 ViT 一起使用，因此不是只靠单独的一致性项训练。</p>
+<h3 id="46">4.6 常见程度</h3>
+<p>这是成熟的 consistency regularization / multi-view self-supervision 范式。BYOL、SimSiam、DINO 等方法都使用“同一输入的不同视图应有一致表示”这一思想，但网络、teacher/student、stop-gradient 和具体 loss 与 VT-MUSE 并不相同。</p>
+<p>VT-MUSE 的具体特点是：</p>
+<blockquote>
+<p>随机移除视觉证据、保留触觉，让模型学习视觉缺失下的多模态状态稳定性。</p>
+</blockquote>
+<hr />
+<h2 id="5">5. 三类范式之间的关系</h2>
+<p>三者并不是互相替代，而是从不同方向组织 latent space。</p>
+<pre><code class="language-text">                         一个真实交互状态
+                                  │
+         ┌────────────────────────┼────────────────────────┐
+         ↓                        ↓                        ↓
+   不同模态观察它           相邻时刻延续它           不同扰动保留它
+ Vision / Touch / Text       State_t / State_t+1       Mask_A / Mask_B
+         ↓                        ↓                        ↓
+  Cross-Modal Loss          Temporal Loss          Consistency Loss
+</code></pre>
+<h3 id="cross-modal-alignment">Cross-Modal Alignment</h3>
+<p>回答：</p>
+<blockquote>
+<p>同一状态换一种传感器观察，表示是否仍然对应？</p>
+</blockquote>
+<h3 id="temporal-coherence">Temporal Coherence</h3>
+<p>回答：</p>
+<blockquote>
+<p>同一交互过程向前发展一点，表示是否保持连续？</p>
+</blockquote>
+<h3 id="augmentationmask-consistency">Augmentation/Mask Consistency</h3>
+<p>回答：</p>
+<blockquote>
+<p>输入缺失或受到无关扰动，表示是否仍然稳定？</p>
+</blockquote>
+<hr />
+<h2 id="6-vt-muse-stage-i">6. VT-MUSE Stage I 是怎样组合三者的</h2>
+<p>VT-MUSE 使用独立的 Visual ViT 和 Tactile ViT：</p>
+<pre><code class="language-text">RGB image          → Visual ViT  → visual CLS vᵢ
+bilateral tactile  → Tactile ViT → tactile CLS hᵢ
+</code></pre>
+<p>然后优化：</p>
+<p>\[
+\mathcal L_{\mathrm{Stage1}}
+=
+\lambda_{\mathrm{cross}}\mathcal L_{\mathrm{cross}}
++
+\lambda_{\mathrm{temp}}\mathcal L_{\mathrm{temp}}
++
+\lambda_{\mathrm{cons}}\mathcal L_{\mathrm{cons}}
+\]</p>
+<h3 id="mathinlineopen42l_mathrmcrossmathinlineclose42">\(L_{\mathrm{cross}}\)</h3>
+<pre><code class="language-text">visual CLS vᵢ ↔ tactile CLS hᵢ
+</code></pre>
+<p>同步跨模态 InfoNCE，使两个 encoder 对同一接触状态形成相近表示。</p>
+<h3 id="mathinlineopen42l_mathrmtempmathinlineclose42">\(L_{\mathrm{temp}}\)</h3>
+<p>先构造多模态状态：</p>
+<p>\[
+s_i=\operatorname{Normalize}\left(\frac{v_i+h_i}{2}\right)
+\]</p>
+<p>再对相邻状态：</p>
+<pre><code class="language-text">sᵢ ↔ sᵢ₊₁
+</code></pre>
+<p>进行 temporal InfoNCE，使接触过程在 latent space 中连续。</p>
+<h3 id="mathinlineopen42l_mathrmconsmathinlineclose42">\(L_{\mathrm{cons}}\)</h3>
+<pre><code class="language-text">同一窗口 + visual mask A → s⁽¹⁾
+同一窗口 + visual mask B → s⁽²⁾
+</code></pre>
+<p>通过 cosine consistency 提高视觉遮挡下的稳健性，并迫使表示利用触觉。</p>
+<p>所以 Stage I 可以压缩成：</p>
+<pre><code class="language-text">Lcross：不要被模态变化影响
+Ltemp：不要忽略时间连续性
+Lcons：不要被非关键遮挡影响
+</code></pre>
+<hr />
+<h2 id="7">7. 三种范式分别适合什么场景</h2>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>优先监督</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>跨模态检索、开放词汇分类</td>
+<td>Cross-Modal Alignment</td>
+</tr>
+<tr>
+<td>接触阶段识别、动作趋势、滑移演化</td>
+<td>Temporal Coherence / Prediction</td>
+</tr>
+<tr>
+<td>遮挡、缺帧、传感器损坏或噪声</td>
+<td>Mask/Augmentation Consistency</td>
+</tr>
+<tr>
+<td>需要恢复具体缺失信息</td>
+<td>Reconstruction</td>
+</tr>
+<tr>
+<td>需要直接输出机器人动作</td>
+<td>Action Supervision</td>
+</tr>
+</tbody>
+</table>
+<p>在接触丰富机器人任务中，通常希望组合：</p>
+<pre><code class="language-text">跨模态对齐
++ 时间建模
++ 缺失模态稳健性
++ 最终动作监督
+</code></pre>
+<hr />
+<h2 id="8">8. 它们为什么属于通用范式，而不是某篇论文的发明</h2>
+<p>三类思想都早已广泛存在：</p>
+<ul>
+<li>Cross-modal contrastive learning：图文、视听、视觉—深度、视觉—触觉；</li>
+<li>Temporal contrastive learning：视频、语音、机器人状态、强化学习；</li>
+<li>Consistency learning：图像增强、teacher–student、半监督学习、多视图自监督。</li>
+</ul>
+<p>论文的创新一般不在“第一次写出余弦损失或 InfoNCE”，而在：</p>
+<ol>
+<li>如何定义正负样本；</li>
+<li>哪些模态参与；</li>
+<li>对齐 global embedding 还是局部 tokens；</li>
+<li>如何处理缺失模态和不同采样率；</li>
+<li>是否加入时序、动作和任务条件；</li>
+<li>多个 loss 如何组合；</li>
+<li>学到的 representation 如何接入下游 policy；</li>
+<li>是否通过严格消融证明每个目标有用。</li>
+</ol>
+<p>VT-MUSE 的特点是把三种成熟监督组合为 Stage I，并在 Stage II 进一步训练 sequential memory，最后通过 gated cross-attention 接入动作策略。</p>
+<hr />
+<h2 id="9">9. 阅读相关论文时的检查清单</h2>
+<h3 id="cross-modal-alignment_1">Cross-Modal Alignment</h3>
+<ul>
+<li>哪些模态互相对齐？</li>
+<li>正样本按对象、时刻还是接触位置定义？</li>
+<li>负样本来自 batch 还是专门采样？</li>
+<li>encoder 哪些冻结、哪些更新？</li>
+<li>使用 CLS、mean pooling 还是局部 token？</li>
+<li>对齐到已有 CLIP 空间，还是共同训练新空间？</li>
+</ul>
+<h3 id="temporal-coherence_1">Temporal Coherence</h3>
+<ul>
+<li>相邻的时间跨度是多少？</li>
+<li>stride 是否固定？</li>
+<li>正样本是相邻帧还是未来帧？</li>
+<li>是否加入 action 条件？</li>
+<li>会不会把接触突变过度平滑？</li>
+<li>负样本会不会实际处于相同接触阶段？</li>
+</ul>
+<h3 id="consistency-learning">Consistency Learning</h3>
+<ul>
+<li>使用了什么 augmentation 或 mask？</li>
+<li>这些扰动真的不改变任务语义吗？</li>
+<li>是比较 global embedding 还是每个 token？</li>
+<li>有没有防止 representation collapse？</li>
+<li>consistency 与 reconstruction 是否同时使用？</li>
+<li>测试环境中是否真的存在相应缺失或噪声？</li>
+</ul>
+<h3 id="_8">实验是否充分</h3>
+<ul>
+<li>是否分别移除每一个 loss？</li>
+<li>是否保持模型容量和数据量一致？</li>
+<li>表征指标提升是否转化为动作成功率？</li>
+<li>结果证明的是对齐、稳健性，还是整个系统的综合收益？</li>
+</ul>
+<hr />
+<h2 id="10">10. 最终记忆框架</h2>
+<p>把多模态表征学习看成在定义三种“不应该改变核心状态”的变换：</p>
+<p>\[
+\underbrace{\text{换模态}}<em>{\mathcal L</em>{\mathrm{cross}}}
+,\qquad
+\underbrace{\text{向前移动一个时间步}}<em>{\mathcal L</em>{\mathrm{temp}}}
+,\qquad
+\underbrace{\text{施加非关键扰动或遮挡}}<em>{\mathcal L</em>{\mathrm{cons}}}
+\]</p>
+<p>最终希望 encoder 满足：</p>
+<pre><code class="language-text">同一状态换一种传感器 → 仍能识别
+同一过程向前发展一点 → 表示连续
+视觉缺一部分或受到扰动 → 表示稳定
+</code></pre>
+<p>但这三类 representation loss 仍然不等于动作学习。要让机器人真正完成任务，通常还需要：</p>
+<pre><code class="language-text">learned representation
+        ↓
+attention / fusion
+        ↓
+policy / action head
+        ↓
+action supervision
+</code></pre>
+<p>最简洁的总结是：</p>
+<blockquote>
+<p><strong>Cross-modal loss 规定不同传感器如何描述同一个状态；temporal loss 规定状态如何沿时间组织；consistency loss 规定哪些缺失和扰动不应改变状态。三者共同塑造 representation，而下游 action loss 决定这些表示是否真正能用于机器人控制。</strong></p>
+</blockquote>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="multimodal-encoder-alignment-infonce.html">← F06 · 多模态 Encoder 对齐：ViT、CLIP 与 InfoNCE</a>
+            <a href="imitation-learning-behavior-cloning.html">IL01 · 模仿学习与 Behavior Cloning 入门 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

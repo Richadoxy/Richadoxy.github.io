@@ -1,0 +1,1250 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="从 ObjTac 和 SA-ViT 预训练出发，分析双触觉 encoder、prefix token 融合、flow matching 与多种机器人本体实验。" />
+    <title>OmniVTLA 精读：语义对齐触觉感知接入 π0 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#0">0. 一句话定位</a></li>
+<li><a href="#1">1. 论文试图解决什么问题</a></li>
+<li><a href="#2">2. 主要贡献与创新边界</a><ul>
+<li><a href="#21-dual-encoder-tactile-path">2.1 Dual-Encoder Tactile Path</a><ul>
+<li><a href="#pretrained-vit">Pretrained ViT路径</a></li>
+<li><a href="#sa-vit">SA-ViT路径</a></li>
+</ul>
+</li>
+<li><a href="#22-objtac">2.2 ObjTac三模态数据集</a></li>
+<li><a href="#23-vit">2.3 将多传感器力场统一为ViT输入</a></li>
+<li><a href="#24-encoder">2.4 触觉Encoder的受控比较</a></li>
+<li><a href="#25">2.5 没有重新发明的部分</a></li>
+</ul>
+</li>
+<li><a href="#3-figure-2">3. Figure 2：每个模块是什么</a><ul>
+<li><a href="#31">3.1 语言路径</a></li>
+<li><a href="#32">3.2 视觉路径</a></li>
+<li><a href="#33">3.3 触觉路径</a></li>
+<li><a href="#34-vlm-backbone">3.4 VLM backbone</a></li>
+<li><a href="#35-action-expert">3.5 Action Expert</a></li>
+</ul>
+</li>
+<li><a href="#4-attention">4. Attention怎样发生</a></li>
+<li><a href="#5-vlmwork">5. VLM没有触觉预训练，为什么能work</a><ul>
+<li><a href="#51">5.1 接口兼容</a></li>
+<li><a href="#52">5.2 语义初始化</a></li>
+<li><a href="#53-action-loss">5.3 Action Loss继续教模型使用触觉</a></li>
+</ul>
+</li>
+<li><a href="#6-sa-vit">6. 训练阶段一：SA-ViT预训练</a><ul>
+<li><a href="#61">6.1 输入数据</a></li>
+<li><a href="#62">6.2 三模态对比对齐</a></li>
+<li><a href="#63-cross-sensor-matching">6.3 Cross-Sensor Matching</a></li>
+<li><a href="#64">6.4 哪些参数更新</a></li>
+</ul>
+</li>
+<li><a href="#7-vtla-fine-tuning">7. 训练阶段二：机器人示范上的VTLA Fine-tuning</a><ul>
+<li><a href="#71">7.1 机器人示范数据</a></li>
+<li><a href="#72">7.2 动作表示</a></li>
+<li><a href="#73-flow-matching-loss">7.3 Flow-Matching Loss</a></li>
+<li><a href="#74-loss">7.4 这一阶段没有哪些loss</a></li>
+<li><a href="#75">7.5 训练超参数</a></li>
+<li><a href="#76">7.6 哪些参数会更新</a></li>
+</ul>
+</li>
+<li><a href="#8">8. 推理链路</a><ul>
+<li><a href="#81-vlm-prefix">8.1 构造VLM Prefix</a></li>
+<li><a href="#82-flow">8.2 Flow推理</a></li>
+<li><a href="#83">8.3 闭环执行</a></li>
+</ul>
+</li>
+<li><a href="#9-tactile-encoder">9. Tactile Encoder感知实验</a><ul>
+<li><a href="#91">9.1 作者采集数据</a></li>
+<li><a href="#92-touch-and-go">9.2 Touch and Go外部数据</a></li>
+</ul>
+</li>
+<li><a href="#10-encoder">10. Encoder架构消融</a></li>
+<li><a href="#11-pick-and-place">11. 两指夹爪Pick-and-Place</a></li>
+<li><a href="#12">12. 四指灵巧手实验（重点）</a></li>
+<li><a href="#13-peg-insertion">13. Peg Insertion</a></li>
+<li><a href="#14-diffusion-policy">14. Diffusion Policy上的触觉对比</a></li>
+<li><a href="#15">15. 轨迹平滑度与柔软物体</a><ul>
+<li><a href="#151">15.1 轨迹平滑度</a></li>
+<li><a href="#152">15.2 未见柔软物体</a></li>
+</ul>
+</li>
+<li><a href="#16-offline-mse">16. Offline MSE与闭环成功率</a></li>
+<li><a href="#17">17. 实验最终支持了什么</a><ul>
+<li><a href="#171">17.1 支持较充分</a></li>
+<li><a href="#172">17.2 尚未充分证明</a></li>
+</ul>
+</li>
+<li><a href="#18">18. 与此前论文的架构区别</a><ul>
+<li><a href="#181-anytouch">18.1 与AnyTouch</a></li>
+<li><a href="#182-vla-touch">18.2 与VLA-Touch</a></li>
+<li><a href="#183-fuse">18.3 与FuSe</a></li>
+</ul>
+</li>
+<li><a href="#19">19. 优点与局限</a><ul>
+<li><a href="#191">19.1 优点</a></li>
+<li><a href="#192">19.2 局限</a></li>
+</ul>
+</li>
+<li><a href="#20">20. 最终理解</a></li>
+<li><a href="#21">21. 精读时最值得记住的六点</a></li>
+<li><a href="#22">22. 原文定位</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span> · TOUCH06</p>
+          <h1>OmniVTLA 精读：语义对齐触觉感知接入 π0</h1>
+          <p class="article-meta"><span data-lang="en">前沿 · September 2026 · 18 min read</span><span data-lang="zh">前沿 · 2026.09 · 约 18 分钟阅读</span></p>
+          <p class="article-deck">从 ObjTac 和 SA-ViT 预训练出发，分析双触觉 encoder、prefix token 融合、flow matching 与多种机器人本体实验。</p>
+          <div class="article-content">
+            <blockquote>
+<p>Zhengxue Cheng, Yiqian Zhang, Anni Tang, Keyu Wang, Wenkang Zhang, Haoyu Li, Hengdi Zhang, Li Song<br>
+arXiv 2025；本文依据2026年6月更新的v3版本整理，目前未注明正式会议或期刊<br>
+<a href="https://arxiv.org/abs/2508.08706">arXiv</a> · <a href="https://arxiv.org/pdf/2508.08706">论文PDF</a> · <a href="https://huggingface.co/papers/2508.08706">Hugging Face论文页</a> · <a href="https://readerek.github.io/Objtac.github.io/">ObjTac项目主页</a></p>
+<p>推荐先读：<a href="18-anytouch-unified-tactile-representation.html">AnyTouch</a>、<a href="19-attention-openclip-tactile-groot.html">Attention专题</a>、<a href="10-flow-matching-training-inference.html">Flow Matching</a>、<a href="vla-overview-reading-map.html">VLA架构地图</a>与<a href="vla-touch-dual-level-tactile-feedback.html">VLA-Touch</a>。本文代表的是“将触觉token直接接入π0内部”的路线。</p>
+</blockquote>
+<h2 id="0">0. 一句话定位</h2>
+<p>OmniVTLA没有重新设计VLM或Action Expert，而是在π0基础上增加一条<strong>双编码器触觉路径</strong>：同一份触觉力场同时经过视觉预训练ViT和语义对齐SA-ViT，得到两组tactile tokens，与语言、第三人称视觉和腕部视觉token共同进入VLM prefix，再条件化π0的flow-matching Action Expert生成动作。</p>
+<pre><code class="language-text">Language ── tokenizer ─────────────────────────┐
+                                              │
+RGB images ── SigLIP ─────────────────────────┤
+                                              ├─&gt; Gemma/PaliGemma VLM prefix
+Tactile force image ── pretrained ViT ────────┤
+                                              │
+Tactile force image ── SA-ViT ────────────────┘
+                                                        ⇅ joint attention
+State + noisy action + timestep ───────&gt; π0 Action Expert
+                                                ↓
+                                     flow-matching action chunk
+</code></pre>
+<p>这篇论文最值得关注的不是新的VLA主干，而是：</p>
+<ol>
+<li>力触觉怎样变成可输入VLA的token；</li>
+<li>触觉encoder是否应该先与视觉、语言做语义对齐；</li>
+<li>单路与双路触觉encoder，哪个更适合真实闭环控制。</li>
+</ol>
+<hr />
+<h2 id="1">1. 论文试图解决什么问题</h2>
+<p>视觉—语言基础模型经过互联网规模预训练，vision encoder与language embedding天然具有一定语义联系。触觉则不同：</p>
+<ul>
+<li>不同传感器输出可能是RGB形变图、深度图、marker位移或力阵列；</li>
+<li>机器人动作数据中的触觉样本远少于视觉—语言数据；</li>
+<li>将原始触觉张量直接输入VLA，不代表模型理解材料、硬度和接触状态；</li>
+<li>在少量遥操作数据上从头训练触觉encoder容易过拟合。</li>
+</ul>
+<p>作者提出的核心假设是：</p>
+<blockquote>
+<p>如果先让触觉表示与视觉和语言语义对齐，再接入VLA，模型会更容易利用少量机器人示范学习稳定抓取、柔性抓取和接触调整。</p>
+</blockquote>
+<p>这里的“semantic-aligned”主要指物体层面的语义：</p>
+<ul>
+<li>object identity；</li>
+<li>material；</li>
+<li>roughness；</li>
+<li>hardness。</li>
+</ul>
+<p>它不是把触觉与机器人动作预先对齐，也不是预训练一个触觉动作模型。</p>
+<hr />
+<h2 id="2">2. 主要贡献与创新边界</h2>
+<h3 id="21-dual-encoder-tactile-path">2.1 Dual-Encoder Tactile Path</h3>
+<p>OmniVTLA最直接的架构创新不是“增加一个触觉encoder”，而是为同一份触觉输入设置两条并行路径：</p>
+<pre><code class="language-text">                            ┌→ Pretrained ViT ─→ tactile tokens A
+force tactile pseudo-image ┤
+                            └→ SA-ViT ─────────→ tactile tokens B
+</code></pre>
+<p>两条路径承担不同角色。</p>
+<h4 id="pretrained-vit">Pretrained ViT路径</h4>
+<p>该路径从大规模自然图像预训练继承：</p>
+<ul>
+<li>通用空间结构；</li>
+<li>局部形状和边缘；</li>
+<li>类图像纹理特征；</li>
+<li>已有视觉语义先验。</li>
+</ul>
+<p>虽然触觉力场不是真实RGB图像，但二维排列后仍然具有接触位置、轮廓和空间分布。</p>
+<h4 id="sa-vit">SA-ViT路径</h4>
+<p>SA-ViT使用触觉—视觉—文本配对数据训练，重点表示：</p>
+<ul>
+<li>触觉专用的物理属性；</li>
+<li>Paxini力场的信号结构；</li>
+<li>不同触觉传感器之间的共性；</li>
+<li>与视觉和语言对应的对象语义。</li>
+</ul>
+<p>作者希望两条路径形成互补：</p>
+<pre><code class="language-text">Pretrained ViT：通用视觉和空间先验
+SA-ViT：触觉专用且语义对齐的属性先验
+</code></pre>
+<h3 id="22-objtac">2.2 ObjTac三模态数据集</h3>
+<p>作者构建ObjTac：</p>
+<ul>
+<li>56个物体；</li>
+<li>10个材料类别；</li>
+<li>135K视觉—触觉配对样本；</li>
+<li>270K条力数据记录；</li>
+<li>252段第一视角视频；</li>
+<li>触觉采样60 Hz，视频30 FPS；</li>
+<li>object name、material、roughness、hardness和文本描述。</li>
+</ul>
+<p>ObjTac使用Paxini Gen2力触觉传感器。其输出不是GelSight图像，而是经传感器内部反演得到的多维力分布。</p>
+<p>ObjTac没有机器人action，因此只用于预训练SA-ViT，不能直接监督Action Expert。</p>
+<h3 id="23-vit">2.3 将多传感器力场统一为ViT输入</h3>
+<p>作者将多个触觉传感器输出：</p>
+<ol>
+<li>做max-min force normalization；</li>
+<li>映射为int8三通道张量；</li>
+<li>按固定空间布局拼接成一张图；</li>
+<li>resize为\(224\times224\)；</li>
+<li>用ViT编码成256个tokens。</li>
+</ol>
+<p>这使两指夹爪的两个传感器，以及四指灵巧手的11个传感器，都能使用统一的图像式输入接口。</p>
+<h3 id="24-encoder">2.4 触觉Encoder的受控比较</h3>
+<p>论文不只比较“有触觉”和“无触觉”，还控制参数量，对从头训练、视觉预训练、触觉预训练、语义对齐和双encoder组合进行消融。</p>
+<h3 id="25">2.5 没有重新发明的部分</h3>
+<p>以下组件主要继承π0：</p>
+<ul>
+<li>PaliGemma/Gemma VLM backbone；</li>
+<li>SigLIP视觉encoder；</li>
+<li>Action Expert；</li>
+<li>joint-attention式条件交互；</li>
+<li>flow-matching action generation。</li>
+</ul>
+<p>SA-ViT的跨模态训练也明确沿用AnyTouch第二阶段。更准确的评价是：</p>
+<blockquote>
+<p>OmniVTLA是一篇以触觉encoder设计和实证比较为核心的VLA论文，不是一种全新的VLA主干范式。</p>
+</blockquote>
+<hr />
+<h2 id="3-figure-2">3. Figure 2：每个模块是什么</h2>
+<h3 id="31">3.1 语言路径</h3>
+<pre><code class="language-text">“Pick up the short can and move it to the plate.”
+                         ↓
+                PaliGemma tokenizer
+                         ↓
+                   language tokens
+</code></pre>
+<p>语言没有单独的T5或CLIP text encoder，而是沿用PaliGemma/Gemma的tokenizer与embedding。</p>
+<h3 id="32">3.2 视觉路径</h3>
+<p>机器人同时输入：</p>
+<ul>
+<li>third-view RGB；</li>
+<li>wrist-camera RGB。</li>
+</ul>
+<p>每张图resize为\(224\times224\)，由SigLIP-400M编码为256个vision tokens：</p>
+<pre><code class="language-text">third-view RGB ─┐
+                ├→ SigLIP-400M → 2 × 256 vision tokens
+wrist RGB ──────┘
+</code></pre>
+<h3 id="33">3.3 触觉路径</h3>
+<pre><code class="language-text">多个Paxini传感器的force arrays
+               ↓
+normalize + reshape + stitch
+               ↓
+      224×224×3 pseudo-image
+          ┌────┴────┐
+          ↓         ↓
+ pretrained ViT   SA-ViT
+          ↓         ↓
+ 256 tokens A    256 tokens B
+</code></pre>
+<p>“dual encoder”不是指vision encoder和tactile encoder各一个，而是<strong>触觉本身有两个encoder</strong>。</p>
+<h3 id="34-vlm-backbone">3.4 VLM backbone</h3>
+<p>文本、视觉和两组触觉token在序列维度拼接：</p>
+<p>\[
+C=
+[L,V_{\mathrm{third}},V_{\mathrm{wrist}},T_{\mathrm{pre}},T_{\mathrm{SA}}]
+\]</p>
+<p>论文将主干写作Gemma 2.6B；结合π0架构，可以理解为PaliGemma派生的VLM prefix部分。</p>
+<h3 id="35-action-expert">3.5 Action Expert</h3>
+<p>Figure 2为了突出触觉encoder，省略了π0 Action Expert的标准输入：</p>
+<ul>
+<li>robot proprioceptive state；</li>
+<li>noisy action chunk；</li>
+<li>flow timestep。</li>
+</ul>
+<p>Action Expert以VLM prefix为条件，预测flow velocity并生成动作序列。</p>
+<hr />
+<h2 id="4-attention">4. Attention怎样发生</h2>
+<p>可以用“跨模态交互”描述，但不要机械地理解为：</p>
+<pre><code class="language-text">VLM先self-attention
+        ↓
+Action Expert再插入一个标准cross-attention模块
+</code></pre>
+<p>π0更接近joint attention或共享attention context：</p>
+<pre><code class="language-text">VLM prefix tokens：language + vision + tactile
+Action tokens：state + noisy action + timestep
+</code></pre>
+<p>两侧可以使用不同的QKV和MLP参数，但Action Expert token能读取VLM prefix的K/V。动作token因此能够综合：</p>
+<ul>
+<li>指令要求；</li>
+<li>场景位置；</li>
+<li>腕部视角；</li>
+<li>当前接触力分布；</li>
+<li>物体软硬语义。</li>
+</ul>
+<p>它具有cross-modal conditioning的效果，但不一定存在一个单独命名为Cross-Attention的模块。</p>
+<hr />
+<h2 id="5-vlmwork">5. VLM没有触觉预训练，为什么能work</h2>
+<p>Gemma/PaliGemma原始预训练没有见过Paxini force field，因此它不可能天然理解原始触觉。OmniVTLA依靠三个层次解决。</p>
+<h3 id="51">5.1 接口兼容</h3>
+<p>力阵列先被转换成三通道伪图像，再通过ViT变成与VLM hidden width兼容的token。Transformer本身不要求token一定来自文字或自然RGB，只要求：</p>
+<ul>
+<li>embedding维度相同；</li>
+<li>position编码和attention mask合法；</li>
+<li>token经过合理投影；</li>
+<li>下游存在训练监督。</li>
+</ul>
+<h3 id="52">5.2 语义初始化</h3>
+<p>SA-ViT预训练使触觉表示大致满足：</p>
+<p>\[
+x_T\approx x_V\approx x_L
+\]</p>
+<p>例如软海绵的触觉表示会靠近对应视觉样本，以及“soft”“sponge”“fabric”等语言表示。VLM收到的不再是随机力数组，而是带有视觉—语言语义的token。</p>
+<h3 id="53-action-loss">5.3 Action Loss继续教模型使用触觉</h3>
+<p>OmniVTLA不是把SA-ViT接到完全冻结的π0后直接zero-shot控制。它还会在遥操作机器人数据上fine-tune：</p>
+<pre><code class="language-text">vision + language + tactile + state
+                    ↓
+                 OmniVTLA
+                    ↓
+              predicted action
+                    ↓ compare
+          teleoperation action
+</code></pre>
+<p>Flow-matching action loss让模型学习：</p>
+<ul>
+<li>未接触时继续接近；</li>
+<li>接触稳定后停止闭合夹爪；</li>
+<li>插孔遇阻时调整位置；</li>
+<li>柔软物体不应持续加大夹持。</li>
+</ul>
+<p>因此真正使它工作的机制是：</p>
+<p>\[
+\boxed{
+\text{语义对齐提供良好初始化}
++
+\text{机器人动作监督学习怎样使用触觉}
+}
+\]</p>
+<p>VTLA-FS从头训练触觉encoder也能超过无触觉π0，说明语义对齐不是使用触觉的必要条件；它主要改善初始化、数据效率、闭环性能和泛化。</p>
+<hr />
+<h2 id="6-sa-vit">6. 训练阶段一：SA-ViT预训练</h2>
+<h3 id="61">6.1 输入数据</h3>
+<pre><code class="language-text">触觉力场T
+对应视觉帧V
+对象文本与属性L
+跨传感器正负样本
+</code></pre>
+<p>作者将ObjTac加入已有触觉数据，并采用AnyTouch第二阶段的多模态对齐与跨传感器匹配范式。</p>
+<h3 id="62">6.2 三模态对比对齐</h3>
+<p>\[
+\mathcal L_{\mathrm{align}}
+=
+\alpha_{VL}
+\frac{\mathcal L_{V\rightarrow L}+\mathcal L_{L\rightarrow V}}{2}
++
+\alpha_{VT}
+\frac{\mathcal L_{V\rightarrow T}+\mathcal L_{T\rightarrow V}}{2}
++
+\alpha_{TL}
+\frac{\mathcal L_{T\rightarrow L}+\mathcal L_{L\rightarrow T}}{2}
+\]</p>
+<p>它同时对齐：</p>
+<pre><code class="language-text">vision ↔ language
+vision ↔ tactile
+tactile ↔ language
+</code></pre>
+<p>每个方向使用CLIP/InfoNCE式batch内对比：正确配对靠近，错误配对远离。</p>
+<h3 id="63-cross-sensor-matching">6.3 Cross-Sensor Matching</h3>
+<p>模型还要判断两份触觉信号是否来自同一物体、同一接触位置：</p>
+<pre><code class="language-text">touch sample A + touch sample B
+               ↓
+         matching head
+               ↓
+             0 / 1
+</code></pre>
+<p>使用Binary Cross Entropy：</p>
+<p>\[
+\mathcal L_{\mathrm{match}}
+=
+\operatorname{BCE}(\hat y,y)
+\]</p>
+<p>所以总目标可概括为：</p>
+<p>\[
+\mathcal L_{\mathrm{SA}}
+=
+\mathcal L_{\mathrm{align}}
++
+\lambda\mathcal L_{\mathrm{match}}
+\]</p>
+<h3 id="64">6.4 哪些参数更新</h3>
+<p>本文可以确认更新：</p>
+<ul>
+<li>SA-ViT encoder；</li>
+<li>SA-ViT decoder/projection；</li>
+<li>cross-sensor matching head。</li>
+</ul>
+<p>如果完整沿用其明确引用的AnyTouch Stage 2设置：</p>
+<ul>
+<li>text encoder冻结，作为anchor；</li>
+<li>vision encoder通过LoRA调整；</li>
+<li>tactile encoder是主要训练对象。</li>
+</ul>
+<p>但OmniVTLA没有重新列出这一阶段全部模块的freeze mask，因此vision/text部分属于依据AnyTouch训练方案进行的推断。</p>
+<hr />
+<h2 id="7-vtla-fine-tuning">7. 训练阶段二：机器人示范上的VTLA Fine-tuning</h2>
+<h3 id="71">7.1 机器人示范数据</h3>
+<p>Pick-and-place：</p>
+<ul>
+<li>两指夹爪使用4种物体；</li>
+<li>四指灵巧手使用2种训练物体；</li>
+<li>每个物体40条teleoperated demonstrations；</li>
+<li>采集频率30 Hz。</li>
+</ul>
+<p>Peg insertion：</p>
+<ul>
+<li>square与triangle用于训练；</li>
+<li>共采集54条遥操作示范；</li>
+<li>round peg作为unseen shape；</li>
+<li>采集频率30 Hz。</li>
+</ul>
+<p>每个训练时刻大致包括：</p>
+<pre><code class="language-text">language instruction
+third-view RGB
+wrist RGB
+multi-sensor tactile force
+robot EEF state
+ground-truth teleoperation action
+</code></pre>
+<h3 id="72">7.2 动作表示</h3>
+<p>两指夹爪动作维度为：</p>
+<p>\[
+3\ \text{relative position}
++6\ \text{rotation}
++1\ \text{gripper}
+=10
+\]</p>
+<p>四指灵巧手动作维度为：</p>
+<p>\[
+3+6+16=25
+\]</p>
+<p>其中16维是手指关节绝对位置。VTLA的action chunk长度为50。</p>
+<h3 id="73-flow-matching-loss">7.3 Flow-Matching Loss</h3>
+<p>给定专家动作块\(A\)、高斯噪声\(\epsilon\)和随机时间\(\tau\)，一种常见等价写法是：</p>
+<p>\[
+A_\tau=(1-\tau)\epsilon+\tau A
+\]</p>
+<p>目标速度为：</p>
+<p>\[
+u_\tau=A-\epsilon
+\]</p>
+<p>Action Expert预测：</p>
+<p>\[
+v_\theta
+\left(
+A_\tau,\tau
+\mid
+V,T,L,s
+\right)
+\]</p>
+<p>训练目标：</p>
+<p>\[
+\mathcal L_{\mathrm{FM}}
+=
+\mathbb E
+\left[
+\left|
+v_\theta-u_\tau
+\right|^2
+\right]
+\]</p>
+<p>不同实现可能采用相反时间方向，速度target符号随之改变，但本质相同：学习从噪声动作分布流向专家动作分布的速度场。</p>
+<h3 id="74-loss">7.4 这一阶段没有哪些loss</h3>
+<p>机器人policy fine-tuning阶段没有报告：</p>
+<ul>
+<li>触觉属性分类loss；</li>
+<li>language generation loss；</li>
+<li>触觉重建loss；</li>
+<li>继续计算三模态对比loss；</li>
+<li>独立contact prediction loss。</li>
+</ul>
+<p>两个阶段不是一个联合总loss：</p>
+<pre><code class="language-text">ObjTac和已有触觉数据
+        ↓ Lalign + Lmatch
+      SA-ViT初始化
+        ↓
+机器人遥操作数据
+        ↓ LFM
+      OmniVTLA policy
+</code></pre>
+<h3 id="75">7.5 训练超参数</h3>
+<p>Appendix Table 10给出的VTLA/π0设置：</p>
+<table>
+<thead>
+<tr>
+<th>设置</th>
+<th>数值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GPU</td>
+<td>NVIDIA A100 80GB</td>
+</tr>
+<tr>
+<td>方法</td>
+<td>fine-tune</td>
+</tr>
+<tr>
+<td>Peak LR</td>
+<td>\(2.5\times10^{-5}\)</td>
+</tr>
+<tr>
+<td>Warmup</td>
+<td>1K steps</td>
+</tr>
+<tr>
+<td>Cosine decay</td>
+<td>29K steps，降至\(2.5\times10^{-6}\)</td>
+</tr>
+<tr>
+<td>Total steps</td>
+<td>30K</td>
+</tr>
+<tr>
+<td>Batch size</td>
+<td>32</td>
+</tr>
+<tr>
+<td>Action chunk</td>
+<td>50</td>
+</tr>
+<tr>
+<td>Input size</td>
+<td>\(224\times224\)</td>
+</tr>
+<tr>
+<td>Observation history</td>
+<td>无</td>
+</tr>
+<tr>
+<td>Robot state</td>
+<td>EEF state</td>
+</tr>
+<tr>
+<td>Image augmentation</td>
+<td>有</td>
+</tr>
+</tbody>
+</table>
+<h3 id="76">7.6 哪些参数会更新</h3>
+<p>可以确定或强烈支持更新：</p>
+<ul>
+<li>tactile encoder path；</li>
+<li>Action Expert/action head。</li>
+</ul>
+<p>因为各变体被定义为“初始化后在少量teleoperation data上fine-tune”，触觉encoder不只是固定特征提取器。</p>
+<p>但论文没有给出逐模块freeze table，也没有说明：</p>
+<ul>
+<li>Gemma 2.6B是否全量更新；</li>
+<li>SigLIP-400M是否冻结；</li>
+<li>是否使用LoRA；</li>
+<li>是否只训练部分π0 block。</li>
+</ul>
+<p>项目页在本文整理时仍显示代码Coming Soon，无法从官方实现核对。最稳妥的表述是：</p>
+<blockquote>
+<p>OmniVTLA按照π0 fine-tuning recipe训练，至少触觉路径和Action Expert更新；Gemma与视觉SigLIP的确切训练状态，论文披露不足。</p>
+</blockquote>
+<hr />
+<h2 id="8">8. 推理链路</h2>
+<h3 id="81-vlm-prefix">8.1 构造VLM Prefix</h3>
+<pre><code class="language-text">instruction → tokenizer → language tokens
+
+two RGB views → SigLIP → vision tokens
+
+tactile arrays → normalize/stitch → pseudo-image
+                                 ├→ pretrained ViT tokens
+                                 └→ SA-ViT tokens
+</code></pre>
+<p>四类token在sequence维度拼接后进入Gemma/PaliGemma prefix。</p>
+<h3 id="82-flow">8.2 Flow推理</h3>
+<pre><code class="language-text">Gaussian action noise
+robot state
+flow timestep
+VLM prefix context
+        ↓
+π0-style Action Expert
+        ↓ 多步ODE/flow integration
+50-step action chunk
+</code></pre>
+<p>Action Expert在积分过程中持续以包含触觉token的VLM context为条件。</p>
+<h3 id="83">8.3 闭环执行</h3>
+<p>机器人执行动作块中的一部分，再重新读取RGB、触觉和state，生成下一段动作。论文不使用Octopi或GPT-4o重新生成指令，也没有在π0后增加独立动作修正器。</p>
+<hr />
+<h2 id="9-tactile-encoder">9. Tactile Encoder感知实验</h2>
+<p>Table 2比较不同encoder在material、roughness和hardness分类上的能力。</p>
+<h3 id="91">9.1 作者采集数据</h3>
+<table>
+<thead>
+<tr>
+<th>Encoder</th>
+<th style="text-align: right;">Material</th>
+<th style="text-align: right;">Roughness</th>
+<th style="text-align: right;">Hardness</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CLIP</td>
+<td style="text-align: right;">54.64</td>
+<td style="text-align: right;">70.16</td>
+<td style="text-align: right;">91.57</td>
+</tr>
+<tr>
+<td>SigLIP</td>
+<td style="text-align: right;">49.15</td>
+<td style="text-align: right;">70.02</td>
+<td style="text-align: right;">89.38</td>
+</tr>
+<tr>
+<td>Tac-ViT w/o Align</td>
+<td style="text-align: right;">32.78</td>
+<td style="text-align: right;">70.82</td>
+<td style="text-align: right;">90.44</td>
+</tr>
+<tr>
+<td>AnyTouch</td>
+<td style="text-align: right;">40.21</td>
+<td style="text-align: right;">68.01</td>
+<td style="text-align: right;">90.11</td>
+</tr>
+<tr>
+<td>SA-ViT</td>
+<td style="text-align: right;"><strong>70.44</strong></td>
+<td style="text-align: right;"><strong>82.21</strong></td>
+<td style="text-align: right;"><strong>93.91</strong></td>
+</tr>
+</tbody>
+</table>
+<p>SA-ViT在ObjTac/Paxini domain上明显最好。</p>
+<h3 id="92-touch-and-go">9.2 Touch and Go外部数据</h3>
+<table>
+<thead>
+<tr>
+<th>Encoder</th>
+<th style="text-align: right;">Material</th>
+<th style="text-align: right;">Roughness</th>
+<th style="text-align: right;">Hardness</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AnyTouch</td>
+<td style="text-align: right;"><strong>79.39</strong></td>
+<td style="text-align: right;"><strong>86.32</strong></td>
+<td style="text-align: right;"><strong>95.16</strong></td>
+</tr>
+<tr>
+<td>SA-ViT</td>
+<td style="text-align: right;">74.90</td>
+<td style="text-align: right;">85.46</td>
+<td style="text-align: right;">92.10</td>
+</tr>
+</tbody>
+</table>
+<p>SA-ViT没有在Touch and Go上超过AnyTouch。更准确的结论是：</p>
+<blockquote>
+<p>SA-ViT显著适配了作者的Paxini力触觉domain，同时在外部视触觉数据上维持较强能力，但不是所有触觉数据集上的统一最佳encoder。</p>
+</blockquote>
+<hr />
+<h2 id="10-encoder">10. Encoder架构消融</h2>
+<p>作者构造六种触觉版本：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>触觉路径</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VTLA-FS</td>
+<td>单encoder，从头训练</td>
+</tr>
+<tr>
+<td>VTLA-Pre</td>
+<td>单encoder，视觉预训练ViT</td>
+</tr>
+<tr>
+<td>VTLA-SA</td>
+<td>单encoder，SA-ViT</td>
+</tr>
+<tr>
+<td>VTLA-Pre-Pre</td>
+<td>双encoder，两个视觉预训练encoder</td>
+</tr>
+<tr>
+<td>VTLA-Pre-Tac</td>
+<td>视觉预训练encoder + 未语义对齐Tac-ViT</td>
+</tr>
+<tr>
+<td>OmniVTLA</td>
+<td>视觉预训练encoder + SA-ViT</td>
+</tr>
+</tbody>
+</table>
+<p>Pre-Pre和Pre-Tac是parameter-matched controls，用于排除“OmniVTLA只是因为参数更多”的解释。</p>
+<pre><code class="language-text">FS vs Pre：大规模视觉预训练是否有用？
+Pre vs SA：触觉语义预训练是否更好？
+Pre-Pre vs Omni：只是多一个encoder，还是SA对齐真正有用？
+Pre-Tac vs Omni：触觉预训练本身有用，还是semantic alignment有用？
+单路SA vs Omni：双路是否具有互补性？
+</code></pre>
+<hr />
+<h2 id="11-pick-and-place">11. 两指夹爪Pick-and-Place</h2>
+<p>作者使用Short Can、Square Coffee Bottle、Gum Tin和Milk Carton等物体。每种条件采用网格化初始位姿，共评估32个rollouts。</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th style="text-align: right;">Success Rate</th>
+<th style="text-align: right;">Completion Time/step</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>π0</td>
+<td style="text-align: right;">75.0%</td>
+<td style="text-align: right;">657</td>
+</tr>
+<tr>
+<td>VTLA-FS</td>
+<td style="text-align: right;">81.2%</td>
+<td style="text-align: right;">537</td>
+</tr>
+<tr>
+<td>VTLA-Pre</td>
+<td style="text-align: right;">84.4%</td>
+<td style="text-align: right;">586</td>
+</tr>
+<tr>
+<td>VTLA-SA</td>
+<td style="text-align: right;">87.5%</td>
+<td style="text-align: right;"><strong>484</strong></td>
+</tr>
+<tr>
+<td>VTLA-Pre-Pre</td>
+<td style="text-align: right;">81.3%</td>
+<td style="text-align: right;">501</td>
+</tr>
+<tr>
+<td>VTLA-Pre-Tac</td>
+<td style="text-align: right;">84.4%</td>
+<td style="text-align: right;">550</td>
+</tr>
+<tr>
+<td>OmniVTLA</td>
+<td style="text-align: right;"><strong>96.9%</strong></td>
+<td style="text-align: right;">498</td>
+</tr>
+</tbody>
+</table>
+<p>结果支持：</p>
+<ol>
+<li>加入触觉通常优于无触觉π0；</li>
+<li>单路SA-ViT优于从头训练和视觉预训练；</li>
+<li>仅增加第二个视觉encoder不能解释提升；</li>
+<li>Pretrained ViT与SA-ViT组合取得最高成功率；</li>
+<li>单路VTLA-SA的平均完成时间略优于OmniVTLA。</li>
+</ol>
+<p>双encoder在成功率上最好，但不是每个指标都最好。</p>
+<hr />
+<h2 id="12">12. 四指灵巧手实验（重点）</h2>
+<p>论文在以下配置的四指灵巧手上验证：</p>
+<ul>
+<li>16个手指关节动作维度；</li>
+<li>11个触觉传感器；</li>
+<li>一个腕部相机；</li>
+<li>一个外部场景相机。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th style="text-align: right;">Average SR</th>
+<th style="text-align: right;">CT/step</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>π0</td>
+<td style="text-align: right;">93.8%</td>
+<td style="text-align: right;">343</td>
+</tr>
+<tr>
+<td>OmniVTLA</td>
+<td style="text-align: right;"><strong>100%</strong></td>
+<td style="text-align: right;"><strong>322</strong></td>
+</tr>
+</tbody>
+</table>
+<p>对于训练中未出现的Plastic bottle和Square bottle：</p>
+<ul>
+<li>π0：87.5%；</li>
+<li>OmniVTLA：100%。</li>
+</ul>
+<p>这说明多传感器stitching和双触觉encoder可以从两指夹爪扩展到11触觉传感器的灵巧手。</p>
+<p>但任务仍是pick-and-place，没有验证：</p>
+<ul>
+<li>in-hand rotation；</li>
+<li>regrasp；</li>
+<li>指尖步态；</li>
+<li>双手协同；</li>
+<li>灵巧工具操作。</li>
+</ul>
+<p>所以这是“使用灵巧手硬件的触觉VLA验证”，还不能等同于复杂dexterous manipulation。</p>
+<hr />
+<h2 id="13-peg-insertion">13. Peg Insertion</h2>
+<p>Peg包含：</p>
+<ul>
+<li>triangle，间隙0.9 mm；</li>
+<li>square，间隙1.2 mm；</li>
+<li>round，间隙1.8 mm，作为unseen shape。</li>
+</ul>
+<p>每个形状测试10次。</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th style="text-align: right;">Average SR</th>
+<th style="text-align: right;">CT/step</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>π0</td>
+<td style="text-align: right;">50.0%</td>
+<td style="text-align: right;">816</td>
+</tr>
+<tr>
+<td>VTLA-FS</td>
+<td style="text-align: right;">46.7%</td>
+<td style="text-align: right;">730</td>
+</tr>
+<tr>
+<td>VTLA-Pre</td>
+<td style="text-align: right;">70.0%</td>
+<td style="text-align: right;">906</td>
+</tr>
+<tr>
+<td>VTLA-SA</td>
+<td style="text-align: right;">70.0%</td>
+<td style="text-align: right;"><strong>678</strong></td>
+</tr>
+<tr>
+<td>VTLA-Pre-Pre</td>
+<td style="text-align: right;">53.3%</td>
+<td style="text-align: right;">799</td>
+</tr>
+<tr>
+<td>VTLA-Pre-Tac</td>
+<td style="text-align: right;">43.3%</td>
+<td style="text-align: right;">910</td>
+</tr>
+<tr>
+<td>OmniVTLA</td>
+<td style="text-align: right;"><strong>83.3%</strong></td>
+<td style="text-align: right;">802</td>
+</tr>
+</tbody>
+</table>
+<p>对于未见过的round peg：</p>
+<ul>
+<li>π0：30%；</li>
+<li>OmniVTLA：90%。</li>
+</ul>
+<p>插孔时peg会遮挡孔洞，视觉信息逐渐退化。触觉能告诉策略是否发生单侧接触、卡住以及应该向哪个方向调整，所以该任务比普通抓放更能体现触觉价值。</p>
+<p>但OmniVTLA的平均完成时间只略好于π0，明显慢于单路VTLA-SA，说明双encoder提高了稳健成功率，却没有同时带来最快执行。</p>
+<hr />
+<h2 id="14-diffusion-policy">14. Diffusion Policy上的触觉对比</h2>
+<p>作者还从头训练Diffusion Policy，比较vision-only与vision-touch：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>输入</th>
+<th style="text-align: right;">SR</th>
+<th style="text-align: right;">CT/step</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DP</td>
+<td>Vision</td>
+<td style="text-align: right;">59.4%</td>
+<td style="text-align: right;">851</td>
+</tr>
+<tr>
+<td>VTA</td>
+<td>Vision + Touch</td>
+<td style="text-align: right;">78.1%</td>
+<td style="text-align: right;">682</td>
+</tr>
+</tbody>
+</table>
+<p>这个实验说明触觉不只对π0有效，也能改善普通visuomotor policy。但它不能单独证明SA-ViT或双encoder更好，因为这里没有使用完整OmniVTLA架构。</p>
+<hr />
+<h2 id="15">15. 轨迹平滑度与柔软物体</h2>
+<h3 id="151">15.1 轨迹平滑度</h3>
+<p>作者测量：</p>
+<ul>
+<li>末端轨迹的加速度变化；</li>
+<li>gripper action的平均绝对变化。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th style="text-align: right;">End-effector ↓</th>
+<th style="text-align: right;">Gripper ↓</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>π0</td>
+<td style="text-align: right;">2.70</td>
+<td style="text-align: right;">2.52</td>
+</tr>
+<tr>
+<td>VTLA-SA</td>
+<td style="text-align: right;"><strong>2.44</strong></td>
+<td style="text-align: right;"><strong>2.17</strong></td>
+</tr>
+<tr>
+<td>OmniVTLA</td>
+<td style="text-align: right;">2.65</td>
+<td style="text-align: right;">2.26</td>
+</tr>
+</tbody>
+</table>
+<p>OmniVTLA比π0平滑，但两个指标的最佳模型都是单路VTLA-SA。</p>
+<h3 id="152">15.2 未见柔软物体</h3>
+<p>作者测试训练中没有出现的Towel和Sponge：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th style="text-align: right;">Average SR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>π0</td>
+<td style="text-align: right;">50.0%</td>
+</tr>
+<tr>
+<td>VTLA-FS</td>
+<td style="text-align: right;"><strong>93.8%</strong></td>
+</tr>
+<tr>
+<td>VTLA-Pre</td>
+<td style="text-align: right;"><strong>93.8%</strong></td>
+</tr>
+<tr>
+<td>VTLA-SA</td>
+<td style="text-align: right;">62.5%</td>
+</tr>
+<tr>
+<td>OmniVTLA</td>
+<td style="text-align: right;">81.3%</td>
+</tr>
+</tbody>
+</table>
+<p>单看成功率，OmniVTLA不是最好。但作者观察到VTLA-FS和VTLA-Pre常通过非常紧的夹爪闭合抓起物体，造成明显变形；VTLA-SA和OmniVTLA的夹持更温和。</p>
+<p>该实验支持的是：</p>
+<blockquote>
+<p>Semantic alignment可能使模型理解soft material，从而避免为了抓取成功而过度夹持。</p>
+</blockquote>
+<p>它没有证明semantic alignment在柔软物体上带来最高成功率。</p>
+<hr />
+<h2 id="16-offline-mse">16. Offline MSE与闭环成功率</h2>
+<p>论文还在遥操作validation data上计算动作MSE。VTLA-Pre-Tac的平均MSE最低，OmniVTLA只排第二，但真实机器人闭环成功率由OmniVTLA领先。</p>
+<p>这说明：</p>
+<p>\[
+\text{低offline action MSE}
+\not\Rightarrow
+\text{高closed-loop task success}
+\]</p>
+<p>可能原因包括：</p>
+<ul>
+<li>专家动作具有多模态性；</li>
+<li>小幅动作误差不一定导致任务失败；</li>
+<li>接触后的及时反馈比整段轨迹平均MSE更重要；</li>
+<li>离线数据没有覆盖policy闭环产生的状态分布。</li>
+</ul>
+<hr />
+<h2 id="17">17. 实验最终支持了什么</h2>
+<h3 id="171">17.1 支持较充分</h3>
+<ol>
+<li>触觉能够改善π0和Diffusion Policy的接触任务表现；</li>
+<li>大规模触觉预训练通常优于只靠少量机器人示范从头学习；</li>
+<li>SA-ViT在作者的Paxini force-tactile domain上学到了更好的属性表示；</li>
+<li><code>Pretrained ViT + SA-ViT</code>在真实闭环成功率上优于参数量匹配的双encoder baseline；</li>
+<li>触觉在稳定抓取、柔软物体、视觉遮挡和插孔调整中尤其重要；</li>
+<li>图像式触觉接口可以用于两指夹爪和带11个传感器的四指灵巧手。</li>
+</ol>
+<h3 id="172">17.2 尚未充分证明</h3>
+<ol>
+<li>VLM已经像理解语言一样理解触觉；</li>
+<li>SA-ViT可以zero-shot接入完全冻结的π0；</li>
+<li>双encoder在所有指标上都最好；</li>
+<li>模型具有大范围开放词汇触觉泛化；</li>
+<li>模型能完成复杂in-hand dexterity；</li>
+<li>模型能在杂乱场景中改善视觉导航；</li>
+<li>三模态语义对齐在policy fine-tuning后仍被完整保留。</li>
+</ol>
+<p>特别是最后一点：SA-ViT在机器人数据上继续fine-tune后，其embedding空间可能发生漂移。论文将semantic alignment作为好的初始化，但没有测量fine-tuning前后的对齐保持程度。</p>
+<hr />
+<h2 id="18">18. 与此前论文的架构区别</h2>
+<table>
+<thead>
+<tr>
+<th>工作</th>
+<th>触觉接入位置</th>
+<th>动作输出</th>
+<th style="text-align: right;">统一policy内部融合</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TVL</td>
+<td>CLIP空间与LLaMA</td>
+<td>无</td>
+<td style="text-align: right;">否</td>
+</tr>
+<tr>
+<td>Octopi</td>
+<td>CLIP-based encoder接Vicuna</td>
+<td>无</td>
+<td style="text-align: right;">否</td>
+</tr>
+<tr>
+<td>AnyTouch</td>
+<td>统一触觉representation</td>
+<td>无</td>
+<td style="text-align: right;">否</td>
+</tr>
+<tr>
+<td>Beyond Sight / FuSe</td>
+<td>触觉token进入Octo/PaliGemma policy</td>
+<td>BC/动作token</td>
+<td style="text-align: right;">是</td>
+</tr>
+<tr>
+<td>VLA-Touch</td>
+<td>GPT-4o规划器与RDT后置Controller</td>
+<td>RDT + 动作修正</td>
+<td style="text-align: right;">否</td>
+</tr>
+<tr>
+<td>OmniVTLA</td>
+<td>双触觉encoder进入π0 VLM prefix</td>
+<td>Flow Matching</td>
+<td style="text-align: right;">是</td>
+</tr>
+</tbody>
+</table>
+<h3 id="181-anytouch">18.1 与AnyTouch</h3>
+<p>AnyTouch主要回答：</p>
+<pre><code class="language-text">怎样跨传感器学习统一的静态—动态触觉表示？
+</code></pre>
+<p>OmniVTLA复用其语义对齐阶段，并进一步回答：</p>
+<pre><code class="language-text">这种语义对齐触觉表示能否作为π0的输入并改善机器人动作？
+</code></pre>
+<h3 id="182-vla-touch">18.2 与VLA-Touch</h3>
+<p>VLA-Touch：</p>
+<pre><code class="language-text">触觉在基础VLA外部
+Octopi/GPT-4o负责高层规划
+Interpolant Controller负责低层修正
+</code></pre>
+<p>OmniVTLA：</p>
+<pre><code class="language-text">触觉token进入基础VLA内部
+与视觉和语言共同形成VLM prefix
+直接条件化Action Expert
+</code></pre>
+<p>所以OmniVTLA更接近“原生触觉VLA”，而VLA-Touch更接近“给已有VLA安装触觉外挂”。</p>
+<h3 id="183-fuse">18.3 与FuSe</h3>
+<p>两者都让触觉进入policy内部，但训练方式不同：</p>
+<ul>
+<li>FuSe使用action loss、language contrastive loss和sensory-grounded generation loss共同迫使策略理解新增传感器；</li>
+<li>OmniVTLA先离线预训练SA-ViT，再使用flow-matching action loss fine-tuneπ0。</li>
+</ul>
+<p>FuSe强调多任务辅助监督，OmniVTLA强调触觉encoder初始化与架构选择。</p>
+<hr />
+<h2 id="19">19. 优点与局限</h2>
+<h3 id="191">19.1 优点</h3>
+<ol>
+<li>在π0这一强VLA基线上直接验证触觉内部融合；</li>
+<li>对触觉encoder进行了系统、参数量匹配的受控实验；</li>
+<li>同时覆盖力触觉、两指夹爪和多传感器灵巧手；</li>
+<li>使用成功率、完成时间、平滑度和柔软物体变形等多种指标；</li>
+<li>Peg insertion较好体现视觉遮挡下的接触反馈价值；</li>
+<li>明确展示offline MSE与closed-loop success不一致。</li>
+</ol>
+<h3 id="192">19.2 局限</h3>
+<ol>
+<li>核心对齐方法较大程度复用AnyTouch；</li>
+<li>VLM和Action Expert没有新结构，创新集中在输入侧；</li>
+<li>机器人任务种类有限，主要是pick-and-place与peg insertion；</li>
+<li>灵巧手只验证抓放，没有复杂手内操作；</li>
+<li>触觉被压成单张伪图像，没有显式建模时间动态；</li>
+<li>VTLA没有observation history，短时滑移等动态可能丢失；</li>
+<li>多传感器直接拼图依赖固定布局，跨机器人迁移仍需验证；</li>
+<li>SA-ViT在外部Touch and Go上不是最佳；</li>
+<li>OmniVTLA在完成时间和平滑度上不是最佳；</li>
+<li>模块冻结、projector和完整训练配置披露不足；</li>
+<li>项目代码尚未开放，暂时无法核对实际attention mask和参数更新范围；</li>
+<li>作者承认模型在cluttered scenes中没有明显改善，因为失败主要来自视觉导航。</li>
+</ol>
+<hr />
+<h2 id="20">20. 最终理解</h2>
+<p>OmniVTLA不是在VLA外面附加Octopi，也不是让LLM先生成触觉描述。它直接把触觉力场变成token，放进π0的VLM prefix：</p>
+<pre><code class="language-text">Force array
+    ↓ pseudo-image
+    ├─ pretrained visual prior
+    └─ tactile semantic prior
+             ↓
+      tactile token sequence
+             ↓
+language + vision + tactile prefix
+             ↓
+       π0 Action Expert
+             ↓
+     flow-matching actions
+</code></pre>
+<p>最重要的研究结论不是“只要有触觉就更好”，而是：</p>
+<blockquote>
+<p>在少量机器人示范条件下，触觉encoder的预训练方式和组合方式会显著影响闭环控制；通用视觉先验与触觉语义先验具有一定互补性。</p>
+</blockquote>
+<p>它把此前的“触觉—视觉—语言表征对齐”真正接进了π0式VLA，但仍然缺少大规模任务、动态触觉建模和完全透明的训练实现。</p>
+<hr />
+<h2 id="21">21. 精读时最值得记住的六点</h2>
+<ol>
+<li>Dual encoder指同一份触觉输入经过两个encoder，不是vision和touch各一个；</li>
+<li>SA-ViT对齐touch、vision和language，但ObjTac本身没有action；</li>
+<li>tactile tokens确实进入VLM prefix，并通过π0 joint attention影响Action Expert；</li>
+<li>VLM并非天然理解触觉，语义初始化之后仍需机器人flow-matching action loss；</li>
+<li>OmniVTLA真实成功率最好，但VTLA-SA在完成时间和平滑度上更好；</li>
+<li>四指灵巧手实验值得标注，但只属于灵巧手抓放，不是复杂手内操作。</li>
+</ol>
+<h2 id="22">22. 原文定位</h2>
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>原文位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>核心问题与贡献</td>
+<td>Introduction、Figure 1</td>
+</tr>
+<tr>
+<td>总体网络架构</td>
+<td>Figure 2、Section 3.1–3.2</td>
+</tr>
+<tr>
+<td>ObjTac与SA-ViT训练</td>
+<td>Figure 3、Section 3.3</td>
+</tr>
+<tr>
+<td>三模态对齐loss</td>
+<td>Equation 3</td>
+</tr>
+<tr>
+<td>触觉encoder感知能力</td>
+<td>Table 2</td>
+</tr>
+<tr>
+<td>机器人平台与任务</td>
+<td>Figure 4、Section 4.1</td>
+</tr>
+<tr>
+<td>Encoder消融定义</td>
+<td>Section 4.1 Evaluation Variants</td>
+</tr>
+<tr>
+<td>两指夹爪抓放</td>
+<td>Table 3</td>
+</tr>
+<tr>
+<td>四指灵巧手抓放</td>
+<td>Table 4</td>
+</tr>
+<tr>
+<td>Diffusion Policy触觉实验</td>
+<td>Table 5</td>
+</tr>
+<tr>
+<td>Peg insertion</td>
+<td>Table 6、Figure 7</td>
+</tr>
+<tr>
+<td>轨迹平滑度</td>
+<td>Table 7</td>
+</tr>
+<tr>
+<td>未见柔软物体</td>
+<td>Table 8、Figure 8</td>
+</tr>
+<tr>
+<td>数据与训练超参数</td>
+<td>Appendix 6.1、Tables 9–10</td>
+</tr>
+</tbody>
+</table>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="vla-touch-dual-level-tactile-feedback.html">← TOUCH05 · VLA-Touch 精读：高层触觉规划与低层动作修正</a>
+            <a href="tactile-vla-physical-knowledge-force-control.html">TOUCH07 · Tactile-VLA 精读：物理知识、力动作与混合控制 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

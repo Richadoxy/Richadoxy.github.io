@@ -31,9 +31,11 @@ class Post:
 POSTS = [
     Post("F01", "08_transformer_latent_encoder_decoder.md", "08-transformer-latent-encoder-decoder", "Token、Embedding、Encoder/Decoder 与 Latent", "建立 token、hidden width、latent、encoder、decoder 和参数量之间的基础概念坐标系。", "foundations", level="入门"),
     Post("F02", "19_attention_from_embeddings_to_action_expert.md", "19-attention-openclip-tactile-groot", "Transformer 与 Attention：从 QKV 到多模态交互", "区分动态 attention matrix 与可训练参数，并系统理解 self、cross 与 joint attention。", "foundations", published_en="September 2026", published_zh="2026.09", level="入门"),
-    Post("F03", "21_clip_and_contrastive_learning.md", "clip-contrastive-representation-learning", "表示学习、CLIP 与对比学习", "从双塔 encoder、global embedding 和 InfoNCE 出发，区分表示对齐、前向融合与下游控制。", "foundations", published_en="September 2026", published_zh="2026.09", level="入门"),
-    Post("F04", "09_attention_multi_expert_and_conditioning.md", "09-attention-multi-expert-conditioning", "多模态融合、多专家与条件注入", "比较 token concat、joint/cross attention、multi-expert 与 AdaLN/AdaRMS 条件调制。", "foundations", level="进阶"),
-    Post("F05", "22_model_training_basics.md", "model-training-forward-loss-backward", "模型训练基础：Forward、Loss、Backward 与微调", "建立一次参数更新的完整闭环，并区分 freeze、LoRA、主损失、辅助损失及训练专用模块。", "foundations", published_en="September 2026", published_zh="2026.09", level="入门"),
+    Post("F03", "22_model_training_basics.md", "model-training-forward-loss-backward", "模型训练基础：Forward、Loss、Backward 与微调", "建立一次参数更新的完整闭环，并区分 freeze、LoRA、主损失、辅助损失及训练专用模块。", "foundations", published_en="September 2026", published_zh="2026.09", level="入门"),
+    Post("F04", "21_clip_and_contrastive_learning.md", "clip-contrastive-representation-learning", "表示学习、CLIP 与对比学习", "从双塔 encoder、global embedding 和 InfoNCE 出发，区分表示对齐、前向融合与下游控制。", "foundations", published_en="September 2026", published_zh="2026.09", level="入门"),
+    Post("F05", "09_attention_multi_expert_and_conditioning.md", "09-attention-multi-expert-conditioning", "多模态融合、多专家与条件注入", "比较 token concat、joint/cross attention、multi-expert 与 AdaLN/AdaRMS 条件调制。", "foundations", level="进阶"),
+    Post("F06", "31_multimodal_encoder_alignment_and_infonce.md", "multimodal-encoder-alignment-infonce", "多模态 Encoder 对齐：ViT、CLIP 与 InfoNCE", "深入解释语义锚点、projector、对齐 loss 与触觉 encoder 的通用训练范式。", "foundations", published_en="September 2026", published_zh="2026.09", level="进阶"),
+    Post("F07", "32_three_consistency_supervision_paradigms.md", "multimodal-consistency-supervision", "多模态表征学习的三类一致性监督", "统一跨模态对齐、时间连续性与增强或遮挡不变性，并区分 consistency、reconstruction 与 action supervision。", "foundations", published_en="September 2026", published_zh="2026.09", level="进阶"),
     Post("IL01", "23_imitation_learning_basics.md", "imitation-learning-behavior-cloning", "模仿学习与 Behavior Cloning 入门", "从 demonstration、policy 和 BC 出发，理解离线监督、闭环 rollout 与分布偏移。", "imitation", published_en="September 2026", published_zh="2026.09", level="入门"),
     Post("IL02", "24_robot_data_action_semantics.md", "robot-data-action-semantics", "机器人数据：Observation、Action 与时间窗口", "统一 state/action 语义、episode、action chunk、horizon、控制频率、归一化和 mask。", "imitation", published_en="September 2026", published_zh="2026.09", level="入门"),
     Post("IL03", "25_action_generation_families.md", "action-generation-mse-token-diffusion-flow", "动作生成方法：MSE、Token、Diffusion 与 Flow Matching", "比较四类动作生成目标，区分网络架构、训练 target 与推理采样方式。", "imitation", published_en="September 2026", published_zh="2026.09", level="进阶"),
@@ -102,6 +104,39 @@ POSTS = [
         published_en="September 2026",
         published_zh="2026.09",
     ),
+    Post(
+        "TOUCH05",
+        "28_vla_touch_paper_reading_notes.md",
+        "vla-touch-dual-level-tactile-feedback",
+        "VLA-Touch 精读：高层触觉规划与低层动作修正",
+        "拆解外挂在 RDT 外部的双层触觉反馈：结构化触觉辅助 GPT-4o 规划，连续触觉通过 Interpolant Controller 修正动作。",
+        "tactile",
+        published_en="September 2026",
+        published_zh="2026.09",
+        level="前沿",
+    ),
+    Post(
+        "TOUCH06",
+        "29_omnivtla_paper_reading_notes.md",
+        "omnivtla-semantic-aligned-tactile-sensing",
+        "OmniVTLA 精读：语义对齐触觉感知接入 π0",
+        "从 ObjTac 和 SA-ViT 预训练出发，分析双触觉 encoder、prefix token 融合、flow matching 与多种机器人本体实验。",
+        "tactile",
+        published_en="September 2026",
+        published_zh="2026.09",
+        level="前沿",
+    ),
+    Post(
+        "TOUCH07",
+        "30_tactile_vla_physical_knowledge_paper_reading_notes.md",
+        "tactile-vla-physical-knowledge-force-control",
+        "Tactile-VLA 精读：物理知识、力动作与混合控制",
+        "分析触觉历史 token、Tactile-Aware Action Expert、位置—力混合控制，以及 CoT 纠错循环的能力与边界。",
+        "tactile",
+        published_en="September 2026",
+        published_zh="2026.09",
+        level="前沿",
+    ),
 ]
 
 
@@ -111,7 +146,7 @@ CHAINS = {
         "title_en": "Part 1: Foundations",
         "label_zh": "基础概念",
         "label_en": "Foundations",
-        "description": "先统一 token、encoder、Attention、CLIP、多模态融合和训练过程中的核心词汇。",
+        "description": "先统一 token、encoder、Attention、训练闭环、CLIP、多模态融合与一致性监督中的核心词汇。",
     },
     "imitation": {
         "title": "第二卷：模仿学习",
@@ -146,7 +181,7 @@ CHAINS = {
         "title_en": "Part 6: Tactile Representation and VLA",
         "label_zh": "触觉 VLA",
         "label_en": "Tactile VLA",
-        "description": "从 TVL 与 AnyTouch 的触觉表征，进入 Octopi 的语言推理和 FuSe 的动作决策。",
+        "description": "从 TVL、AnyTouch 的表征和 Octopi 的推理，进入 FuSe、VLA-Touch、OmniVTLA 与 Tactile-VLA 的动作和控制。",
     },
 }
 
