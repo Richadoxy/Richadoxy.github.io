@@ -266,6 +266,13 @@ LLM或robot policy
 - 实际感知—决策—执行频率；
 - 与开环VLA的关键差别。
 
+### 补充阅读：RDP 的慢速扩散与快速触觉闭环
+
+**Xue et al., Reactive Diffusion Policy: Slow-Fast Visual-Tactile Policy Learning for Contact-Rich Manipulation — RSS 2025**<br>
+[精读笔记](35_rdp_paper_reading_notes.md) · [arXiv](https://arxiv.org/abs/2503.02881v3) · [官方代码](https://github.com/xiaoxiaoxh/reactive_diffusion_policy)
+
+RDP 是任务特定的视觉—触觉模仿学习策略，可在阅读触觉 VLA 的执行时反馈机制时作为基础对照。重点理解 Fig. 5 中动作块、temporal ensembling 与慢快策略的反馈时序差异，以及 Fig. 6 中非对称 tokenizer 和潜在扩散策略的两阶段训练。论文同时展示 TactAR 如何改善示范质量，但快策略仍从记录下来的专家动作学习，不能凭触觉自动纠正系统性的差示范。
+
 ---
 
 ## 第四阶段：灵巧手与高自由度操作
@@ -375,7 +382,7 @@ LLM或robot policy
 
 ## 推荐的最短主线
 
-如果暂时不想读完全部论文，可以先按这12篇走：
+如果暂时不想读完全部论文，可以先按这13篇走：
 
 1. TVL：三模态语义对齐；
 2. Touch100k：触觉语言数据规模化；
@@ -388,7 +395,8 @@ LLM或robot policy
 9. ForceVLA：力觉、MoE和接触操作；
 10. DreamTacVLA：未来触觉预测；
 11. TacForcing：执行期闭环触觉；
-12. **Dexterous Arm-Hand VLA → MoDE-VLA：灵巧手与双臂高自由度操作。**
+12. RDP：潜在动作块与高频触觉解码；
+13. **Dexterous Arm-Hand VLA → MoDE-VLA：灵巧手与双臂高自由度操作。**
 
 这条主线对应：
 

@@ -57,6 +57,7 @@
 <li><a href="#13-taf-vlafd-vlaforcevla2">13. TaF-VLA、FD-VLA与ForceVLA2：成组阅读</a></li>
 <li><a href="#14-tacvlaat-vlarestacvlavitar">14. TacVLA、AT-VLA、ResTacVLA与ViTaR：比较融合机制</a></li>
 <li><a href="#15-tacforcing">15. TacForcing：执行时流式触觉反馈</a></li>
+<li><a href="#rdp">补充阅读：RDP 的慢速扩散与快速触觉闭环</a></li>
 </ul>
 </li>
 <li><a href="#_3">第四阶段：灵巧手与高自由度操作</a><ul>
@@ -90,7 +91,7 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span> · TOUCH00</p>
           <h1>触觉 VLA 与模仿学习阅读地图</h1>
-          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 11 min read</span><span data-lang="zh">入门 · 2026.09 · 约 11 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 12 min read</span><span data-lang="zh">入门 · 2026.09 · 约 12 分钟阅读</span></p>
           <p class="article-deck">按表征与数据、Language-Action、力控闭环、灵巧手和前沿专题，组织触觉 VLA 的渐进阅读顺序。</p>
           <div class="article-content">
             <blockquote>
@@ -351,6 +352,10 @@ LLM或robot policy
 <li>实际感知—决策—执行频率；</li>
 <li>与开环VLA的关键差别。</li>
 </ul>
+<h3 id="rdp">补充阅读：RDP 的慢速扩散与快速触觉闭环</h3>
+<p><strong>Xue et al., Reactive Diffusion Policy: Slow-Fast Visual-Tactile Policy Learning for Contact-Rich Manipulation — RSS 2025</strong><br>
+<a href="rdp-reactive-diffusion-policy.html">精读笔记</a> · <a href="https://arxiv.org/abs/2503.02881v3">arXiv</a> · <a href="https://github.com/xiaoxiaoxh/reactive_diffusion_policy">官方代码</a></p>
+<p>RDP 是任务特定的视觉—触觉模仿学习策略，可在阅读触觉 VLA 的执行时反馈机制时作为基础对照。重点理解 Fig. 5 中动作块、temporal ensembling 与慢快策略的反馈时序差异，以及 Fig. 6 中非对称 tokenizer 和潜在扩散策略的两阶段训练。论文同时展示 TactAR 如何改善示范质量，但快策略仍从记录下来的专家动作学习，不能凭触觉自动纠正系统性的差示范。</p>
 <hr />
 <h2 id="_3">第四阶段：灵巧手与高自由度操作</h2>
 <p>这一阶段需要同时理解遥操作数据、手臂—手指动作分解、触觉闭环和高维action建模。</p>
@@ -477,7 +482,7 @@ LLM或robot policy
 </ul>
 <hr />
 <h2 id="_5">推荐的最短主线</h2>
-<p>如果暂时不想读完全部论文，可以先按这12篇走：</p>
+<p>如果暂时不想读完全部论文，可以先按这13篇走：</p>
 <ol>
 <li>TVL：三模态语义对齐；</li>
 <li>Touch100k：触觉语言数据规模化；</li>
@@ -490,6 +495,7 @@ LLM或robot policy
 <li>ForceVLA：力觉、MoE和接触操作；</li>
 <li>DreamTacVLA：未来触觉预测；</li>
 <li>TacForcing：执行期闭环触觉；</li>
+<li>RDP：潜在动作块与高频触觉解码；</li>
 <li><strong>Dexterous Arm-Hand VLA → MoDE-VLA：灵巧手与双臂高自由度操作。</strong></li>
 </ol>
 <p>这条主线对应：</p>

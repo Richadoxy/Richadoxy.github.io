@@ -133,6 +133,17 @@ POSTS = [
         published_zh="2026.09",
         level="前沿",
     ),
+    Post(
+        "TOUCH08",
+        "35_rdp_paper_reading_notes.md",
+        "rdp-reactive-diffusion-policy",
+        "RDP 精读：动作块中的触觉闭环与示范质量",
+        "从 Fig. 5 的反馈时序和 Fig. 6 的两阶段训练出发，理解慢速潜在扩散、快速触觉解码、TactAR 数据采集及示范质量边界。",
+        "tactile",
+        published_en="October 2026",
+        published_zh="2026.10",
+        level="前沿",
+    ),
 ]
 
 
@@ -185,7 +196,7 @@ CHAINS = {
         "title_en": "Part 6: Tactile Representation and VLA",
         "label_zh": "触觉 VLA",
         "label_en": "Tactile VLA",
-        "description": "从 TVL、AnyTouch 的表征和 Octopi 的推理，进入 FuSe、VLA-Touch、OmniVTLA 与 Tactile-VLA 的动作和控制。",
+        "description": "从 TVL、AnyTouch 的表征和 Octopi 的推理，进入 FuSe、VLA-Touch、OmniVTLA、Tactile-VLA 与 RDP 的动作和控制。",
     },
 }
 
@@ -511,7 +522,7 @@ def main() -> None:
     for index, post in enumerate(POSTS):
         raw = (source_copy_dir / post.source).read_text(encoding="utf-8")
         reading_times[post.code] = reading_time(raw)
-        raw_without_title = re.sub(r"^# .+?\n+", "", raw, count=1)
+        raw_without_title = re.sub(r"^[ \t]*# .+?\n+", "", raw, count=1)
         rewritten = rewrite_links(raw_without_title, posts_by_source)
         rewritten, math_replacements = protect_math(rewritten)
         md = markdown.Markdown(extensions=["fenced_code", "tables", "toc", "sane_lists"])

@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="从 Fig. 5 的反馈时序和 Fig. 6 的两阶段训练出发，理解慢速潜在扩散、快速触觉解码、TactAR 数据采集及示范质量边界。" />
+    <title>RDP 精读：动作块中的触觉闭环与示范质量 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#0">0. 核心命题</a></li>
+<li><a href="#1">1. 为什么触觉进入策略后，问题仍没有解决</a></li>
+<li><a href="#2-fig-5">2. Fig. 5：四种动作执行方式比较</a><ul>
+<li><a href="#21-a-action-chunk">2.1 (a) 普通 action chunk：块内动作已经定好</a></li>
+<li><a href="#22-b-temporal-ensembling">2.2 (b) Temporal ensembling：重算动作块，再平均相同时间点的预测</a></li>
+<li><a href="#23-c-rdp-latent">2.3 (c) RDP：固定一段 latent，让最新触觉参与动作解码</a></li>
+<li><a href="#24-d">2.4 (d) 人类抓杯子的类比</a></li>
+</ul>
+</li>
+<li><a href="#3-fig-6">3. Fig. 6 左：先训练快解码器，再训练慢扩散策略</a><ul>
+<li><a href="#31-asymmetric-tokenizerat">3.1 第一阶段：Asymmetric Tokenizer（AT）</a></li>
+<li><a href="#32-latent-diffusion-policyldp">3.2 第二阶段：Latent Diffusion Policy（LDP）</a></li>
+</ul>
+</li>
+<li><a href="#4-fig-6">4. Fig. 6 右：运行时哪些信息复用，哪些信息更新</a></li>
+<li><a href="#5-tactar">5. TactAR 与触觉表示：数据质量是方法的一部分</a></li>
+<li><a href="#6">6. 实验应该如何解读</a></li>
+<li><a href="#7">7. 触觉闭环的上限：执行偏差与示范偏差</a></li>
+<li><a href="#8-vla">8. 放到触觉 VLA 研究链中的位置</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span> · TOUCH08</p>
+          <h1>RDP 精读：动作块中的触觉闭环与示范质量</h1>
+          <p class="article-meta"><span data-lang="en">前沿 · October 2026 · 13 min read</span><span data-lang="zh">前沿 · 2026.10 · 约 13 分钟阅读</span></p>
+          <p class="article-deck">从 Fig. 5 的反馈时序和 Fig. 6 的两阶段训练出发，理解慢速潜在扩散、快速触觉解码、TactAR 数据采集及示范质量边界。</p>
+          <div class="article-content">
+            <blockquote>
+<p>Han Xue、Jieji Ren、Wendi Chen 等，<em>Reactive Diffusion Policy: Slow-Fast Visual-Tactile Policy Learning for Contact-Rich Manipulation</em>，RSS 2025。本文依据 <a href="https://arxiv.org/abs/2503.02881v3">arXiv v3</a> 整理。相关资料：<a href="https://reactive-diffusion-policy.github.io/">项目主页</a> · <a href="https://github.com/xiaoxiaoxh/reactive_diffusion_policy">官方代码</a>。</p>
+<p>阅读前可参考：<a href="action-generation-mse-token-diffusion-flow.html">动作生成方法</a>、<a href="vla-online-runtime-sync-async.html">VLA 在线执行</a>与<a href="16-tactile-vla-reading-guide.html">触觉 VLA 阅读地图</a>。本文重点是 Fig. 5 的反馈时序、Fig. 6 的两阶段训练，以及触觉闭环与示范质量之间的关系。</p>
+</blockquote>
+<h2 id="0">0. 核心命题</h2>
+<p>RDP 解决的主要矛盾是：<strong>动作块有利于生成连贯、可能多模态的操作轨迹，但接触状态会在动作块执行期间快速改变。</strong> 如果机器人只在生成动作块时读取触觉，执行中的新触觉就要等下一次规划才能改变动作。</p>
+<p>作者把这两个职责交给不同频率的模块：</p>
+<pre><code class="language-text">低频视觉、本体状态与触觉 ─→ Latent Diffusion Policy（慢）─→ 潜在动作块 Z
+                                                           │
+不断更新的触觉／力反馈 ─────────→ Asymmetric Tokenizer Decoder（快）
+                                                           ↓
+                                                当前要执行的具体动作
+</code></pre>
+<p>慢网络负责生成一段动作的潜在表示；快网络反复结合最新触觉，把这段表示解码成具体动作。RDP 同时提出 TactAR，通过 AR 把接触信息呈现给遥操作者，以采集更稳定、包含反应行为的示范数据。</p>
+<p>这是一篇<strong>任务特定的视觉—触觉模仿学习论文</strong>。RDP 本身不输入语言指令，不是预训练的通用 VLA，也没有在线更新策略参数的强化学习环节。</p>
+<hr />
+<h2 id="1">1. 为什么触觉进入策略后，问题仍没有解决</h2>
+<p>以机器人削黄瓜为例。视觉和当前触觉可以帮助模型预测“接近黄瓜、建立接触、沿表面向下削”的动作块。但开始执行后，黄瓜可能被人移动，或表面曲率发生变化：</p>
+<ul>
+<li>受力突然增大时，需要轻微退开；</li>
+<li>接触丢失时，需要重新贴近；</li>
+<li>工具方向偏离表面时，需要调整姿态。</li>
+</ul>
+<p>把触觉加入动作块生成时的观测，只能保证<strong>生成时</strong>参考了触觉。若随后按原计划连续执行，块内新产生的触觉仍不能及时修正后续动作。因此，要区分两个问题：</p>
+<ol>
+<li>模型是否能表示触觉？</li>
+<li>触觉变化后，下一个动作能否及时改变？</li>
+</ol>
+<p>普通 Diffusion Policy 可以通过滚动重规划形成闭环；论文所说的“开环”，特指<strong>一次动作块执行期间</strong>的反馈空窗。RDP 的目标是在保留较长动作上下文的同时，缩短这段空窗。</p>
+<hr />
+<h2 id="2-fig-5">2. Fig. 5：四种动作执行方式比较</h2>
+<p><a href="https://arxiv.org/pdf/2503.02881v3#page=5">原文 Fig. 5</a> 中，灰色实心方块表示低频观测，橙色虚线方块表示预测的具体动作。图 (c) 额外使用橙色实心方块表示潜在动作，红色方块表示触觉／力反馈。横向的 \(t=0,1,2,3\) 是<strong>示意性的机器人执行时间</strong>，不是扩散模型的去噪步骤，也不代表每格恰好一秒。</p>
+<h3 id="21-a-action-chunk">2.1 (a) 普通 action chunk：块内动作已经定好</h3>
+<p>在 \(t=0\) 读取观测后，策略一次预测一段具体动作，随后依次发送：</p>
+<pre><code class="language-text">t=0  观测 → 预测 [a₀, a₁, a₂] → 执行 a₀
+t=1                         → 执行 a₁
+t=2                         → 执行 a₂
+t=3  重新观测、预测下一段动作
+</code></pre>
+<p>如果执行 \(a_0\) 后受力突然增大，\(a_1,a_2\) 仍来自旧预测。反馈要到下一次重规划才能发挥作用，这就是图右侧的 <em>open-loop during chunk execution</em>。</p>
+<h3 id="22-b-temporal-ensembling">2.2 (b) Temporal ensembling：重算动作块，再平均相同时间点的预测</h3>
+<p>策略在多个时刻重新观测并预测动作块。对同一个未来执行时刻，可能有多份不同时间生成的预测；实际动作是它们的加权平均。例如要执行 \(a_2\) 时，会汇总 \(t=0,1,2\) 三次预测中各自针对 \(t=2\) 的结果。</p>
+<p>图中的虚线连接的是<strong>同一执行时刻的多个候选动作</strong>，并非把前后不同时间的动作混在一起平均。最新观测能够影响输出，所以图称之为 <em>semi-closed-loop</em>。但权重偏向旧预测时反应慢，偏向新预测时又可能削弱动作连续性；此外，每次更新都需要重新运行较重的策略。</p>
+<p>论文在擦拭任务中尝试缩短动作块或调整 temporal ensembling 权重，发现抓取和抗扰表现会受影响。这支持作者的设计动机，但不意味着短动作块或 temporal ensembling 在所有任务上必然失败。</p>
+<h3 id="23-c-rdp-latent">2.3 (c) RDP：固定一段 latent，让最新触觉参与动作解码</h3>
+<p>慢网络在 \(t=0\) 生成的是潜在动作块 \(Z\)，还不是机器人可执行的具体动作。快网络结合 \(Z\) 与当前触觉生成 \(\hat a_0\)；在 \(t=1,2\) 继续使用这段 \(Z\)，但读取更新后的触觉并重新生成后续动作。到 \(t=3\)，慢网络再生成下一段 latent。</p>
+<pre><code class="language-text">t=0  慢网络生成 Z；快网络读取 Z + F₀ → Â₀
+t=1  复用 Z；       快网络读取 Z + 新触觉 → Â₁
+t=2  复用 Z；       快网络读取 Z + 新触觉 → Â₂
+t=3  慢网络更新 Z；快网络继续逐步解码
+</code></pre>
+<p>同一份 \(Z\) 遇到不同接触历史，可以产生不同具体动作。图中叠放的粉色框表示<strong>同一个快网络反复调用</strong>。快网络直接输出动作，并非论文明确规定的“原动作加触觉残差”结构。</p>
+<h3 id="24-d">2.4 (d) 人类抓杯子的类比</h3>
+<p>人先根据视觉形成“伸手抓住杯子”的整体运动，再根据是否接触、握得是否足够、是否滑动等触觉信息持续调整手指。这个类比帮助理解快慢分工，但 RDP 的 latent 是学习得到的连续数值表示，不是显式的语言计划或技能标签。</p>
+<hr />
+<h2 id="3-fig-6">3. Fig. 6 左：先训练快解码器，再训练慢扩散策略</h2>
+<p><a href="https://arxiv.org/pdf/2503.02881v3#page=6">原文 Fig. 6</a> 左边展示两个顺序训练阶段。理解它的关键是：<strong>训练时 latent 来自专家动作编码，部署时 latent 来自慢网络预测；快解码器连接两者。</strong></p>
+<h3 id="31-asymmetric-tokenizerat">3.1 第一阶段：Asymmetric Tokenizer（AT）</h3>
+<p>数据集中有同步的专家动作序列 \(A\) 和触觉／力反馈序列 \(F\)。AT 使用 1D CNN 编码器 \(E\) 把动作块压缩成 \(Z=E(A)\)，再使用 GRU 解码器 \(D\) 重建动作：</p>
+<p>\[
+Z=E(A),\qquad \hat A=D(Z,F).
+\]</p>
+<p>编码器沿时间维度压缩动作序列；论文默认预测 horizon 为 32 个 24 Hz 动作时刻，时间下采样比例为 4。解码器沿时间顺序读取 latent 与对应触觉，并用 GRU 状态保留过去的信息。训练目标是动作重建的 \(L_1\) 误差，加一个系数很小的 KL 正则项：</p>
+<p>\[
+\mathcal L_{\mathrm{AT}}
+=\lVert A-\hat A\rVert_1+\lambda_{\mathrm{KL}}\mathcal L_{\mathrm{KL}},
+\qquad \lambda_{\mathrm{KL}}=10^{-6}.
+\]</p>
+<p>所谓 <em>asymmetric</em>，是指<strong>编码器只读动作，解码器读 latent 和触觉</strong>。作者希望 latent 主要承载较稳定的动作过程，而触觉条件帮助解码器处理具体接触调整。这个输入设计鼓励分工，却不构成严格的信息解耦证明：编码器读取的专家动作本身已经包含接触修正。这里的 tokenizer 也不是语言模型的离散词表；论文默认实现使用连续 latent。</p>
+<h3 id="32-latent-diffusion-policyldp">3.2 第二阶段：Latent Diffusion Policy（LDP）</h3>
+<p>真实部署没有未来专家动作可供编码。因此，作者用已经训练好的编码器，把示范动作映射成训练目标 \(Z_0=E(A)\)，再训练慢网络从低频观测 \(O\) 生成它。</p>
+<p>训练时给 \(Z_0\) 加噪，1D U-Net 接收带噪 latent、观测条件和扩散步数，学习预测所加噪声：</p>
+<p>\[
+\mathcal L_{\mathrm{LDP}}
+=\mathbb E\bigl[\lVert\epsilon-\epsilon_\theta(Z_k,O,k)\rVert_2^2\bigr].
+\]</p>
+<p>这里 \(k\) 是<strong>扩散去噪步骤</strong>，与 Fig. 6 右边机器人执行时间的 \(t\) 不同。部署时慢网络从随机噪声反复去噪，得到可交给 AT 解码器的 latent。</p>
+<p>慢网络的观测条件包含视觉、本体状态和低频触觉／力觉。因此快慢之分是<strong>调用频率、计算量及在动作生成中的职责</strong>，并不是“慢网络只看视觉、快网络只看触觉”。</p>
+<hr />
+<h2 id="4-fig-6">4. Fig. 6 右：运行时哪些信息复用，哪些信息更新</h2>
+<p>Fig. 6 右侧的 \(O_{-1},O_0\) 表示已有的低频观测历史。慢网络据此生成一段潜在动作；快网络先用当前反馈 \(F_0\) 生成 \(\hat A_0\)，执行后再读取新反馈，依次生成 \(\hat A_1,\hat A_2\)。红色方块逐渐增多，表示可利用的<strong>过去及当前触觉历史</strong>，不是未来触觉。</p>
+<p>到图中的 \(t=3\)，慢网络获取新观测，生成下一段 latent，快网络继续按最新触觉解码。因而图中的 <em>autoregressive decoding</em> 指动作沿执行时间顺序生成、GRU 利用此前信息；不应与扩散模型的去噪迭代混为一谈。</p>
+<table>
+<thead>
+<tr>
+<th>时钟或过程</th>
+<th style="text-align: right;">论文实机设置</th>
+<th>负责什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>慢网络观测序列</td>
+<td style="text-align: right;">12 Hz</td>
+<td>提供图像、状态与低频触觉条件</td>
+</tr>
+<tr>
+<td>慢网络调用</td>
+<td style="text-align: right;">约 1–2 Hz</td>
+<td>周期性生成新的潜在动作块</td>
+</tr>
+<tr>
+<td>快网络触觉输入与动作更新</td>
+<td style="text-align: right;">24 Hz</td>
+<td>在块内读取新反馈并生成动作</td>
+</tr>
+<tr>
+<td>机器人底层命令</td>
+<td style="text-align: right;">大于 500 Hz</td>
+<td>插值并跟踪动作目标</td>
+</tr>
+</tbody>
+</table>
+<p>论文报告在 RTX 4090 上，慢网络推理约 100 ms，快网络不足 1 ms；<strong>不足 1 ms 是网络计算时间，并非传感器到机器人动作的端到端延迟</strong>。光学触觉相机、数据传输和实际执行仍有延迟。24 Hz 是论文实机验证的快策略频率；更高频率属于方法潜力，不能当作实测结果。</p>
+<p>部署还依赖相对末端轨迹与延迟匹配。前者让动作块相对于固定参考位姿表示，后者跳过因推理和执行延迟而已经过期的动作，以减少新旧动作块交接时的跳变。这些细节在接触任务中会直接影响受力。</p>
+<hr />
+<h2 id="5-tactar">5. TactAR 与触觉表示：数据质量是方法的一部分</h2>
+<p>TactAR 让遥操作者在 Quest 3 的 AR 画面中看到附着于机器人末端的形变／力场，以及可选的 RGB 和触觉相机画面。它提供的是<strong>视觉化的接触反馈</strong>，不是把反作用力物理地施加到操作者手上的力反馈设备。</p>
+<p>对于 GelSight Mini 和 MCTac，系统跟踪凝胶表面 marker 的二维位移，并将形变场可视化。训练策略时，论文对 marker 位移场做 PCA，得到 15 维低维触觉特征；力觉实验则直接输入机器人估计的 6 维力／力矩 \([f_x,f_y,f_z,\tau_x,\tau_y,\tau_z]\)。PCA 主成分可以反映受力模式，但不是经标定、以牛顿为单位的测量值。</p>
+<p>作者分别采集了削皮 60 条、擦拭 80 条、双臂提杯 50 条任务示范，并主动纳入一些反应行为。10 名用户的削皮遥操作研究中，可视化接触反馈把归一化削皮长度从 0.72 提高到 0.91，把受力稳定比例从 0.58 提高到 0.87。相同数量的削皮示范，若改用没有接触反馈的传统 VR 遥操作，训练出的 RDP 得分下降超过 30%。</p>
+<p>这些结果说明：快解码器要从数据中学到“受力变化后怎样调整”，示范里就需要出现较稳定、可学习的反馈—动作对应关系。传感器与动作同步记录，只保证相关信号存在；它本身不会产生高质量反应行为。</p>
+<hr />
+<h2 id="6">6. 实验应该如何解读</h2>
+<p>论文在削皮、擦拭和双臂夹持纸杯并提起三个真实任务上测试。下表是各任务的<strong>总体评分</strong>，不是统一定义的成功率；不同任务的评分规则不同。</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th style="text-align: right;">削皮</th>
+<th style="text-align: right;">擦拭</th>
+<th style="text-align: right;">双臂提杯</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>纯视觉 Diffusion Policy</td>
+<td style="text-align: right;">0.44</td>
+<td style="text-align: right;">0.57</td>
+<td style="text-align: right;">0.00</td>
+</tr>
+<tr>
+<td>Diffusion Policy + 触觉 embedding</td>
+<td style="text-align: right;">0.39</td>
+<td style="text-align: right;">0.50</td>
+<td style="text-align: right;">0.08</td>
+</tr>
+<tr>
+<td>RDP + 光学触觉</td>
+<td style="text-align: right;">0.90</td>
+<td style="text-align: right;">0.77</td>
+<td style="text-align: right;">0.48</td>
+</tr>
+<tr>
+<td>RDP + 力／力矩</td>
+<td style="text-align: right;">0.95</td>
+<td style="text-align: right;">0.87</td>
+<td style="text-align: right;">0.70</td>
+</tr>
+</tbody>
+</table>
+<p>光学触觉列中，削皮与擦拭采用 GelSight；双臂提杯同时使用 GelSight 和 MCTac。削皮实验另报告 MCTac 版本总体得分 0.88。</p>
+<p>最能体现反馈时序差异的是接触后的扰动：削皮时，DP + 触觉 embedding 得分 0.15，RDP + GelSight 得分 0.80。普通 DP 即使在预测时读了触觉，剩余动作块仍可能很快过期；RDP 的快解码器能够在后续动作中使用新反馈。</p>
+<p>附录 Table VI 的削皮消融提供了另外两条线索：</p>
+<table>
+<thead>
+<tr>
+<th>设置</th>
+<th style="text-align: right;">总体得分</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RDP，完整 6 维 wrench</td>
+<td style="text-align: right;">0.95</td>
+</tr>
+<tr>
+<td>只保留法向力</td>
+<td style="text-align: right;">0.48</td>
+</tr>
+<tr>
+<td>编码器也读取触觉的对称 tokenizer</td>
+<td style="text-align: right;">0.58</td>
+</tr>
+</tbody>
+</table>
+<p>这支持该削皮设置中剪切／扭转相关信息和非对称结构的价值。对其他传感器与任务，仍需重新验证其贡献。</p>
+<p>实验也有清晰边界：每个测试变化条件通常仅有 10 次试验；跨 GelSight、MCTac 与力觉的结果表明框架可以适配多种传感器，不等同于<strong>同一个权重零样本更换传感器</strong>。三项任务使用平行夹爪，不能直接视作已验证全掌触觉或灵巧手控制。</p>
+<hr />
+<h2 id="7">7. 触觉闭环的上限：执行偏差与示范偏差</h2>
+<p>RDP 的“动作修正”要结合训练目标理解。设操作者示范的整体策略合理，但部署时黄瓜突然移动；只要示范覆盖过类似的触觉变化及其后续调整，快解码器就有机会及时修正<strong>执行偏差</strong>。</p>
+<p>另一种情况是<strong>示范动作本身长期不理想</strong>：例如操作者缺少接触反馈，每次受力过大仍持续压入。AT 的 \(L_1\) 损失会把这些实际记录的动作当作重建目标。若训练集中没有更好的反应，仅输入触觉并不会告诉模型“应该退开多少”。RDP 在部署时根据反馈改变动作，但不通过任务结果在线更新策略参数。</p>
+<p>因此，触觉提供的是接触状态；要超越示范，还需要额外说明什么行为更好：</p>
+<table>
+<thead>
+<tr>
+<th>改进依据</th>
+<th>典型用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>更稳定的接触可视化与遥操作</td>
+<td>从数据采集阶段改善示范动作</td>
+</tr>
+<tr>
+<td>目标力与低层反馈控制</td>
+<td>将局部受力误差转为运动修正</td>
+</tr>
+<tr>
+<td>人类接管与纠正</td>
+<td>补充策略容易失败的状态及恢复行为</td>
+</tr>
+<tr>
+<td>任务成功、损坏、滑落等评价</td>
+<td>通过交互优化策略，而非只复现动作标签</td>
+</tr>
+</tbody>
+</table>
+<p>这不意味着每条示范必须完美。偶发噪声可以被多条数据的共同规律缓解；更棘手的是系统性的错误、缺少恢复样本，以及无法区分成功与失败动作。失败数据仍可用于训练失败预测或评价模型，但不能无区别地当成正确动作监督。</p>
+<hr />
+<h2 id="8-vla">8. 放到触觉 VLA 研究链中的位置</h2>
+<table>
+<thead>
+<tr>
+<th>工作</th>
+<th>重点</th>
+<th>与 RDP 的关系</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="15-tvl-touch-vision-language-alignment.html">TVL</a>、<a href="18-anytouch-unified-tactile-representation.html">AnyTouch</a></td>
+<td>触觉语义对齐、跨传感器与时序表示</td>
+<td>主要改善策略可读取的触觉信息</td>
+</tr>
+<tr>
+<td><a href="omnivtla-semantic-aligned-tactile-sensing.html">OmniVTLA</a></td>
+<td>触觉 token 进入 π0 的视觉语言前缀</td>
+<td>增强触觉表示及策略融合，执行时仍需考虑更新频率</td>
+</tr>
+<tr>
+<td><a href="tactile-vla-physical-knowledge-force-control.html">Tactile-VLA</a></td>
+<td>触觉条件的目标位置、目标力与混合控制</td>
+<td>提供显式力动作和低层力控制接口</td>
+</tr>
+<tr>
+<td><a href="vla-touch-dual-level-tactile-feedback.html">VLA-Touch</a></td>
+<td>高层属性规划与外部动作修正器</td>
+<td>从已有 VLA 动作出发改进接触执行</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/abs/2606.17055">T-Rex</a></td>
+<td>缓存视觉语言上下文，触觉专家继续分段 flow</td>
+<td>延续慢速规划、快速接触反馈的问题意识，机制不同</td>
+</tr>
+<tr>
+<td><strong>RDP</strong></td>
+<td>潜在动作块加高频触觉条件解码</td>
+<td>突出动作块执行期间的反馈时序</td>
+</tr>
+</tbody>
+</table>
+<p>RDP 最重要的启发是：<strong>触觉表示得好，不会自动让它及时改变机器人动作；反馈通路与运行频率必须一起设计。</strong> 对全掌触觉灵巧操作，可以把慢模块用于任务、物体和目标接触区域，把快模块用于实时接触变化。不过，RDP 使用低维 PCA 或 wrench，并未解决“语言中的拇指侧／小拇指侧”如何对齐到具体手指与掌区，也没有验证多物体接触分配。</p>
+<p>进一步研究应把三个问题分开评估：触觉是否保留了必要的空间与动态信息；新触觉能否及时改变动作；动作改变后是否真正提高接触稳定性、区域正确率和任务结果。RDP 清楚展示了第二个问题的重要性，也为第三个问题提供了真实机器人证据；第一个问题和跨任务泛化仍留有充分研究空间。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="tactile-vla-physical-knowledge-force-control.html">← TOUCH07 · Tactile-VLA 精读：物理知识、力动作与混合控制</a>
+            <span></span>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>
