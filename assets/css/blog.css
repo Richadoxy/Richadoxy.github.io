@@ -367,6 +367,13 @@
   color: var(--text-soft);
 }
 
+.article-content mjx-container[display="true"] {
+  max-width: 100%;
+  padding: 0.3rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .article-content table {
   width: 100%;
   margin: 1rem 0;

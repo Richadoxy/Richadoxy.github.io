@@ -2,6 +2,8 @@
 
 DataLoader 准备好 batch 后，训练还需要一个保存“模型当前状态”的对象，这就是 `TrainState`。
 
+> 本文跟踪 BrainCo-IL 的训练入口与配置约定。官方 openpi 的参数过滤和 π₀.₅微调范围见 [FAST 与 KI](42_fast_ki_and_pi_training.md)；两份代码的字段和训练配方需要分别核对。
+
 ## 1. TrainState 包含什么
 
 [`TrainState`](../../src/openpi/training/utils.py) 可以概括为：
@@ -115,6 +117,10 @@ TrainState.model_def + params
 ```
 
 `freeze_strategy` 在这里真正生效：冻结参数仍参与前向计算，但不产生用于更新的梯度。
+
+冻结参数与截断激活梯度是两种操作：冻结某层权重，不代表经过该层传给其他可训练输入或适配器的梯度也被截断。KI 则在 Action Expert 读取 VLM K/V 的路径上使用 `stop-gradient`，并用 FAST/文字 loss 继续训练 VLM。仅从 `trainable_filter` 无法判断一个训练步骤是否实现了 KI。
+
+官方 openpi 的公开 π₀.₅路径只计算 flow loss；全参、LoRA、冻结策略改变该损失可更新的参数集合。加载 KI 训练过的权重不会自动增加另一条 loss。检查一次实验时，需要同时追踪 `compute_loss`、梯度边界和参数过滤。[官方模型代码](https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py)
 
 ## 7. checkpoint 中保存什么
 

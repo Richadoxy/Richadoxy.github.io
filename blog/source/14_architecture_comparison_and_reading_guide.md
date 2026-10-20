@@ -70,8 +70,10 @@ current image + language -> Qwen latent/action conditions
 | VLM–Action 连接 | 每层 masked joint attention | cross-attention to VLM memory | 不强制改变 | `z_a`/context condition Action Head |
 | state 入口 | 默认离散 state prompt | continuous state token | execution-time future state | State Encoder -> DiT |
 | timestep | adaRMS condition | Action Encoder fusion + AdaLN | 沿用基础模型 | DiT condition |
-| 主要训练 loss | flow matching | flow matching | flow loss不变、改样本 offset | `L_FM + βL_WM` |
+| 主要训练 loss | 公开微调：flow；论文训练另含 FAST，见下文 | flow matching | flow loss不变、改样本 offset | `L_FM + βL_WM` |
 | 部署附加模块 | 无 | 无 | async chunk manager | teacher/predictor 移除 |
+
+表中 PI0.5 的 flow matching 指公开 openpi 的连续动作微调路径。原始论文还使用 FAST 离散目标，发布 checkpoint 使用后续 KI 配方；完整训练需要把动作表示、阶段安排和梯度路径一起比较，详见 [FAST 与 KI](42_fast_ki_and_pi_training.md)。
 
 ## 4. 典型 hidden widths
 
@@ -136,6 +138,8 @@ VLA-JEPA world predictor：
 | 模块 | 训练 | 推理 |
 | --- | --- | --- |
 | PI0.5 flow noise/target action | 需要 | 不需要真实 action，只需要初始 noise |
+| PI0.5 FAST 动作目标 / CE | 论文联合训练与 KI 配方使用；公开 flow-only 微调不含 | 连续动作部署路径不生成这些 token |
+| KI 的 K/V stop-gradient | 指定梯度边界，VLM 仍由离散目标更新 | 不改变前向数值，无需额外采样步骤 |
 | VLASH temporal offset dataset | 需要 | 不需要 dataset offset sampling |
 | VLASH async scheduler | 不属于模型训练 | 需要 |
 | VLA-JEPA Frozen V-JEPA2 | 需要 target | 移除 |
@@ -180,6 +184,10 @@ both
 
 错误。Prefix/Action expert 由模态固定分配，不是 router top-k 选择。
 
+### 误区 8：冻结参数或设置 attention mask 就等于 KI
+
+冻结决定参数是否更新，attention mask 决定前向能读哪些位置，KI 的 stop-gradient 决定 flow 损失能否回传到 VLM。完整 KI 还用离散动作监督使主干继续适应机器人任务。
+
 ## 9. 阅读一篇新 VLA 论文的顺序
 
 建议不要从模型名字开始，而是依次回答以下问题。
@@ -219,6 +227,8 @@ flow matching/diffusion？
 latent prediction？
 world-model loss？
 哪些参数被冻结？
+每个 loss 更新哪些参数？
+论文训练配方与公开微调代码相同吗？
 ```
 
 ### 第五步：推理与部署
@@ -262,6 +272,7 @@ VLASH 的 offset 应依据 observation 到实际 handoff 的完整延迟；Actio
 - [VLASH 训练与异步运行图](vlash.drawio)
 - [VLA-JEPA 结构图](vla_jepa_structure.drawio)
 - [PI0.5 代码架构说明](04_pi05_architecture.md)
+- [FAST 与 KI：动作监督、梯度与微调](42_fast_ki_and_pi_training.md)
 - [BrainCo-IL VLASH 实现说明](07_vlash_integration.md)
 
 如果只记住一条主线，可以记成：

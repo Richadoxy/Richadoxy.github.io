@@ -50,10 +50,13 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 4: OpenPI / BrainCo Engineering</span><span data-lang="zh">第四卷：OpenPI / BrainCo 工程实践</span> · ENG04</p>
           <h1>TrainState、JIT 与 Checkpoint</h1>
-          <p class="article-meta"><span data-lang="en">进阶 · August 2026 · 2 min read</span><span data-lang="zh">进阶 · 2026.08 · 约 2 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">进阶 · August 2026 · 3 min read</span><span data-lang="zh">进阶 · 2026.08 · 约 3 分钟阅读</span></p>
           <p class="article-deck">理解参数初始化、优化器状态、JIT 编译边界、分片方式以及训练恢复流程。</p>
           <div class="article-content">
             <p>DataLoader 准备好 batch 后，训练还需要一个保存“模型当前状态”的对象，这就是 <code>TrainState</code>。</p>
+<blockquote>
+<p>本文跟踪 BrainCo-IL 的训练入口与配置约定。官方 openpi 的参数过滤和 π₀.₅微调范围见 <a href="fast-ki-pi-training.html">FAST 与 KI</a>；两份代码的字段和训练配方需要分别核对。</p>
+</blockquote>
 <h2 id="1-trainstate">1. TrainState 包含什么</h2>
 <p><a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/training/utils.py"><code>TrainState</code></a> 可以概括为：</p>
 <pre><code class="language-text">TrainState
@@ -151,6 +154,8 @@
   -&gt; 写回参数并 step + 1
 </code></pre>
 <p><code>freeze_strategy</code> 在这里真正生效：冻结参数仍参与前向计算，但不产生用于更新的梯度。</p>
+<p>冻结参数与截断激活梯度是两种操作：冻结某层权重，不代表经过该层传给其他可训练输入或适配器的梯度也被截断。KI 则在 Action Expert 读取 VLM K/V 的路径上使用 <code>stop-gradient</code>，并用 FAST/文字 loss 继续训练 VLM。仅从 <code>trainable_filter</code> 无法判断一个训练步骤是否实现了 KI。</p>
+<p>官方 openpi 的公开 π₀.₅路径只计算 flow loss；全参、LoRA、冻结策略改变该损失可更新的参数集合。加载 KI 训练过的权重不会自动增加另一条 loss。检查一次实验时，需要同时追踪 <code>compute_loss</code>、梯度边界和参数过滤。<a href="https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py">官方模型代码</a></p>
 <h2 id="7-checkpoint">7. checkpoint 中保存什么</h2>
 <p><a href="https://github.com/YINJIAJU1123/BrainCo-IL/blob/feature/vlash-integration/src/openpi/training/checkpoints.py"><code>checkpoints.save_state()</code></a> 每个保存步写入：</p>
 <pre><code class="language-text">&lt;step&gt;/

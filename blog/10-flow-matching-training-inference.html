@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="../assets/css/main.css" />
     <link rel="stylesheet" href="../assets/css/blog.css" />
     <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
   </head>
   <body>
     <header class="site-header">
@@ -34,17 +35,22 @@
           <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
           <div class="toc">
 <ul>
-<li><a href="#1">1. 三个最重要的对象</a></li>
+<li><a href="#1">1. 三个最重要的对象</a><ul>
+<li><a href="#11">1.1 从一个答案到一条生成路径</a></li>
+<li><a href="#12">1.2 噪声、干净动作和速度是不同参数化</a></li>
+<li><a href="#13">1.3 三种时间与两种速度</a></li>
+</ul>
+</li>
 <li><a href="#2-pi05">2. PI0.5 的约定</a></li>
 <li><a href="#3-gr00t">3. GR00T 的方向约定</a></li>
-<li><a href="#4-timestep">4. timestep 为什么不是监督目标</a></li>
-<li><a href="#5">5. 训练时存在推理去噪步数吗</a></li>
-<li><a href="#6-40k-training-steps-loss">6. 40k training steps 对应多少次 loss</a></li>
-<li><a href="#7">7. 训练时反向更新什么</a></li>
-<li><a href="#8-action">8. 推理如何从噪声得到 action</a></li>
+<li><a href="#4-timestep">4. timestep 提供噪声阶段条件</a></li>
+<li><a href="#5">5. 单次训练前向与多步推理</a></li>
+<li><a href="#6">6. 训练步数、样本数与损失聚合</a></li>
+<li><a href="#7">7. 梯度路径与参数更新</a></li>
+<li><a href="#8">8. 推理：从噪声到动作的数值积分</a></li>
 <li><a href="#9-action-chunk-tensor">9. action chunk、模型内部 tensor 与有效输出</a></li>
 <li><a href="#10-flow-matching">10. Flow Matching 与异步执行是两个层级</a></li>
-<li><a href="#11-flow-matching">11. 阅读 Flow Matching 代码的检查表</a></li>
+<li><a href="#11_1">11. 从路径定义到部署接口</a></li>
 </ul>
 </div>
 
@@ -54,7 +60,7 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 3: VLA Architectures</span><span data-lang="zh">第三卷：VLA 核心架构</span> · VLA01</p>
           <h1>Flow Matching：训练、timestep 与推理</h1>
-          <p class="article-meta"><span data-lang="en">进阶 · August 2026 · 4 min read</span><span data-lang="zh">进阶 · 2026.08 · 约 4 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">进阶 · August 2026 · 7 min read</span><span data-lang="zh">进阶 · 2026.08 · 约 7 分钟阅读</span></p>
           <p class="article-deck">从插值路径、velocity target 和 timestep condition 出发，区分训练采样与推理积分。</p>
           <div class="article-content">
             <p>Flow matching 在 PI0.5、GR00T 和 VLA-JEPA Action Head 中承担同一类任务：学习一个速度场，把随机噪声逐步变成 action chunk。</p>
@@ -64,7 +70,71 @@
 ε：同 shape 的高斯噪声
 t：flow timestep，每个训练样本采一个标量
 </code></pre>
-<p>模型不直接监督“预测最终 action”，而是在噪声和 action 之间构造中间点 <code>x_t</code>，监督模型预测该位置的速度方向。</p>
+<p>本篇使用速度参数化：在噪声和 action 之间构造中间点 <code>x_t</code>，监督模型预测该位置的生成速度。它是动作生成的一种参数化，并不排除直接预测干净动作的其他生成模型。</p>
+<h3 id="11">1.1 从一个答案到一条生成路径</h3>
+<p>确定性行为克隆输入 observation，直接输出一个动作块；flow 输入 observation、当前带噪动作和生成阶段，输出动作张量下一步应怎样变化。前者学习一个点预测，后者学习如何搬运整个噪声分布。</p>
+<p>同一个观测下，可以从障碍物左侧绕，也可以从右侧绕。直接 MSE 回归容易把两条路线平均；生成模型则允许不同的随机起点最终形成不同路线。随机性提供表达多个模式的入口，但实际是否学到这些模式仍取决于数据和训练。</p>
+<p>在线性路径约定 \(x_s=(1-s)\epsilon+sA\) 下，单个训练样本的速度是 \(A-\epsilon\)。网络并不知道采样时对应的两个真实端点；MSE 训练的理想预测是给定 \(x_s,s,c\) 后的条件平均速度。把许多样本的局部监督汇总起来，才形成推理时可用的速度场。<a href="https://arxiv.org/abs/2210.02747">Flow Matching 原论文</a></p>
+<h3 id="12">1.2 噪声、干净动作和速度是不同参数化</h3>
+<p>先写一个通用的带噪样本：</p>
+<p>\[
+x_s=\alpha_s A+\sigma_s\epsilon.
+\]</p>
+<p>如果模型预测噪声，则在 \(\alpha_s\ne0\) 时可以换算成干净动作估计：</p>
+<p>\[
+\hat A=\frac{x_s-\sigma_s\hat\epsilon}{\alpha_s}.
+\]</p>
+<p>这就是预测噪声能够服务于去噪的直接联系。两种预测使用相同的带噪输入与条件；它们都不同于只根据 observation 输出动作的一次性回归。</p>
+<p>不过，“预测可以互相换算”并不意味着未加权的 loss 完全相同。对按上式转换的预测，有：</p>
+<p>\[
+\|\hat A-A\|^2
+=\frac{\sigma_s^2}{\alpha_s^2}\|\hat\epsilon-\epsilon\|^2.
+\]</p>
+<p>相同预测误差会被噪声阶段重新加权。时间采样分布、SNR 和 loss 权重会共同影响训练；在系数为零的端点也不能直接除法换算。<a href="https://arxiv.org/abs/2006.11239">DDPM 原论文</a></p>
+<p>对于噪声到动作的直线路径，速度 \(u=A-\epsilon\) 又满足：</p>
+<p>\[
+A=x_s+(1-s)u,\qquad \epsilon=x_s-su.
+\]</p>
+<p>所以预测速度也能推导出端点估计。若只优化对应的动作重建误差，则它相对于速度 MSE 多出 \((1-s)^2\) 的权重。选择参数化时，必须同时考虑路径、损失和采样器，不能仅比较输出名字。</p>
+<p>扩散文献中的一种 \(v\)-prediction 定义为 \(v=\alpha_s\epsilon-\sigma_s A\)。它与一般路径导数 \(\alpha'_s A+\sigma'_s\epsilon\) 的关系取决于调度和时间参数；不能因为都叫 velocity 就直接等同于线性 FM 的 \(A-\epsilon\)。这种扩散参数化可见 <a href="https://arxiv.org/abs/2202.00512">Progressive Distillation</a>。</p>
+<h3 id="13">1.3 三种时间与两种速度</h3>
+<table>
+<thead>
+<tr>
+<th>量</th>
+<th>含义</th>
+<th>典型单位或索引</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>机器人时间 \(\tau\)</td>
+<td>观测采集和控制执行经过的时间</td>
+<td>秒、控制周期</td>
+</tr>
+<tr>
+<td>动作块位置 \(h\)</td>
+<td>未来第几个命令</td>
+<td>\(0,\ldots,H-1\)</td>
+</tr>
+<tr>
+<td>生成时间 \(s\) 或离散步 \(k\)</td>
+<td>动作张量从噪声变为样本的阶段</td>
+<td>无量纲区间或采样索引</td>
+</tr>
+<tr>
+<td>关节速度 \(\dot q\)</td>
+<td>机器人关节随实际时间变化</td>
+<td>rad/s 等</td>
+</tr>
+<tr>
+<td>生成速度 \(dx_s/ds\)</td>
+<td>带噪动作张量随生成时间变化</td>
+<td>取决于动作表示和归一化</td>
+</tr>
+</tbody>
+</table>
+<p>如果 action 本身定义成速度命令，生成模型的最终输出可以交给速度控制器；但模型内部预测的 flow velocity 仍然是生成路径上的导数。两者处在不同层级。</p>
 <h2 id="2-pi05">2. PI0.5 的约定</h2>
 <p>当前 BrainCo-IL/OpenPI 使用：</p>
 <pre><code class="language-text">x_t = t * ε + (1 - t) * a
@@ -96,7 +166,7 @@ t = 1：真实 action
 <li>推理时 <code>dt</code> 的正负方向。</li>
 </ul>
 <p>不能只看“t=0”或“t=1”判断实现是否相同。</p>
-<h2 id="4-timestep">4. timestep 为什么不是监督目标</h2>
+<h2 id="4-timestep">4. timestep 提供噪声阶段条件</h2>
 <p>训练监督仍然是：</p>
 <pre><code class="language-text">predicted velocity 与 target velocity 的 loss
 </code></pre>
@@ -110,7 +180,7 @@ t = 1：真实 action
 <pre><code class="language-text">v_θ(x_t, t, image, language, state)
 </code></pre>
 <p>“条件”表示在给定 t、图像、语言和 state 的情况下预测速度；它不表示这些输入都是 loss target。</p>
-<h2 id="5">5. 训练时存在推理去噪步数吗</h2>
+<h2 id="5">5. 单次训练前向与多步推理</h2>
 <p>通常不存在“一次训练样本内部跑 10 次去噪”的过程。</p>
 <p>一次训练前向通常只做：</p>
 <pre><code class="language-text">随机采一个连续 t
@@ -123,7 +193,7 @@ t = 1：真实 action
 </code></pre>
 <p>训练中的随机 t 是对连续区间的采样，不必预先被 <code>1/10</code> 分割。因为模型在训练中见过大量不同 t，推理时可以选择 4、10 或其他数量的积分步数；步数越多通常积分误差越小，但延迟越大。</p>
 <p>有些实现会把 t 离散成 bucket 用于 embedding，例如 GR00T 的 1000 个 timestep buckets。这仍不等于推理必须执行 1000 步。</p>
-<h2 id="6-40k-training-steps-loss">6. 40k training steps 对应多少次 loss</h2>
+<h2 id="6">6. 训练步数、样本数与损失聚合</h2>
 <p>如果训练配置是：</p>
 <pre><code class="language-text">num_train_steps = 40,000
 </code></pre>
@@ -135,11 +205,11 @@ t = 1：真实 action
 </code></pre>
 <p>每个样本的 loss 又会对 <code>[H,D]</code> 上的误差求平均。不能把“一个 tensor 中有 H×D 个误差项”说成 H×D 次独立反向传播；它们汇总成一次标量 loss，再共同反向传播。</p>
 <p>如果使用梯度累积，则 micro-batch forward 次数可能更多，但 optimizer step 仍以配置和训练循环定义为准。</p>
-<h2 id="7">7. 训练时反向更新什么</h2>
+<h2 id="7">7. 梯度路径与参数更新</h2>
 <p>计算：</p>
 <pre><code class="language-text">L_FM = MSE(v_pred, velocity_target)
 </code></pre>
-<p>自动求导会沿预测路径更新所有允许训练的参数，例如：</p>
+<p>反向传播沿预测路径计算梯度，优化器更新纳入参数组且具有有效梯度的参数，例如：</p>
 <ul>
 <li>action input/output projection；</li>
 <li>Action Expert 或 DiT；</li>
@@ -148,7 +218,7 @@ t = 1：真实 action
 <li>未冻结的 VLM 参数。</li>
 </ul>
 <p>噪声、t、真实 action 和 target velocity 都是构造出来的训练数据，不是可训练参数。</p>
-<h2 id="8-action">8. 推理如何从噪声得到 action</h2>
+<h2 id="8">8. 推理：从噪声到动作的数值积分</h2>
 <p>推理没有真实 action，先采样：</p>
 <pre><code class="language-text">x_noise ~ Normal(0,I), shape [B,H,D]
 </code></pre>
@@ -180,7 +250,7 @@ dimension 0:56
 什么时候切换 active/pending chunk
 </code></pre>
 <p>VLASH 不需要改变 PI0.5 的 flow objective；它改变的是训练样本的时间对齐和部署调度条件。</p>
-<h2 id="11-flow-matching">11. 阅读 Flow Matching 代码的检查表</h2>
+<h2 id="11_1">11. 从路径定义到部署接口</h2>
 <p>看到一个新 VLA 的 action generator 时，依次检查：</p>
 <ol>
 <li>真实 action 和噪声如何插值得到 <code>x_t</code>；</li>
@@ -193,10 +263,11 @@ dimension 0:56
 <li>最终输出是否需要 slice、unnormalize 或坐标变换。</li>
 </ol>
 <p>PI0.5 的完整结构和公式也可以配合 <a href="assets/diagrams/pi05_structure.drawio">pi05_structure.drawio</a> 阅读。</p>
+<p>这条知识链的分工是：<strong>概率路径定义中间样本，训练目标定义局部监督，网络学习条件速度场，积分器生成动作块，执行系统把命令放到真实时间轴。</strong> 采样加速可以继续阅读 <a href="generative-consistency-and-sampling-distillation.html">生成一致性与采样蒸馏</a>，与经典策略的比较见 <a href="diffusion-policy-and-act.html">DP 与 ACT</a>。</p>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="action-generation-mse-token-diffusion-flow.html">← IL03 · 动作生成方法：MSE、Token、Diffusion 与 Flow Matching</a>
-            <a href="04-pi05-architecture.html">VLA02 · PI0.5：VLM Prefix 与 Action Expert →</a>
+            <a href="generative-consistency-and-sampling-distillation.html">← IL05 · 生成一致性与采样蒸馏：从多步到少步生成</a>
+            <a href="04-pi05-architecture.html">VLA02 · PI0.5：前向结构与 Action Expert →</a>
           </nav>
         </article>
       </main>

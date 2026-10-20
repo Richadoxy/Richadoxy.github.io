@@ -337,7 +337,7 @@ z_L=P_L(E_L(L))
 \]</p>
 <p>映射到统一维度后再归一化：</p>
 <p>\[
-\bar z=\frac{z}{|z|_2}
+\bar z=\frac{z}{\|z\|_2}
 \]</p>
 <p>归一化后的点积等价于余弦相似度：</p>
 <p>\[
@@ -529,7 +529,7 @@ Vision ↔ Language
 <h3 id="75">7.5 为什么不能只拉近正样本</h3>
 <p>如果两个可训练 encoder 只优化：</p>
 <p>\[
-|z_T-z_V|_2^2
+\|z_T-z_V\|_2^2
 \]</p>
 <p>所有输入输出同一个常数向量也能使 loss 很低，这叫 representation collapse。</p>
 <p>InfoNCE 同时拉近正确配对、推远错误配对，因此保存判别结构。非对比方法则需要 stop-gradient、teacher–student、variance regularization 或 reconstruction 等其他防坍塌机制。</p>

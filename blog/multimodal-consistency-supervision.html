@@ -35,7 +35,10 @@
           <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
           <div class="toc">
 <ul>
-<li><a href="#0">0. 先修正一个术语</a></li>
+<li><a href="#0">0. 监督目标与标签来源</a><ul>
+<li><a href="#_1">同名术语的分工</a></li>
+</ul>
+</li>
 <li><a href="#1">1. 统一视角：先定义什么应该相同</a></li>
 <li><a href="#2-cross-modal-alignment">2. 范式一：Cross-Modal Alignment</a><ul>
 <li><a href="#21">2.1 它解决什么问题</a></li>
@@ -43,10 +46,10 @@
 <li><a href="#23-clipinfonce">2.3 CLIP/InfoNCE 公式</a></li>
 <li><a href="#24">2.4 它学到什么</a></li>
 <li><a href="#25">2.5 常见陷阱</a><ul>
-<li><a href="#_1">假负样本</a></li>
-<li><a href="#_2">只对齐对象身份</a></li>
-<li><a href="#_3">配对不精确</a></li>
-<li><a href="#_4">全局对齐忽略局部信息</a></li>
+<li><a href="#_2">假负样本</a></li>
+<li><a href="#_3">只对齐对象身份</a></li>
+<li><a href="#_4">配对不精确</a></li>
+<li><a href="#_5">全局对齐忽略局部信息</a></li>
 </ul>
 </li>
 <li><a href="#26">2.6 常见程度</a></li>
@@ -59,9 +62,9 @@
 <li><a href="#34-latent-space">3.4 它在 latent space 中产生什么</a></li>
 <li><a href="#35">3.5 与下一帧预测的区别</a></li>
 <li><a href="#36">3.6 常见陷阱</a><ul>
-<li><a href="#_5">过度平滑</a></li>
-<li><a href="#_6">采样间隔不合适</a></li>
-<li><a href="#_7">时间负样本定义不合理</a></li>
+<li><a href="#_6">过度平滑</a></li>
+<li><a href="#_7">采样间隔不合适</a></li>
+<li><a href="#_8">时间负样本定义不合理</a></li>
 <li><a href="#action">忽略 action</a></li>
 </ul>
 </li>
@@ -84,21 +87,15 @@
 </ul>
 </li>
 <li><a href="#6-vt-muse-stage-i">6. VT-MUSE Stage I 是怎样组合三者的</a><ul>
-<li><a href="#mathinlineopen42l_mathrmcrossmathinlineclose42">MATHINLINEOPEN42L_{\mathrm{cross}}MATHINLINECLOSE42</a></li>
-<li><a href="#mathinlineopen42l_mathrmtempmathinlineclose42">MATHINLINEOPEN42L_{\mathrm{temp}}MATHINLINECLOSE42</a></li>
-<li><a href="#mathinlineopen42l_mathrmconsmathinlineclose42">MATHINLINEOPEN42L_{\mathrm{cons}}MATHINLINECLOSE42</a></li>
+<li><a href="#mathinlineopen42l_mathrmcrossmathinlineclose42">\(L_{\mathrm{cross}}\)</a></li>
+<li><a href="#mathinlineopen42l_mathrmtempmathinlineclose42">\(L_{\mathrm{temp}}\)</a></li>
+<li><a href="#mathinlineopen42l_mathrmconsmathinlineclose42">\(L_{\mathrm{cons}}\)</a></li>
 </ul>
 </li>
 <li><a href="#7">7. 三种范式分别适合什么场景</a></li>
 <li><a href="#8">8. 它们为什么属于通用范式，而不是某篇论文的发明</a></li>
-<li><a href="#9">9. 阅读相关论文时的检查清单</a><ul>
-<li><a href="#cross-modal-alignment_1">Cross-Modal Alignment</a></li>
-<li><a href="#temporal-coherence_1">Temporal Coherence</a></li>
-<li><a href="#consistency-learning">Consistency Learning</a></li>
-<li><a href="#_8">实验是否充分</a></li>
-</ul>
-</li>
-<li><a href="#10">10. 最终记忆框架</a></li>
+<li><a href="#9">9. 从监督设计到实验判断</a></li>
+<li><a href="#10">10. 表示、记忆与动作之间的联系</a></li>
 </ul>
 </div>
 
@@ -108,16 +105,16 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F03</p>
           <h1>多模态表示的监督配方</h1>
-          <p class="article-meta"><span data-lang="en">核心 · September 2026 · 11 min read</span><span data-lang="zh">核心 · 2026.09 · 约 11 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">核心 · September 2026 · 14 min read</span><span data-lang="zh">核心 · 2026.09 · 约 14 分钟阅读</span></p>
           <p class="article-deck">统一跨模态对齐、时间连续性、增强或遮挡一致性，并说明 reconstruction、future prediction 与任务监督的分工。</p>
           <div class="article-content">
             <blockquote>
 <p>本文是学习多模态 VLM/VLA 与触觉表示的监督地图。主线是三类反复出现的一致性关系：Cross-Modal Alignment、Temporal Coherence 和 Augmentation/Mask Consistency；同时说明它们与 reconstruction、future prediction、属性标签及 action supervision 的分工。</p>
 <p>阅读位置：<a href="vla-overview-reading-map.html">统一研究范式</a> → <a href="multimodal-encoder-alignment-infonce.html">从原始模态到公共语义空间</a> → 本文 → <a href="19-attention-openclip-tactile-groot.html">从对齐表示到 Policy 融合</a>。</p>
 </blockquote>
-<h2 id="0">0. 先修正一个术语</h2>
+<h2 id="0">0. 监督目标与标签来源</h2>
 <p>这三类方法经常被笼统地称为“监督信号”，但不一定属于传统 supervised learning。</p>
-<p>传统监督学习依赖人工标签：</p>
+<p>监督学习使用明确的输入—目标配对，目标可以来自人工标注、测量或其他可靠过程。人工属性标签是其中一种情况：</p>
 <pre><code class="language-text">输入：一张触觉图像
 标签：hard / soft
 Loss：分类Cross-Entropy
@@ -134,10 +131,41 @@ Loss：分类Cross-Entropy
 <li>consistency regularization；</li>
 <li>contrastive learning。</li>
 </ul>
-<p>它们共同回答一个问题：</p>
-<blockquote>
-<p>哪些输入虽然表面形式不同，但在 latent space 中应该被看作“同一个状态”或“相关状态”？</p>
-</blockquote>
+<p>它们共同规定：哪些输入虽然表面形式不同，但在 latent space 中应该保留相同的任务信息。这里的“一致”通常针对某些属性，不要求两个输入中的所有细节都相同。</p>
+<h3 id="_1">同名术语的分工</h3>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>希望保持一致的内容</th>
+<th>主要用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>表示一致性</td>
+<td>合理增强前后的任务表示</td>
+<td>抗干扰、缺失模态学习</td>
+</tr>
+<tr>
+<td>时间连续性</td>
+<td>相邻真实时刻之间的状态关系</td>
+<td>学习时序结构</td>
+</tr>
+<tr>
+<td>生成 Consistency Models</td>
+<td>同一生成轨迹上不同噪声级对应的端点</td>
+<td>一步或少步生成</td>
+</tr>
+<tr>
+<td>在线记忆</td>
+<td>沿真实交互不断更新的历史状态</td>
+<td>在遮挡和部分可观测条件下决策</td>
+</tr>
+</tbody>
+</table>
+<p>前两项主要塑造 encoder 的表示，第三项作用于生成过程，第四项是模型如何保存和使用历史的机制。它们可以组合，但不能因名字相近就视为同一个 loss 或同一块网络。</p>
+<p>生成一致性详见 <a href="generative-consistency-and-sampling-distillation.html">生成一致性与采样蒸馏</a>；历史如何进入策略，见 <a href="policy-memory-and-object-centric-tactile-state.html">策略记忆与对象级触觉状态</a>。</p>
 <hr />
 <h2 id="1">1. 统一视角：先定义什么应该相同</h2>
 <p>三类监督都可以写成：</p>
@@ -148,7 +176,7 @@ Loss：分类Cross-Entropy
                ↓
 要求zA与zB接近
 </code></pre>
-<p>它们的区别只在于 A 和 B 如何构造：</p>
+<p>它们最直观的区别在于 A 和 B 如何构造；实际效果还取决于负样本、目标网络、比较的表示层和损失权重：</p>
 <table>
 <thead>
 <tr>
@@ -274,13 +302,13 @@ s_{ij}=\frac{z_{T_i}^{\top}z_{V_j}}{\tau}
 <li>对具体机器人动作最重要、但难以语言化的细节。</li>
 </ul>
 <h3 id="25">2.5 常见陷阱</h3>
-<h4 id="_1">假负样本</h4>
+<h4 id="_2">假负样本</h4>
 <p>batch 中两条数据可能来自不同实例，但实际语义相同。例如两块相似海绵可能被当作负样本。</p>
-<h4 id="_2">只对齐对象身份</h4>
+<h4 id="_3">只对齐对象身份</h4>
 <p>模型可能主要识别“这是海绵”，却没有理解当前接触是轻压、重压还是滑动。</p>
-<h4 id="_3">配对不精确</h4>
+<h4 id="_4">配对不精确</h4>
 <p>不同传感器依次触摸同一个位置时，真实接触位置和力度可能存在误差。</p>
-<h4 id="_4">全局对齐忽略局部信息</h4>
+<h4 id="_5">全局对齐忽略局部信息</h4>
 <p>只比较 CLS/global embedding，不能保证视觉 patch 和触觉局部区域具有精细对应关系。</p>
 <h3 id="26">2.6 常见程度</h3>
 <p>这是成熟、广泛使用的多模态学习范式，不是某篇触觉论文首次提出。CLIP、ImageBind、TVL、AnyTouch、OmniVTLA 和 Beyond Sight 都采用了这一思想的不同版本。</p>
@@ -386,14 +414,14 @@ s_i
 </table>
 <p>Temporal contrast 的监督更轻，不要求精确恢复未来；下一帧预测和 dynamics model 对表示的信息量要求更高。</p>
 <h3 id="36">3.6 常见陷阱</h3>
-<h4 id="_5">过度平滑</h4>
+<h4 id="_6">过度平滑</h4>
 <p>接触、碰撞和滑移可能突然发生。机械地拉近所有相邻状态，可能模糊关键事件边界。</p>
-<h4 id="_6">采样间隔不合适</h4>
+<h4 id="_7">采样间隔不合适</h4>
 <ul>
 <li>stride 太小：相邻帧几乎相同，任务过于简单；</li>
 <li>stride 太大：相邻帧已经发生状态跳变，不再适合作为正样本。</li>
 </ul>
-<h4 id="_7">时间负样本定义不合理</h4>
+<h4 id="_8">时间负样本定义不合理</h4>
 <p>不同轨迹可能处于相同接触阶段，却被错误当成负样本。</p>
 <h4 id="action">忽略 action</h4>
 <p>相同状态在不同 action 下可能产生不同未来。只学习状态连续性，不一定足以学习可控动力学。</p>
@@ -476,7 +504,7 @@ Mask B → representation B
 </code></pre>
 <p>要求输出被遮挡内容：</p>
 <p>\[
-\mathcal L_{\mathrm{rec}}=|\hat X-X|_2^2
+\mathcal L_{\mathrm{rec}}=\|\hat X-X\|_2^2
 \]</p>
 <p>因此：</p>
 <table>
@@ -580,7 +608,7 @@ s_i=\operatorname{Normalize}\left(\frac{v_i+h_i}{2}\right)
 <pre><code class="language-text">同一窗口 + visual mask A → s⁽¹⁾
 同一窗口 + visual mask B → s⁽²⁾
 </code></pre>
-<p>通过 cosine consistency 提高视觉遮挡下的稳健性，并迫使表示利用触觉。</p>
+<p>通过 cosine consistency 约束视觉遮挡下的表示稳定性；表示是否实际利用触觉，还需要移除或打乱触觉等消融来验证。</p>
 <p>所以 Stage I 可以压缩成：</p>
 <pre><code class="language-text">Lcross：不要被模态变化影响
 Ltemp：不要忽略时间连续性
@@ -624,6 +652,9 @@ Lcons：不要被非关键遮挡影响
 + 缺失模态稳健性
 + 最终动作监督
 </code></pre>
+<p>动作监督也能直接塑造 VLM 的表示。例如用 FAST 将专家动作块编码为离散 tokens，再训练模型预测下一 token，就能让主干从机器人数据中学习动作相关特征。这属于带动作目标的条件预测；它没有本文 InfoNCE 的配对检索目标，也不要求两种视图的表示一致。<a href="https://arxiv.org/abs/2501.09747">FAST 原论文</a></p>
+<p>还要分清三个独立问题：<strong>监督目标</strong>规定预测什么；<strong>参数冻结</strong>规定哪些参数不更新；<strong>KI 梯度边界</strong>规定某个 loss 可以沿哪些连接更新参数。KI 在 Action Expert 读取主干 K/V 时停止 flow 梯度，主干仍可从离散动作和文字预测中学习。离散分支可以只在训练时使用，推理由连续 expert 输出底层动作；因此不能只看部署结构图判断训练监督。<a href="https://arxiv.org/abs/2505.23705">KI 原论文</a></p>
+<p>这给触觉研究的启发是：可以为表示学习增加任务目标，但增加动作 token loss 并不保证模型会使用触觉。仍需通过遮挡、移除或打乱触觉等对照检验依赖关系。两种动作 loss 的分工，以及 KI 与全参数、LoRA、冻结主干微调的区别，见 <a href="fast-ki-pi-training.html">FAST 与 KI：动作监督、梯度与微调</a>。</p>
 <hr />
 <h2 id="8">8. 它们为什么属于通用范式，而不是某篇论文的发明</h2>
 <p>三类思想都早已广泛存在：</p>
@@ -645,50 +676,58 @@ Lcons：不要被非关键遮挡影响
 </ol>
 <p>VT-MUSE 的特点是把三种成熟监督组合为 Stage I，并在 Stage II 进一步训练 sequential memory，最后通过 gated cross-attention 接入动作策略。</p>
 <hr />
-<h2 id="9">9. 阅读相关论文时的检查清单</h2>
-<h3 id="cross-modal-alignment_1">Cross-Modal Alignment</h3>
-<ul>
-<li>哪些模态互相对齐？</li>
-<li>正样本按对象、时刻还是接触位置定义？</li>
-<li>负样本来自 batch 还是专门采样？</li>
-<li>encoder 哪些冻结、哪些更新？</li>
-<li>使用 CLS、mean pooling 还是局部 token？</li>
-<li>对齐到已有 CLIP 空间，还是共同训练新空间？</li>
-</ul>
-<h3 id="temporal-coherence_1">Temporal Coherence</h3>
-<ul>
-<li>相邻的时间跨度是多少？</li>
-<li>stride 是否固定？</li>
-<li>正样本是相邻帧还是未来帧？</li>
-<li>是否加入 action 条件？</li>
-<li>会不会把接触突变过度平滑？</li>
-<li>负样本会不会实际处于相同接触阶段？</li>
-</ul>
-<h3 id="consistency-learning">Consistency Learning</h3>
-<ul>
-<li>使用了什么 augmentation 或 mask？</li>
-<li>这些扰动真的不改变任务语义吗？</li>
-<li>是比较 global embedding 还是每个 token？</li>
-<li>有没有防止 representation collapse？</li>
-<li>consistency 与 reconstruction 是否同时使用？</li>
-<li>测试环境中是否真的存在相应缺失或噪声？</li>
-</ul>
-<h3 id="_8">实验是否充分</h3>
-<ul>
-<li>是否分别移除每一个 loss？</li>
-<li>是否保持模型容量和数据量一致？</li>
-<li>表征指标提升是否转化为动作成功率？</li>
-<li>结果证明的是对齐、稳健性，还是整个系统的综合收益？</li>
-</ul>
+<h2 id="9">9. 从监督设计到实验判断</h2>
+<table>
+<thead>
+<tr>
+<th>层面</th>
+<th>需要记录的设计</th>
+<th>对结果的影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>跨模态配对</td>
+<td>模态组合、对象/时刻/位置级正样本、负样本来源</td>
+<td>决定表示学到类别相似还是局部接触对应</td>
+</tr>
+<tr>
+<td>表示接口</td>
+<td>CLS、池化或局部 token；冻结与更新范围</td>
+<td>决定哪些信息能保留、哪些参数真正接受监督</td>
+</tr>
+<tr>
+<td>时间结构</td>
+<td>时间跨度、stride、动作条件、阶段变化</td>
+<td>决定模型描述连续变化还是把关键变化抹平</td>
+</tr>
+<tr>
+<td>增强与遮挡</td>
+<td>扰动范围、目标表示、重建分支</td>
+<td>决定鲁棒性是否针对部署时真实的缺失</td>
+</tr>
+<tr>
+<td>防塌缩机制</td>
+<td>负样本、方差约束、目标网络等具体配方</td>
+<td>避免所有输入输出相同表示的无效解</td>
+</tr>
+<tr>
+<td>任务验证</td>
+<td>独立移除各损失，匹配数据、容量和反馈</td>
+<td>区分表示改善与整体系统变化</td>
+</tr>
+</tbody>
+</table>
+<p>以遮挡中的手内操作为例，物体身份可以在一段时间内保持稳定，但位置、接触和受力需要随动作更新。对所有 latent 维度都强加“相邻帧几乎相同”，可能让模型忽视刚发生的滑移。更合理的设计是区分稳定身份与动态状态，并验证这些表示是否帮助闭环纠正。</p>
 <hr />
-<h2 id="10">10. 最终记忆框架</h2>
-<p>把多模态表征学习看成在定义三种“不应该改变核心状态”的变换：</p>
+<h2 id="10">10. 表示、记忆与动作之间的联系</h2>
+<p>把多模态表征学习看成在组织三种关系：共享信息怎样跨模态保持，动态状态怎样随时间演化，以及哪些非关键扰动应被忽略。</p>
 <p>\[
-\underbrace{\text{换模态}}<em>{\mathcal L</em>{\mathrm{cross}}}
+\underbrace{\text{换模态}}_{\mathcal L_{\mathrm{cross}}}
 ,\qquad
-\underbrace{\text{向前移动一个时间步}}<em>{\mathcal L</em>{\mathrm{temp}}}
+\underbrace{\text{向前移动一个时间步}}_{\mathcal L_{\mathrm{temp}}}
 ,\qquad
-\underbrace{\text{施加非关键扰动或遮挡}}<em>{\mathcal L</em>{\mathrm{cons}}}
+\underbrace{\text{施加非关键扰动或遮挡}}_{\mathcal L_{\mathrm{cons}}}
 \]</p>
 <p>最终希望 encoder 满足：</p>
 <pre><code class="language-text">同一状态换一种传感器 → 仍能识别
@@ -704,10 +743,9 @@ policy / action head
         ↓
 action supervision
 </code></pre>
-<p>最简洁的总结是：</p>
-<blockquote>
-<p><strong>Cross-modal loss 规定不同传感器如何描述同一个状态；temporal loss 规定状态如何沿时间组织；consistency loss 规定哪些缺失和扰动不应改变状态。三者共同塑造 representation，而下游 action loss 决定这些表示是否真正能用于机器人控制。</strong></p>
-</blockquote>
+<p><strong>Cross-modal loss 组织不同传感器的共享信息，temporal loss 组织真实时间上的状态变化，consistency loss 规定哪些扰动可以忽略。</strong> 在线记忆进一步把这些表示保留下来，动作损失再把它们连接到具体控制命令。</p>
+<p>例如，把每一时刻的融合特征 \(x_t\) 输入 GRU，用 \(h_t=\operatorname{GRU}(x_t,h_{t-1})\) 更新隐藏状态，再由策略读取 \(h_t\) 预测动作，就把表示学习接到了历史决策上。这里 temporal loss 约束表示的时间关系，GRU 的状态传递负责在运行时保留历史；仅有前者，并不会自动得到后者。记忆也可以直接从专家动作损失中学习，不一定需要额外的“记忆标签”。具体的门控机制、训练与状态重置见<a href="policy-memory-and-object-centric-tactile-state.html">策略记忆与对象级触觉状态</a>。</p>
+<p>这条链也说明了预训练的边界：触觉重建得好、检索得准，并不自动意味着遮挡后能跟踪物体，更不意味着能在移动 B 时保住 A。表征、记忆和控制需要对应的监督与评测。完整实验链见 <a href="tactile-memory-experiment-design.html">触觉记忆的实验设计</a>。</p>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
             <a href="multimodal-encoder-alignment-infonce.html">← F02 · 从原始模态到公共语义空间</a>

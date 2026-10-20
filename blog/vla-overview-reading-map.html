@@ -102,13 +102,14 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F01</p>
           <h1>多模态 VLA 与模仿学习：统一研究范式</h1>
-          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 11 min read</span><span data-lang="zh">入门 · 2026.09 · 约 11 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 12 min read</span><span data-lang="zh">入门 · 2026.09 · 约 12 分钟阅读</span></p>
           <p class="article-deck">从数据、表示、对齐、任务融合、动作生成到闭环执行，先建立阅读和研究多模态策略的总地图。</p>
           <div class="article-content">
             <blockquote>
 <p>这一章不是从某个模型名字开始，而是先建立研究地图：一项多模态机器人工作通常怎样组织数据、训练表示、融合模态、生成动作并完成闭环验证。后续所有基础概念与论文精读都放回这张地图中理解。</p>
 <p>后续阅读顺序：<a href="multimodal-encoder-alignment-infonce.html">从原始模态到公共语义空间</a> → <a href="multimodal-consistency-supervision.html">多模态表示的监督配方</a> → <a href="19-attention-openclip-tactile-groot.html">从对齐表示到 Policy 融合</a> → <a href="imitation-learning-behavior-cloning.html">模仿学习与 Behavior Cloning</a>。</p>
 </blockquote>
+<p>若已经能读懂 VLA 前向框图，可以沿 <a href="action-generation-mse-token-diffusion-flow.html">动作生成</a> → <a href="04-pi05-architecture.html">π₀.₅结构</a> → <a href="fast-ki-pi-training.html">FAST 与 KI</a> → <a href="05-train-state-jit-checkpoint.html">参数更新</a> 继续。这条路线补齐“表示什么、由什么监督、梯度更新谁、部署运行什么”四个理解关口。</p>
 <h2 id="0">0. 先记住整条主线</h2>
 <p>多模态 VLA 或模仿学习研究通常可以拆成六层：</p>
 <pre><code class="language-text">1. Data
@@ -480,6 +481,7 @@ robot action chunk
 <li>使用 VLM 不代表动作一定由语言 token 自回归生成。</li>
 </ul>
 <p>动作生成方法的细节放在第二卷和第三卷展开。</p>
+<p>同一策略也可以同时训练多种动作表示。π₀.₅相关训练方案把真实动作编码成 FAST tokens 来监督 VLM，又用 flow loss 训练连续动作 expert；部署可以只使用连续动作路径。训练中存在离散动作目标，不意味着每次控制都要自回归生成动作 token，详见 <a href="fast-ki-pi-training.html">FAST 与 KI</a>。</p>
 <hr />
 <h2 id="8">8. 训练图和推理图必须分开画</h2>
 <h3 id="81">8.1 训练时可能存在的模块</h3>
@@ -511,6 +513,7 @@ robot action chunk
 <li>哪些模块部署时真正运行？</li>
 <li>训练时使用的信息在推理时是否可获得？</li>
 </ul>
+<p>还应单独补一张梯度图：<strong>每项 loss 能更新哪些参数？</strong> 前向 attention mask、参数冻结和 <code>stop-gradient</code> 分别控制读取范围、更新集合与反向路径，不能仅凭一张前向框图判断。</p>
 <hr />
 <h2 id="9">9. 三种常见训练组织方式</h2>
 <h3 id="91-policy">9.1 独立表示预训练，再冻结接 Policy</h3>
@@ -544,6 +547,7 @@ Encoder + Fusion + Policy
 <li>bottleneck 或 routing；</li>
 <li>matched no-sensor ablation。</li>
 </ul>
+<p>上面的三种方式描述训练阶段如何组织；全参数微调、LoRA 与 KI 则需要另行记录。LoRA 用低秩参数承载适应，冻结决定哪些参数保持不变，KI 限制特定损失的梯度来源。这些机制可以与阶段安排组合。特别是“论文完整训练配方”“发布权重怎样获得”和“当前仓库实际执行的微调”可能不同，π₀.₅是一个具体例子。</p>
 <hr />
 <h2 id="10-vla">10. 多模态 VLA 研究通常在研究什么</h2>
 <p>可以把论文 contribution 放入下面七个问题。</p>
@@ -667,6 +671,8 @@ Encoder + Fusion + Policy
 <li>每个 stage 的数据和 loss 是什么？</li>
 <li>哪些参数更新、冻结或使用 LoRA？</li>
 <li>哪些训练辅助模块推理时丢弃？</li>
+<li>每个 loss 的梯度流向哪里，是否设置 stop-gradient？</li>
+<li>论文训练、checkpoint 来源和当前公开微调实现是否一致？</li>
 </ul>
 <h3 id="_7">第七步：检查实验闭环</h3>
 <ul>

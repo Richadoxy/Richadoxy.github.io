@@ -36,7 +36,10 @@
           <div class="toc">
 <ul>
 <li><a href="#1">1. 从示范到策略</a></li>
-<li><a href="#2-observation-state">2. Observation 不等于 State</a></li>
+<li><a href="#2-observation-state">2. Observation 不等于 State</a><ul>
+<li><a href="#21-gru">2.1 为什么策略还需要历史：以 GRU 为例</a></li>
+</ul>
+</li>
 <li><a href="#3-behavior-cloning">3. Behavior Cloning</a></li>
 <li><a href="#4-demonstration">4. Demonstration 从哪里来</a></li>
 <li><a href="#5-offline-online-rollout">5. Offline 训练与 Online Rollout</a></li>
@@ -53,7 +56,7 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span> · IL01</p>
           <h1>模仿学习与 Behavior Cloning 入门</h1>
-          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 3 min read</span><span data-lang="zh">入门 · 2026.09 · 约 3 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 4 min read</span><span data-lang="zh">入门 · 2026.09 · 约 4 分钟阅读</span></p>
           <p class="article-deck">从 demonstration、policy 和 BC 出发，理解离线监督、闭环 rollout 与分布偏移。</p>
           <div class="article-content">
             <p>模仿学习的目标是让策略从示范中学习行为。它是理解 VLA 动作训练的直接起点。</p>
@@ -83,6 +86,16 @@ proprioceptive state：关节角、夹爪状态等机器人自身观测
 <pre><code class="language-text">o_t = images + language + proprioceptive state + history
 </code></pre>
 <p>这里 robot state 是 observation 的组成部分，不是 action。</p>
+<h3 id="21-gru">2.1 为什么策略还需要历史：以 GRU 为例</h3>
+<p>单帧观测未必能决定动作。例如，球在当前画面中都位于中央，但向左运动和向右运动时，机器人接球的方向可能不同。历史观测帮助策略判断当前帧里没有直接给出的速度、接触变化或任务进度。</p>
+<p>一种做法是输入最近几帧；另一种做法是用 <strong>GRU（Gated Recurrent Unit，门控循环单元）</strong>，把历史逐步压缩到隐藏状态中：</p>
+<p>\[
+x_t=E(o_t),\qquad
+h_t=\operatorname{GRU}(x_t,h_{t-1}),\qquad
+\hat a_t=g(h_t).
+\]</p>
+<p>这里 \(o_t\) 表示当前观测，\(E\) 是观测编码器，\(g\) 是动作预测头。<strong>GRU 负责更新记忆，\(h_t\) 承载记忆。</strong> 同一个 episode 内，下一步会接着使用这个状态；新 episode 开始时则重新初始化。它保存的是为动作预测学出来的历史摘要，不是完整录像。</p>
+<p>使用 GRU 后，学习目标仍然可以是下面的 Behavior Cloning：让每一步预测接近专家动作。动作误差也会训练 GRU，使它有机会学会保留有用的历史。门控机制、序列训练与触觉应用见<a href="policy-memory-and-object-centric-tactile-state.html">策略记忆与对象级触觉状态</a>。</p>
 <h2 id="3-behavior-cloning">3. Behavior Cloning</h2>
 <p>Behavior Cloning 把模仿学习转成监督学习：</p>
 <pre><code class="language-text">专家观测 -&gt; policy -&gt; predicted action

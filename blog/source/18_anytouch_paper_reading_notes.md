@@ -47,9 +47,9 @@ AnyTouch研究的是：**能否用一个触觉编码器，同时理解不同视�
 AnyTouch希望得到：
 
 \[
-f\_T(x^{\text{DIGIT}}) \approx
-f\_T(x^{\text{GelSight}}) \approx
-f\_T(x^{\text{DuraGel}})
+f_T(x^{\text{DIGIT}}) \approx
+f_T(x^{\text{GelSight}}) \approx
+f_T(x^{\text{DuraGel}})
 \]
 
 这里的“相等”不是像素相同，而是：如果它们观测的是相同物体的相同接触位置，编码后的语义应该相近。
@@ -191,8 +191,8 @@ Stage 1采用masked modeling。约75%的触觉patch被遮挡，encoder只能看�
 对于复制成多帧的静态输入，Touch Decoder根据可见token恢复被遮挡的像素，并与真实图像计算MSE：
 
 \[
-\mathcal{L}\_{\mathrm{rec}}^S
-= \lVert \hat{X}\_S-X\_S \rVert\_2^2
+\mathcal{L}_{\mathrm{rec}}^S
+= \lVert \hat{X}_S-X_S \rVert_2^2
 \]
 
 这迫使encoder理解局部纹理与接触形变，而不是简单复制像素。
@@ -202,10 +202,10 @@ Stage 1采用masked modeling。约75%的触觉patch被遮挡，encoder只能看�
 对动态输入，模型既要重建被遮挡的视频patch，也要预测下一帧：
 
 \[
-\mathcal{L}\_{\mathrm{stage1}}
-= \mathcal{L}\_{\mathrm{rec}}^S
-+ \mathcal{L}\_{\mathrm{rec}}^D
-+ \mathcal{L}\_{\mathrm{pred}}^D
+\mathcal{L}_{\mathrm{stage1}}
+= \mathcal{L}_{\mathrm{rec}}^S
++ \mathcal{L}_{\mathrm{rec}}^D
++ \mathcal{L}_{\mathrm{pred}}^D
 \]
 
 因此，你此前说的“真实frame对比重建frame建立loss”是对的，但还要加上动态分支的下一帧预测。下一帧监督让模型学习按压、滑动过程中形变如何变化，而不只是单帧外观。
@@ -240,10 +240,10 @@ Text Encoder   -> x_L
 然后对存在配对关系的模态计算双向InfoNCE对比损失：
 
 \[
-\mathcal{L}\_{\mathrm{align}}
-= \alpha\_{TV}\mathcal{L}\_{TV}
-+ \alpha\_{TL}\mathcal{L}\_{TL}
-+ \alpha\_{VL}\mathcal{L}\_{VL}
+\mathcal{L}_{\mathrm{align}}
+= \alpha_{TV}\mathcal{L}_{TV}
++ \alpha_{TL}\mathcal{L}_{TL}
++ \alpha_{VL}\mathcal{L}_{VL}
 \]
 
 论文设置中，触觉—视觉和触觉—语言的权重为1，视觉—语言为0.2。目标是让同一样本的跨模态全局embedding接近，让不匹配样本远离。
@@ -272,9 +272,9 @@ Text Encoder   -> x_L
 两份embedding做逐元素乘法，再送入MLP Task Head预测是否匹配，并以二元交叉熵训练：
 
 \[
-\mathcal{L}\_{\mathrm{stage2}}
-= \mathcal{L}\_{\mathrm{align}}
-+ \lambda \mathcal{L}\_{\mathrm{match}}
+\mathcal{L}_{\mathrm{stage2}}
+= \mathcal{L}_{\mathrm{align}}
++ \lambda \mathcal{L}_{\mathrm{match}}
 \]
 
 这个任务直接打击“按传感器外观聚类”的捷径，要求encoder保留接触内容。

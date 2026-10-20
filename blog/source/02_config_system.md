@@ -1,5 +1,7 @@
 # 02. 配置系统：从 YAML 到 DataConfig
 
+> 本文描述 BrainCo-IL 项目的 YAML 入口、`freeze_strategy` 与机器人数据合同。官方 openpi 的 `TrainConfig.freeze_filter`、LoRA 默认过滤和 π₀.₅训练范围另见 [FAST 与 KI](42_fast_ki_and_pi_training.md)。字段名相似不代表两份实现完全相同。
+
 配置系统负责回答三个问题：
 
 1. 训练什么模型？

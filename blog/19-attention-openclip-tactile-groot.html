@@ -38,12 +38,16 @@
 <li><a href="#0">0. 先给出核心结论</a></li>
 <li><a href="#1-token2048">1. 一个token是“2048个向量”吗</a></li>
 <li><a href="#2-attention">2. Attention的一次前向传播到底做什么</a><ul>
-<li><a href="#21">2.1 一个极简例子</a></li>
+<li><a href="#21-multi-head">2.1 Multi-head里的单头维度是什么</a></li>
+<li><a href="#22-keysoftmax">2.2 沿Key维度做Softmax</a></li>
+<li><a href="#23-attention-matrix">2.3 Attention Matrix的形状与含义</a></li>
+<li><a href="#24">2.4 一个极简例子</a></li>
 </ul>
 </li>
 <li><a href="#3">3. 前向“更新表示”与训练“更新参数”</a><ul>
 <li><a href="#31-forward">3.1 Forward</a></li>
 <li><a href="#32-backwardoptimizer-step">3.2 Backward与optimizer step</a></li>
+<li><a href="#33-query">3.3 为什么不只更新产生Query的投影参数</a></li>
 <li><a href="#33">3.3 推理时会发生什么</a></li>
 </ul>
 </li>
@@ -52,6 +56,8 @@
 <li><a href="#51-self-attention">5.1 Self-attention</a></li>
 <li><a href="#52-cross-attention">5.2 Cross-attention</a></li>
 <li><a href="#53-token">5.3 拼接多模态token的特殊情况</a></li>
+<li><a href="#54-joint-causal-attention">5.4 Joint Causal Attention：共同计算不等于完全双向</a></li>
+<li><a href="#55-learned-query-tokenq">5.5 Learned Query Token不代表它只产生Q</a></li>
 </ul>
 </li>
 <li><a href="#6-openclipself-attention">6. OpenCLIP视觉编码器中的Self-attention</a><ul>
@@ -101,6 +107,8 @@
 <li><a href="#cross-attention">误区四：有Cross-attention就完成了模态对齐</a></li>
 <li><a href="#crossattention">误区五：没有名为CrossAttention的层，就没有跨模态交流</a></li>
 <li><a href="#transformerattention">误区六：Transformer只等于Attention</a></li>
+<li><a href="#queryloss">误区七：只有Query投影会被动作Loss更新</a></li>
+<li><a href="#joint-attention">误区八：Joint Attention表示所有模态完全双向可见</a></li>
 </ul>
 </li>
 <li><a href="#14">14. 最终记忆框架</a></li>
@@ -113,7 +121,7 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span> · F04</p>
           <h1>从对齐表示到 Policy 融合</h1>
-          <p class="article-meta"><span data-lang="en">核心 · September 2026 · 15 min read</span><span data-lang="zh">核心 · 2026.09 · 约 15 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">核心 · September 2026 · 19 min read</span><span data-lang="zh">核心 · 2026.09 · 约 19 分钟阅读</span></p>
           <p class="article-deck">把 Transformer 基础放回策略数据流，系统理解 self/cross/joint attention、readout、projector、gate、AdaNorm 与 Action Head。</p>
           <div class="article-content">
             <blockquote>
@@ -192,6 +200,74 @@ A=\operatorname{softmax}\left(\frac{QK^\top}{\sqrt{d_k}}\right)
 <p>\[
 O=AV
 \]</p>
+<h3 id="21-multi-head">2.1 Multi-head里的单头维度是什么</h3>
+<p>设每个token的hidden width为\(d\)，一个attention layer有\(h\)个query heads。对第\(r\)个head：</p>
+<p>\[
+W_Q^{(r)},W_K^{(r)},W_V^{(r)}\in\mathbb R^{d\times d_h}
+\]</p>
+<p>因此：</p>
+<p>\[
+Q^{(r)},K^{(r)},V^{(r)}\in\mathbb R^{N\times d_h}
+\]</p>
+<p>\(d_h\)是<strong>单个attention head内部的特征维度</strong>，也就是一次query-key点积包含多少个通道。标准Multi-Head Attention通常满足：</p>
+<p>\[
+d=h\,d_h
+\]</p>
+<p>例如Qwen3-VL-2B的文本Transformer使用：</p>
+<pre><code class="language-text">hidden size d       = 2048
+query heads h       = 16
+head dimension d_h  = 128
+KV heads            = 8
+</code></pre>
+<p>所以每个query head在128维子空间中计算相似度。它使用Grouped-Query Attention：16个Q heads共享8组K/V heads，即每两组query heads共享一组K/V。实现中通常把所有head的投影合并为一个大矩阵，而不是显式保存16个Python层：</p>
+<p>\[
+W_Q\in\mathbb R^{d\times(hd_h)}
+\]</p>
+<p>“self/cross/joint”描述Q/K/V来自哪里和哪些位置可连接；“16 heads”描述有多少组并行子空间，两者不是同一种分类。</p>
+<h3 id="22-keysoftmax">2.2 沿Key维度做Softmax</h3>
+<p>对固定query token \(i\)，先计算它与每个key token \(j\)的score：</p>
+<p>\[
+s_{ij}=\frac{q_i^\top k_j}{\sqrt{d_h}}+M_{ij}
+\]</p>
+<p>然后沿所有key位置\(j\)归一化：</p>
+<p>\[
+a_{ij}=\frac{\exp(s_{ij})}{\sum_{m=1}^{N_K}\exp(s_{im})}
+\]</p>
+<p>数值实现通常先减去该行最大值：</p>
+<p>\[
+a_{ij}=\frac{\exp(s_{ij}-\max_m s_{im})}{\sum_m\exp(s_{im}-\max_m s_{im})}
+\]</p>
+<p>这样既不改变结果，又能避免指数溢出。若一行score为：</p>
+<p>\[
+[2,1,0]
+\]</p>
+<p>softmax后约为：</p>
+<p>\[
+[0.665,0.245,0.090]
+\]</p>
+<p>每项非负且一行和为1。被mask的位置加上\(-\infty\)，经过softmax后权重为0。</p>
+<p>这里“沿Key维度”指query对不同key token的分数归一化，不是对一个key向量内部的\(d_h\)个特征做softmax。</p>
+<h3 id="23-attention-matrix">2.3 Attention Matrix的形状与含义</h3>
+<p>单个head的attention matrix为：</p>
+<p>\[
+A=\operatorname{softmax}\left(\frac{QK^\top}{\sqrt{d_h}}+M\right)
+\in\mathbb R^{N_Q\times N_K}
+\]</p>
+<p>其中：</p>
+<ul>
+<li>第\(i\)行对应query token \(i\)；</li>
+<li>第\(j\)列对应key/value token \(j\)；</li>
+<li>\(a_{ij}\)表示query \(i\)从value \(j\)读取多少信息。</li>
+</ul>
+<p>多头和batch维都保留时：</p>
+<p>\[
+A\in\mathbb R^{B\times h\times N_Q\times N_K}
+\]</p>
+<p>最终：</p>
+<p>\[
+o_i=\sum_j a_{ij}v_j
+\]</p>
+<p>Attention matrix是由当前输入临时计算的activation，不是checkpoint中的可训练参数。同一个模型输入不同图像、语言或触觉时会产生不同的\(A\)。</p>
 <p>这里：</p>
 <ul>
 <li><code>Q</code>表示每个token当前想检索什么；</li>
@@ -210,7 +286,7 @@ H' = H + OW_O
   -&gt; 汇总其他token的V
   -&gt; 得到新的token表示 H'
 </code></pre>
-<h3 id="21">2.1 一个极简例子</h3>
+<h3 id="24">2.4 一个极简例子</h3>
 <p>假设一句话只有三个token：</p>
 <pre><code class="language-text">[拿起] [红色] [杯子]
 </code></pre>
@@ -238,6 +314,26 @@ H' = H + OW_O
 W_Q \leftarrow W_Q-\eta\frac{\partial \mathcal L}{\partial W_Q}
 \]</p>
 <p>模型学到的不是某一张固定attention map，而是<strong>如何从不同输入生成有用attention map的投影规则</strong>。</p>
+<h3 id="33-query">3.3 为什么不只更新产生Query的投影参数</h3>
+<p>设cross-attention为：</p>
+<p>\[
+Y=\operatorname{softmax}\left(
+\frac{(X_qW_Q)(X_mW_K)^\top}{\sqrt{d_h}}
+\right)(X_mW_V)W_O
+\]</p>
+<p>Loss对\(Y\)反向传播时：</p>
+<ul>
+<li>attention score依赖Q和K，因此\(W_Q\)与\(W_K\)都有梯度；</li>
+<li>加权读取的内容直接依赖V，因此\(W_V\)有梯度；</li>
+<li>最终输出依赖\(W_O\)，所以\(W_O\)也有梯度；</li>
+<li>如果memory encoder没有freeze或detach，梯度还会进入产生\(X_m\)的网络。</li>
+</ul>
+<p>“Cross-attention只更新query stream”描述的是前向输出写回哪个token位置，不代表训练时只有query一侧参数得到梯度。</p>
+<p>例如Action tokens以Q读取VLM memory的K/V：</p>
+<pre><code class="language-text">forward：新的hidden states写回Action token位置
+backward：W_Q、W_K、W_V、W_O和未冻结的上游网络都可能获得梯度
+</code></pre>
+<p>只有在memory被显式freeze、<code>detach()</code>或在<code>no_grad()</code>中缓存时，来自该loss的梯度才不会继续穿过memory分支。T-Rex训练Tactile Expert时就使用了detached latent/action KV cache，因此tactile loss可以读取slow-stream知识，但不会反向更新slow stream。</p>
 <h3 id="33">3.3 推理时会发生什么</h3>
 <p>推理没有backward和optimizer，因此模型参数被冻结；但attention matrix仍会根据每次输入重新计算。于是模型仍能动态关注不同图像区域、文字或VLM memory。</p>
 <hr />
@@ -288,6 +384,79 @@ VLM memory ───K/V────┘
 <h3 id="53-token">5.3 拼接多模态token的特殊情况</h3>
 <p>如果先把触觉token和文本token拼成一个序列，再在整个序列上做self-attention，那么从算子定义看它仍是self-attention；从功能上看，它已经发生了跨模态交流。</p>
 <p>Octopi中的Vicuna就是这种情况。不要仅凭“没有单独叫CrossAttention的模块”断言模型没有跨模态交互。</p>
+<h3 id="54-joint-causal-attention">5.4 Joint Causal Attention：共同计算不等于完全双向</h3>
+<p>假设三类token按顺序拼接：</p>
+<p>\[
+H=[H_L;H_A;H_T]
+\]</p>
+<p>分别代表latent、action与tactile。三类token可以使用不同的projection：</p>
+<p>\[
+Q=[H_LW_Q^L;H_AW_Q^A;H_TW_Q^T]
+\]</p>
+<p>\[
+K=[H_LW_K^L;H_AW_K^A;H_TW_K^T],\qquad
+V=[H_LW_V^L;H_AW_V^A;H_TW_V^T]
+\]</p>
+<p>它们仍然在同一个attention matrix中计算，但causal mask使信息流具有方向：</p>
+<table>
+<thead>
+<tr>
+<th>Query \ Key</th>
+<th style="text-align: right;">Latent</th>
+<th style="text-align: right;">Action</th>
+<th style="text-align: right;">Tactile</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Latent</td>
+<td style="text-align: right;">✓</td>
+<td style="text-align: right;">×</td>
+<td style="text-align: right;">×</td>
+</tr>
+<tr>
+<td>Action</td>
+<td style="text-align: right;">✓</td>
+<td style="text-align: right;">✓</td>
+<td style="text-align: right;">×</td>
+</tr>
+<tr>
+<td>Tactile</td>
+<td style="text-align: right;">✓</td>
+<td style="text-align: right;">✓</td>
+<td style="text-align: right;">✓</td>
+</tr>
+</tbody>
+</table>
+<p>所以“joint attention”只说明token共享attention geometry，不能据此推断所有模态双向互读。真正的信息流必须结合token顺序和mask判断。</p>
+<p>T-Rex就是这个例子：Latent、Action、Tactile Expert分别拥有独立Q/K/V/O和FFN，再把三组Q/K/V拼起来做joint causal self-attention。Action query可以读取前面的视觉语言latent；fast tick中的tactile query可以读取缓存的latent/action K/V，但缓存不会被触觉反向更新。详见<a href="trex-tactile-reactive-dexterous-manipulation.html">T-Rex精读</a>。</p>
+<h3 id="55-learned-query-tokenq">5.5 Learned Query Token不代表它只产生Q</h3>
+<p>CLS、action readout、Q-Former queries或future-latent queries常被称为“query tokens”。这通常是功能命名：它们是一组可学习槽位，用于在attention中收集特定任务需要的信息。</p>
+<p>如果learned query和其他token一起进入self-attention，它通常仍会产生自己的：</p>
+<p>\[
+Q_{\mathrm{query}},K_{\mathrm{query}},V_{\mathrm{query}}
+\]</p>
+<p>只有在一个明确的cross-attention模块中，架构才可能规定query stream只提供Q，而另一个memory stream提供K/V。</p>
+<p>因此需要区分：</p>
+<table>
+<thead>
+<tr>
+<th>说法</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>query在attention公式中的角色</td>
+<td>本次计算中提供Q的hidden states</td>
+</tr>
+<tr>
+<td>learned query token</td>
+<td>可训练的信息收集槽位，不保证只产生Q</td>
+</tr>
+</tbody>
+</table>
+<p>T-Rex的future-latent query tokens属于第二种：它们位于causal self-attention序列中，每层都会通过Latent Expert生成Q/K/V；训练目标则让这些位置的最终hidden states对齐未来head-camera的ViT features。</p>
 <hr />
 <h2 id="6-openclipself-attention">6. OpenCLIP视觉编码器中的Self-attention</h2>
 <p>以常见的ViT-L/14、224×224输入作为说明性例子：</p>
@@ -524,6 +693,12 @@ x_T, x_V, x_L --contrastive loss--&gt; 共享语义空间
 <td>Action query读取视觉语言K/V</td>
 <td>连续action chunk生成</td>
 </tr>
+<tr>
+<td>T-Rex</td>
+<td>Latent/Action/Tactile分别投影Q/K/V后做joint causal self-attention</td>
+<td>后置token读取前置token；fast tactile读取缓存KV</td>
+<td>分段flow-matching action chunk</td>
+</tr>
 </tbody>
 </table>
 <p>这张表揭示了一个很实用的分层：</p>
@@ -663,6 +838,10 @@ action chunk
 <p>不对。多模态token拼进同一序列后，普通self-attention也可以完成跨模态交互，Octopi/Vicuna就是例子。</p>
 <h3 id="transformerattention">误区六：Transformer只等于Attention</h3>
 <p>不对。典型block至少还有normalization、MLP/FFN、residual connection；完整模型还包含输入embedding和输出head。</p>
+<h3 id="queryloss">误区七：只有Query投影会被动作Loss更新</h3>
+<p>不对。只要计算图没有被freeze或detach，loss会同时沿attention score和value aggregation更新\(W_Q/W_K/W_V/W_O\)以及相关上游encoder。前向中“更新Q位置的hidden state”和反向中“哪些参数有梯度”是两个问题。</p>
+<h3 id="joint-attention">误区八：Joint Attention表示所有模态完全双向可见</h3>
+<p>不对。Joint只表示共享一次attention计算；causal、prefix、blockwise或padding mask仍可禁止大量连接。读VLA论文时必须同时写出token顺序和attention mask。</p>
 <hr />
 <h2 id="14">14. 最终记忆框架</h2>
 <p>先记住四句话：</p>

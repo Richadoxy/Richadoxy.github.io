@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="串联滑窗、GRU、缓存和 memory tokens，再理解遮挡中的身份 anchor、动态 slot 与接触归属。" />
+    <title>策略记忆：从历史观测到对象级触觉状态 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#0">0. 相同的当前观测，可以对应不同的下一步动作</a></li>
+<li><a href="#1">1. 记忆状态与模型参数是两件事</a></li>
+<li><a href="#2">2. 四种常见的历史处理方式</a><ul>
+<li><a href="#21">2.1 滑动窗口：保留最近一段原始历史</a></li>
+<li><a href="#22-gru-lstm">2.2 GRU / LSTM：递归更新固定大小的状态</a></li>
+<li><a href="#23">2.3 历史特征缓存：当前时刻按需读取过去</a></li>
+<li><a href="#24-memory-tokens">2.4 循环 memory tokens：用少量向量压缩历史</a></li>
+</ul>
+</li>
+<li><a href="#3">3. 记忆如何进入动作生成器</a></li>
+<li><a href="#4">4. 没有记忆标签，也能训练记忆</a><ul>
+<li><a href="#41-bptt">4.1 BPTT：把时间上的更新展开后反向传播</a></li>
+<li><a href="#42">4.2 长序列与截断的取舍</a></li>
+</ul>
+</li>
+<li><a href="#5">5. 物理时间与扩散时间必须分开</a></li>
+<li><a href="#6">6. 遮挡下维护的是状态估计</a><ul>
+<li><a href="#61">6.1 位置、身份和接触归属并不相同</a></li>
+<li><a href="#62">6.2 可观测性的边界</a></li>
+</ul>
+</li>
+<li><a href="#7">7. 从全局记忆到对象级记忆</a></li>
+<li><a href="#8-o-tac-anchorslotrole-ownership">8. O-TAC 设计案例：anchor、slot、role 与 ownership</a><ul>
+<li><a href="#81-anchor">8.1 Anchor：在允许可见时建立身份线索</a></li>
+<li><a href="#82-slot">8.2 Slot：用新触觉更新对象状态</a></li>
+<li><a href="#83-role">8.3 Role：身份固定，任务角色可以变化</a></li>
+<li><a href="#84-ownership">8.4 Ownership：单独预测对象与接触区域的关系</a></li>
+<li><a href="#85">8.5 对象级状态如何服务动作</a></li>
+</ul>
+</li>
+<li><a href="#9">9. 一个合理的递进路线</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span> · TOUCH12</p>
+          <h1>策略记忆：从历史观测到对象级触觉状态</h1>
+          <p class="article-meta"><span data-lang="en">进阶 · October 2026 · 16 min read</span><span data-lang="zh">进阶 · 2026.10 · 约 16 分钟阅读</span></p>
+          <p class="article-deck">串联滑窗、GRU、缓存和 memory tokens，再理解遮挡中的身份 anchor、动态 slot 与接触归属。</p>
+          <div class="article-content">
+            <blockquote>
+<p>记忆模块的作用，是把当前观测不足以说明的历史信息保留下来，供下一步决策使用。本文从滑动窗口和 GRU 讲起，再连接到视觉被遮挡后的状态估计，以及对象级接触记忆。</p>
+<p>输入表示见<a href="tactile-input-representation.html">触觉输入怎样构建</a>，验证方法见<a href="tactile-memory-experiment-design.html">触觉记忆的实验设计</a>。文中的 O-TAC 是用于解释模块关系的研究设计案例，相关能力和比较优势需要实验检验。</p>
+</blockquote>
+<h2 id="0">0. 相同的当前观测，可以对应不同的下一步动作</h2>
+<p>想象两次抓取的当前掌面压力很接近。第一次刚刚发生过持续滑动，第二次已经稳定保持一段时间。即使当前帧很像，第一种情况可能需要继续调整支撑，第二种情况可以进入下一步操作。</p>
+<p>视觉遮挡时，这个问题更明显。物体上一刻在哪里、随后手怎样移动、哪些接触刚刚消失，都可能影响当前判断。</p>
+<p>无记忆策略主要依赖当前输入：</p>
+<p>\[
+x_t=E(o_t),\qquad a_t\sim\pi_\theta(\cdot\mid x_t).
+\]</p>
+<p>加入记忆后，可以写成：</p>
+<p>\[
+\begin{aligned}
+x_t&amp;=E(o_t),\\
+m_t&amp;=U_\phi(m_{t-1},x_t,a_{t-1}),\\
+a_t&amp;\sim\pi_\theta(\cdot\mid x_t,m_t).
+\end{aligned}
+\]</p>
+<p>\(m_t\) 保存历史，\(U_\phi\) 决定如何更新，策略负责读取。上一执行指令 \(a_{t-1}\) 是可选但有用的输入：它帮助模型区分“因为自己动了而产生的触觉变化”和其他变化。</p>
+<h2 id="1">1. 记忆状态与模型参数是两件事</h2>
+<table>
+<thead>
+<tr>
+<th>对象</th>
+<th>表达什么</th>
+<th>正常部署时如何变化</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>参数 \(\phi,\theta\)</td>
+<td>更新记忆和生成动作的规则</td>
+<td>通常固定</td>
+</tr>
+<tr>
+<td>记忆状态 \(m_t\)</td>
+<td>当前 episode 中积累的信息</td>
+<td>随新观测更新</td>
+</tr>
+<tr>
+<td>初始化状态 \(m_{\rm init}\)</td>
+<td>读取本 episode 观测前的状态，可为零或可学习初值</td>
+<td>每个 episode 重新建立</td>
+</tr>
+</tbody>
+</table>
+<p>可以把参数理解为“记笔记的方法”，把隐藏状态理解为“这次操作写下的笔记”。推理时更新隐藏状态，不需要做梯度下降，也不等于在线强化学习。</p>
+<p>记忆本身也可以是 embedding。区别在于它经过时间递推，含有过去的信息。一个只编码当前帧的向量，即使维度很大，也不会自动知道没有输入过的历史。</p>
+<h2 id="2">2. 四种常见的历史处理方式</h2>
+<h3 id="21">2.1 滑动窗口：保留最近一段原始历史</h3>
+<p>\[
+c_t=F(x_{t-L+1},\ldots,x_t).
+\]</p>
+<p>\(F\) 可以是拼接后的 MLP、时序卷积或 Transformer。它实现直接，训练时也不必跨多个片段维护状态。</p>
+<p>代价是窗口有限。一个关键接触事件滑出窗口后，如果没有另行保存，就不能直接访问。窗口的时长还取决于采样率：同样 16 帧，在不同频率下覆盖的物理时间并不相同。</p>
+<p>滑窗因此是必要的基线。只有击败当前帧模型，还不能证明压缩记忆比直接读取更长历史更有效。</p>
+<h3 id="22-gru-lstm">2.2 GRU / LSTM：递归更新固定大小的状态</h3>
+<p>GRU 全称是 <strong>Gated Recurrent Unit（门控循环单元）</strong>，是一种循环神经网络。它在每个时刻读取当前特征和上一步隐藏状态，再产生新的隐藏状态。基本接口是：</p>
+<p>\[
+m_t=\operatorname{GRU}(x_t,m_{t-1}).
+\]</p>
+<p>文献和代码常把这个隐藏状态写作 \(h_t\) 或 <code>h</code>，本文统一记作 \(m_t\)。如果看到 <code>GRU_h</code>，它可能指 GRU 的隐藏状态，具体仍需看变量定义；这不是另一种标准网络名称。<strong>GRU 是更新记忆的模块，\(h_t\) 或 \(m_t\) 是在时间步之间传递的记忆内容。</strong></p>
+<p>其状态更新可概括为：</p>
+<p>\[
+m_t=g_t\odot m_{t-1}+(1-g_t)\odot\widetilde m_t.
+\]</p>
+<p>这里 \(\odot\) 表示逐元素相乘，\(\widetilde m_t\) 是候选新状态。两个门承担不同的作用：</p>
+<ul>
+<li><strong>更新门 \(g_t\)</strong>：决定旧状态与候选状态怎样混合。按上式约定，某一维的门值越接近 1，该维保留的旧状态越多；越接近 0，写入的候选内容越多。</li>
+<li><strong>重置门</strong>：在计算候选状态时，控制过去状态参与多少。它改变的是候选内容的计算，不等于把整个 episode 的记忆清零。</li>
+</ul>
+<p>门值是网络根据当前输入与过去状态学出的向量，不是人工设定的开关。完整单步定义见 <a href="https://docs.pytorch.org/docs/stable/generated/torch.nn.GRUCell.html">PyTorch GRUCell 文档</a>。LSTM 也是门控递归结构，另外显式维护 cell state。</p>
+<p>例如，抓取时可能需要保留“物体刚才在哪里”，又根据新触觉更新“是否开始滑动”。这些信息如何写进状态，由训练目标决定；隐藏向量的某一维通常没有预先指定的物理含义。</p>
+<p>固定大小状态让运行成本容易控制，但历史经过压缩，细节可能丢失。一个 GRU 单元也不会天然知道哪些维度该存物体位置、哪些该存滑移，它需要从训练目标中学习。</p>
+<p>例如，单层、输入 256 维、隐藏状态 256 维，包含 PyTorch 默认两组 bias 的 GRU，参数量是：</p>
+<p>\[
+3d_h d_x+3d_h^2+6d_h=394{,}752.
+\]</p>
+<p>这个数字只对应 GRU，本体编码器、视觉网络和动作生成器还要另外计算。记忆模块可以很小，但任务是否可学仍取决于输入和数据。</p>
+<h3 id="23">2.3 历史特征缓存：当前时刻按需读取过去</h3>
+<p>保存一组历史特征后，可以通过 attention 读取：</p>
+<p>\[
+r_t=\operatorname{Attention}(Q_t,K(M_{&lt;t}),V(M_{&lt;t})).
+\]</p>
+<p>这里保留了多个历史条目，读取时可以关注不同时间点。<a href="https://arxiv.org/abs/1901.02860">Transformer-XL</a>采用跨片段复用先前隐藏状态的机制，是这种历史访问思想的一个实例。</p>
+<p>缓存越长，存储和读取成本通常越高，还需要时间位置和因果 mask。工程上常用固定长度、降采样或摘要来限制开销。</p>
+<p>此外，<strong>计算缓存与环境记忆不能直接画等号</strong>。缓存一次静态视觉前缀的 K/V，可以避免重复计算；只有它确实携带过去观测并供后续时间读取时，才承担了相应的历史记忆作用。</p>
+<h3 id="24-memory-tokens">2.4 循环 memory tokens：用少量向量压缩历史</h3>
+<p>可以保存 \(K\) 个记忆 token：</p>
+<p>\[
+M_t\in\mathbb R^{K\times d}.
+\]</p>
+<p>每次让旧记忆与新观测交互，并将指定输出作为下一时刻记忆：</p>
+<p>\[
+M_t=\operatorname{ReadMemoryOutputs}
+\bigl(\operatorname{Transformer}([M_{t-1};X_t])\bigr).
+\]</p>
+<p>这是一种概念写法，具体实现还需要定义读写位置与 mask。<a href="https://arxiv.org/abs/2207.06881">Recurrent Memory Transformer</a>通过特殊 memory tokens 在片段之间传递状态，展示了这种做法。</p>
+<p>关键是把更新后的内容传下去。若每次都从相同的可学习 token 开始，并丢弃上次输出，这些 token 本身没有保存当前 episode 的历史。</p>
+<h2 id="3">3. 记忆如何进入动作生成器</h2>
+<p>保存、更新和读取可以分开设计。一个最简单的 DP 接法如下：</p>
+<pre><code class="language-text">当前触觉 ─→ 触觉编码器 ─→ z_T ─────────────┐
+                            │              │
+视觉特征、本体状态、上一指令 ─┤              │
+                            ↓              │
+上一步记忆 m_(t-1) ───────→ GRU ─→ m_t     │
+                                  │        │
+                                  └──┬─────┘
+                                     ↓
+                          当前特征与记忆融合 → c_t
+                                     ↓
+带噪动作 A_t^k、去噪步 k ───→ 条件动作生成器
+                                     ↓
+                                动作序列
+</code></pre>
+<p>当前触觉保留一条直接进入条件分支的路径，帮助策略及时响应，不必把所有瞬时细节先挤进隐藏状态。</p>
+<p>如果动作头是 U-Net，可以把融合结果作为全局条件，并通过 FiLM 调节中间特征；如果是 Transformer，可以用记忆 tokens 作为 cross-attention 的 K/V。两种接口解决“如何读取”，GRU 或循环 Transformer 解决“如何更新”。</p>
+<p><strong>记忆机制与动作生成机制相互独立。</strong> 一个含 GRU 的策略仍然可以用扩散生成动作块；“状态按时间递推”并不意味着动作头必须变成离散 token 自回归模型。</p>
+<h2 id="4">4. 没有记忆标签，也能训练记忆</h2>
+<p>先从<a href="imitation-learning-behavior-cloning.html">模仿学习入门</a>中的直接动作回归出发。按时间读取专家轨迹 \((o_t,a_t^*)\)，用 GRU 更新状态，再预测动作：</p>
+<p>\[
+\begin{aligned}
+m_t&amp;=\operatorname{GRU}_{\phi}(E(o_t),m_{t-1}),\\
+\hat a_t&amp;=g_\theta(m_t),\\
+\mathcal L_{\rm BC}&amp;=\sum_t\|\hat a_t-a_t^*\|_2^2.
+\end{aligned}
+\]</p>
+<p>这里没有给记忆提供单独的标准答案。动作损失经动作头和时间上的状态连接，训练 GRU 的参数 \(\phi\)，让它有机会保留预测专家动作所需的信息。编码器若参与联合训练，也会收到梯度。</p>
+<p>将动作头换成上一节的条件 DP 后，记忆仍从策略损失获得学习信号。对于预测噪声的 DP，动作目标仍然是示范中的真实动作块 \(A_t^0\)。采样噪声和去噪步，构造：</p>
+<p>\[
+A_t^k=\sqrt{\bar\alpha_k}A_t^0+
+\sqrt{1-\bar\alpha_k}\epsilon.
+\]</p>
+<p>训练损失可以保持：</p>
+<p>\[
+\mathcal L_{\rm policy}
+=\mathbb E_{t,k,\epsilon}
+\left[\left\|\epsilon-
+\epsilon_\theta(A_t^k,k,F(x_t,m_t))\right\|_2^2\right].
+\]</p>
+<p>动作误差会通过条件分支回传到记忆更新网络。如果过去的信息有助于正确预测当前动作，梯度就可能推动模型保留它。</p>
+<p>不过，优化器也可能发现更简单的捷径，例如仅用视觉或动作进度就能复现示范。加上记忆模块不等于模型已经学会利用历史，因此需要专门的实验检验。</p>
+<h3 id="41-bptt">4.1 BPTT：把时间上的更新展开后反向传播</h3>
+<pre><code class="language-text">o_0 → m_0 → m_1 → m_2 → … → m_t → 动作预测损失
+             ↑      ↑          ↑
+            o_1    o_2         o_t
+</code></pre>
+<p>反向传播沿着这些状态更新连接返回过去，这就是 through time 的含义。训练时可以打乱不同 episode 或片段的采样顺序，但一个片段内部应按时间处理。</p>
+<p>若任务依赖“看见物体→长时间遮挡→再次调整”，训练片段必须让模型有机会建立并保留最初信息。只采遮挡后的独立帧，然后每帧清零记忆，无法训练这条信息链。</p>
+<h3 id="42">4.2 长序列与截断的取舍</h3>
+<p>完整前缀反传最直接，但显存和计算会随序列增长。截断 BPTT 可以在片段边界保留状态值，同时切断更早的计算图。</p>
+<p>这让模型在数值上仍读取过去状态，却不能让当前损失直接修正截断点之前的写入过程。要学习跨越很长间隔的依赖，仍需设计足够的训练跨度、阶段课程或中间监督。</p>
+<p>Burn-in 是另一种常用安排：先用一段前缀恢复隐藏状态，再在后续片段计算损失。它能减轻片段中途初始化的问题，但如果前缀不参与反传，并不会自动解决跨前缀的信用分配。</p>
+<h2 id="5">5. 物理时间与扩散时间必须分开</h2>
+<p>设 \(t\) 是机器人观测时间，\(k\) 是同一次动作采样内的去噪步骤：</p>
+<pre><code class="language-text">物理时刻 t：收到新观测 → 更新一次记忆 m_t → 构造 c_t
+                                              ↓
+                              k=K → K-1 → … → 0
+                              多次去噪共用同一份 c_t
+                                              ↓
+                                        执行动作前缀
+
+物理时刻 t+1：收到下一条观测 → 更新 m_(t+1)
+</code></pre>
+<p>不能因为一次采样做了 8 次去噪，就把同一帧触觉当成 8 个新事件反复写入 GRU。也不能在每次生成新动作块时清空全部历史。</p>
+<p>如果系统在动作块执行期间持续接收观测，可以持续更新记忆；但这些更新什么时候真正影响动作，还取决于重规划或快速解码的调用时机。<strong>记忆更新快，并不自动意味着控制反馈快。</strong> <a href="rdp-reactive-diffusion-policy.html">RDP 笔记</a>专门讨论了这一执行层问题。</p>
+<p>episode 开始、任务显式重置或系统重新初始化时，应重置相应状态。并行处理多个 episode 时，每个样本有独立的记忆与 reset mask，不能让轨迹之间串状态。</p>
+<p>以单步动作回归策略为例，下面的伪代码展示记忆在一次 rollout 中的生命周期；<code>gru_cell</code> 表示一次状态更新：</p>
+<pre><code class="language-python">obs = env.reset()
+h = initial_hidden_state()       # 新 episode，可用全零初值
+done = False
+
+with inference_mode():          # 推理时固定参数，只更新隐藏状态
+    while not done:
+        x = encoder(obs)
+        h = gru_cell(x, h)       # h 对应正文中的 m_t
+        action = action_head(h)
+        obs, done = execute_and_observe(action)
+</code></pre>
+<p><code>h</code> 在循环外初始化，并在循环内持续传递。如果每一步都重新置零，策略就无法通过它使用此前的观测。训练时则要把同样的递推按时间展开，并在有效时间步上累计专家动作损失；不能直接用上述关闭梯度的推理循环训练。</p>
+<h2 id="6">6. 遮挡下维护的是状态估计</h2>
+<p>完整物理状态可能包含物体位置、速度、接触、摩擦与支撑关系，但相机和触觉每次只观察到其中一部分。这种“状态不完全可见”的情况，可以用 POMDP 的直觉理解。</p>
+<p>历史提供一组关于当前状态的证据：</p>
+<p>\[
+b_t(s)=P(s_t=s\mid o_{0:t},a_{0:t-1}).
+\]</p>
+<p>\(b_t\) 称为 belief，可以理解为“在已有观测与动作下，对当前状态有哪些可能的判断”。神经网络的隐藏状态可以用作任务相关的 belief 摘要，但没有专门建模和验证时，不能把任意 GRU 向量直接称为准确的概率后验。</p>
+<p>例如，可见时确认物体在掌面中央；随后手腕移动，压力分布大致保持。模型可以结合本体运动推测物体随手移动。若压力重心突然变化，或者某个指尖失去接触，模型就应有机会修正这一估计。</p>
+<p>这也解释了为什么只输入触觉还不够：相同的压力变化，可能来自手指主动弯曲、物体移动或传感器漂移。关节状态、历史动作、观测年龄与视觉线索共同帮助消除歧义。</p>
+<h3 id="61">6.1 位置、身份和接触归属并不相同</h3>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>含义</th>
+<th>一种可能的监督</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>物体位置</td>
+<td>物体中心在哪里</td>
+<td>独立相机或跟踪器的位置标签</td>
+</tr>
+<tr>
+<td>物体姿态</td>
+<td>物体如何旋转</td>
+<td>可用的姿态标注与对称性定义</td>
+</tr>
+<tr>
+<td>物体身份</td>
+<td>当前对象对应初始的哪一个</td>
+<td>可见时建立的 episode 内身份</td>
+</tr>
+<tr>
+<td>接触归属</td>
+<td>哪些区域正在接触哪个对象</td>
+<td>对象—区域接触标注</td>
+</tr>
+<tr>
+<td>支撑/保持状态</td>
+<td>这些接触是否足以完成任务</td>
+<td>独立保持结果与扰动测试</td>
+</tr>
+</tbody>
+</table>
+<p>接触在掌心附近，不等于已经知道物体的三维中心；某区域接触了 A，也不等于该区域独立承担了 A 的重量。设计辅助头时，要明确自己监督的是哪一层。</p>
+<h3 id="62">6.2 可观测性的边界</h3>
+<p>不同物理状态可能产生相似观测。一个近似对称的物体转动后，压力与指尖力未必明显变化；两个相似物体完全遮挡并发生不可观测交换时，身份也可能无法确定。</p>
+<p>记忆能结合过去约束可能状态，却不能凭空生成从未获得过的信息。因此，第一版可以把目标设为“维护有用的接触状态，改善遮挡操作”，而不是直接承诺完整、精确的 6D 物体重建。</p>
+<p>如果确实需要位置估计，可以增加小型辅助头：</p>
+<p>\[
+\hat p_t=D(m_t),\qquad
+\mathcal L=\mathcal L_{\rm policy}+\lambda_p\mathcal L_{\rm pos}.
+\]</p>
+<p>\(\mathcal L_{\rm pos}\) 只在独立标签有效的时刻计算。标签用于监督，并不作为部署输入；预测结果是否再显式接入策略，是另一个可以消融的选择。</p>
+<h2 id="7">7. 从全局记忆到对象级记忆</h2>
+<p>全局 GRU 把整只手的历史压进一个状态。对于单物体任务，这是合理的起点。多物体操作则提出了更细的问题：调整 B 时，怎样保留正在支撑 A 的接触？</p>
+<p>对象级表示尝试为每个已知对象保存一个状态槽位：</p>
+<p>\[
+M_t=[m_t^1,\ldots,m_t^K].
+\]</p>
+<p>这种结构给模型一个分工先验，但并不自动保证各槽位真的对应不同物体。身份初始化、时间连续性和辅助监督都可能影响它是否学成。</p>
+<p>全局模型也可能学会隐式区分物体。对象级设计必须与拥有相同传感器、历史和任务信息的全局模型比较，才能判断显式分解是否值得。</p>
+<h2 id="8-o-tac-anchorslotrole-ownership">8. O-TAC 设计案例：anchor、slot、role 与 ownership</h2>
+<p>下面用一个称为 O-TAC 的对象级触觉记忆方案解释模块如何连接。<strong>这是设计案例，不是已证明优于其他方法的实验结论。</strong></p>
+<h3 id="81-anchor">8.1 Anchor：在允许可见时建立身份线索</h3>
+<p>对于第 \(j\) 个对象，使用可见时的外观和位置信息建立身份 anchor：</p>
+<p>\[
+\alpha_j=E_v(\operatorname{crop}_j,\operatorname{box}_j,\text{context}).
+\]</p>
+<p>裁剪图像主要提供外观；同一个物体 crop 无论来自画面左侧还是右侧，缩放后都可能相似，因此还需要允许使用的位置上下文。这个输入必须来自实际可见或可估计的信息，不能在遮挡后继续用隐藏真值生成 crop 或 box。</p>
+<p>Anchor 作为相对稳定的身份参照，帮助动态状态在接触迁移后仍对应同一对象。它不是物体精确三维位置，也不是识别永不出错的保证。</p>
+<h3 id="82-slot">8.2 Slot：用新触觉更新对象状态</h3>
+<p>当前区域触觉 tokens 记为 \(Z_t\)。一个可实现的更新形式是：</p>
+<p>\[
+\begin{aligned}
+r_t^j &amp;=\operatorname{CrossAttn}
+\bigl(Q([\alpha_j;m_{t-1}^j]),K(Z_t),V(Z_t)\bigr),\\
+m_t^j &amp;=\operatorname{GRU}
+\bigl([r_t^j;q_t;a_{t-1};\text{age}_t],m_{t-1}^j\bigr).
+\end{aligned}
+\]</p>
+<p>对象槽位读取与自己相关的触觉，再结合本体状态和动作更新。若允许新的视觉观测，也可以加入相应更新分支；遮挡协议下不可用的视觉必须明确屏蔽。</p>
+<h3 id="83-role">8.3 Role：身份固定，任务角色可以变化</h3>
+<p>同一个物体可以在一次任务中被保护，在下一次任务中成为要释放的目标。因此，身份与角色应分开表示：</p>
+<pre><code class="language-text">对象 A：身份 anchor_A + 当前 slot_A + protected 角色
+对象 B：身份 anchor_B + 当前 slot_B + target 角色
+                                ↓
+                 目标区域、操作类型与共享上下文
+                                ↓
+                         条件动作生成器
+</code></pre>
+<p>不能把 slot 0 永久当成“保留对象”、slot 1 永久当成“释放对象”。角色交换既是合理接口，也是检验模型是否真正理解任务条件的办法。</p>
+<h3 id="84-ownership">8.4 Ownership：单独预测对象与接触区域的关系</h3>
+<p>可以使用辅助头预测对象 \(j\) 与区域 \(r\) 是否存在接触关联：</p>
+<p>\[
+\hat y_{t,j,r}=\sigma\bigl(D(m_t^j,z_{t,r},\alpha_j)\bigr).
+\]</p>
+<p>若一个区域可能同时接触多个物体，可以采用多标签形式，而不是强迫每个区域只能属于一个对象。没有接触、传感器无效和归属未知需要分别标记；未知标签不能直接当负例。</p>
+<p><strong>Attention 权重不等于接触归属。</strong> Attention 描述网络从哪里读取信息，即使当前没有可靠接触，softmax 仍会分配权重。归属判断需要明确语义、标签、损失和独立评测。</p>
+<p>同样，某个 sigmoid 输出接近 1，也不自动等于“已经确定”或“物体一定能保住”。若要表达归属是否可知，可以增加单独的可判定性头，但它也需要相应标签与校准检验。</p>
+<h3 id="85">8.5 对象级状态如何服务动作</h3>
+<pre><code class="language-text">允许的视觉 → 对象身份 anchors ─────────────┐
+                                          ↓
+掌区 / 指尖触觉 → 区域 tokens → 对象读取与递归更新
+本体状态、上一指令、观测年龄 ───────────→ 对象 slots
+                                          ├→ 位置或归属辅助头
+                                          ↓
+                     当前触觉 + slots + anchors + 任务角色
+                                          ↓
+                                    条件 Diffusion Policy
+                                          ↓
+                                  动作块 → 执行短前缀
+</code></pre>
+<p>这里辅助头可以只提供训练信号，策略直接读取完整状态。若要把预测接触图进一步用于动作约束、候选排序或风险筛选，需要另行定义机制和实验，不能因为已有归属头就默认这些能力已经存在。</p>
+<h2 id="9">9. 一个合理的递进路线</h2>
+<p>先用当前观测模型确认数据与动作接口可学，再加入长窗口和全局 GRU。确认任务确实受益于历史后，比较区域记忆与对象级记忆。</p>
+<p>对于遮挡问题，训练数据应包含可见初始化、遮挡持续过程、遮挡后变化与相应动作。对于对象级问题，还需要平衡对象身份与角色，并提供能检验对象区分的任务。</p>
+<p>GRU、attention 和 DP 都是实现工具。研究要解释的是：保存了什么历史、这些信息为什么有助于当前动作，以及在相同观测条件下是否带来更好的控制。下一篇把这些问题转换成<a href="tactile-memory-experiment-design.html">数据与实验方案</a>。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="cgp-contact-grounded-policy.html">← TOUCH11 · CGP 精读：状态、触觉与接触一致的控制</a>
+            <a href="tactile-memory-experiment-design.html">TOUCH13 · 触觉记忆的实验设计：从假设到控制证据 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

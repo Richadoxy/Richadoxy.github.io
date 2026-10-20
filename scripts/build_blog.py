@@ -12,6 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import markdown
+from markdown.extensions import Extension
+from markdown.extensions.toc import slugify
+from markdown.inlinepatterns import BACKTICK_RE
+from markdown.postprocessors import Postprocessor
+from markdown.preprocessors import Preprocessor
 
 
 @dataclass(frozen=True)
@@ -35,12 +40,15 @@ POSTS = [
     Post("F04", "19_attention_from_embeddings_to_action_expert.md", "19-attention-openclip-tactile-groot", "从对齐表示到 Policy 融合", "把 Transformer 基础放回策略数据流，系统理解 self/cross/joint attention、readout、projector、gate、AdaNorm 与 Action Head。", "foundations", published_en="September 2026", published_zh="2026.09", level="核心"),
     Post("IL01", "23_imitation_learning_basics.md", "imitation-learning-behavior-cloning", "模仿学习与 Behavior Cloning 入门", "从 demonstration、policy 和 BC 出发，理解离线监督、闭环 rollout 与分布偏移。", "imitation", published_en="September 2026", published_zh="2026.09", level="入门"),
     Post("IL02", "24_robot_data_action_semantics.md", "robot-data-action-semantics", "机器人数据：Observation、Action 与时间窗口", "统一 state/action 语义、episode、action chunk、horizon、控制频率、归一化和 mask。", "imitation", published_en="September 2026", published_zh="2026.09", level="入门"),
-    Post("IL03", "25_action_generation_families.md", "action-generation-mse-token-diffusion-flow", "动作生成方法：MSE、Token、Diffusion 与 Flow Matching", "比较四类动作生成目标，区分网络架构、训练 target 与推理采样方式。", "imitation", published_en="September 2026", published_zh="2026.09", level="进阶"),
+    Post("IL03", "25_action_generation_families.md", "action-generation-mse-token-diffusion-flow", "动作生成方法：从连续回归到概率生成", "串联回归、自回归、CVAE、GAN、扩散、Flow Matching 与生成一致性，区分训练目标、采样和执行。", "imitation", published_en="September 2026", published_zh="2026.09", level="进阶"),
+    Post("IL04", "36_diffusion_policy_and_act.md", "diffusion-policy-and-act", "Diffusion Policy 与 ACT：小型策略的训练和推理", "拆解 DP 的 U-Net 与 Transformer、条件特征和噪声预测，再对照 ACT 的 CVAE、动作块与预训练。", "imitation", published_en="October 2026", published_zh="2026.10", level="核心"),
+    Post("IL05", "37_generative_consistency_and_sampling_distillation.md", "generative-consistency-and-sampling-distillation", "生成一致性与采样蒸馏：从多步到少步生成", "理解生成轨迹、端点一致性、边界条件和 teacher/student，以及少步生成与闭环反馈的关系。", "imitation", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("VLA01", "10_flow_matching_training_and_inference.md", "10-flow-matching-training-inference", "Flow Matching：训练、timestep 与推理", "从插值路径、velocity target 和 timestep condition 出发，区分训练采样与推理积分。", "architectures"),
-    Post("VLA02", "04_pi05_architecture.md", "04-pi05-architecture", "PI0.5：VLM Prefix 与 Action Expert", "拆解 VLM Prefix Expert、Action Expert、联合 attention 和 flow-matching action generation。", "architectures", "pi05_structure.drawio"),
-    Post("VLA03", "11_groot_dit_architecture.md", "11-groot-dit-architecture", "GR00T：VLM Memory 与 DiT Action Head", "梳理 VLM memory、state/action encoders、AlternateVLDiT、AdaLN 与 action decoder 的数据流。", "architectures", "groot_n1d7_structure.drawio"),
-    Post("VLA04", "14_architecture_comparison_and_reading_guide.md", "14-architecture-comparison-reading-guide", "PI0.5、GR00T、VLASH 与 VLA-JEPA 对照", "把架构、异步框架和 world-model supervision 放到正确层级，并形成统一比较坐标。", "architectures"),
-    Post("VLA05", "13_jepa_and_vla_jepa.md", "13-jepa-vla-jepa", "JEPA、World Model 与 VLA-JEPA", "理解 teacher/student/predictor、latent world-model supervision、leakage-free training 和联合 action loss。", "architectures", "vla_jepa_structure.drawio", level="前沿"),
+    Post("VLA02", "04_pi05_architecture.md", "04-pi05-architecture", "PI0.5：前向结构与 Action Expert", "拆解 Prefix、Action Expert、联合 attention 与连续动作路径，再连接 FAST/KI 训练专题。", "architectures", "pi05_structure.drawio"),
+    Post("VLA03", "42_fast_ki_and_pi_training.md", "fast-ki-pi-training", "FAST 与 KI：动作监督、梯度与微调", "连接动作 token、双损失、两阶段与联合训练，区分 KI、冻结、LoRA 和官方 openpi 微调。", "architectures", "pi05_fast_ki_training.drawio", published_en="October 2026", published_zh="2026.10", level="核心"),
+    Post("VLA04", "11_groot_dit_architecture.md", "11-groot-dit-architecture", "GR00T：VLM Memory 与 DiT Action Head", "梳理 VLM memory、state/action encoders、AlternateVLDiT、AdaLN 与 action decoder 的数据流。", "architectures", "groot_n1d7_structure.drawio"),
+    Post("VLA05", "14_architecture_comparison_and_reading_guide.md", "14-architecture-comparison-reading-guide", "PI0.5、GR00T、VLASH 与 VLA-JEPA 对照", "把架构、异步框架和 world-model supervision 放到正确层级，并形成统一比较坐标。", "architectures"),
+    Post("VLA06", "13_jepa_and_vla_jepa.md", "13-jepa-vla-jepa", "JEPA、World Model 与 VLA-JEPA", "理解 teacher/student/predictor、latent world-model supervision、leakage-free training 和联合 action loss。", "architectures", "vla_jepa_structure.drawio", level="前沿"),
     Post("ENG01", "02_config_system.md", "02-config-system", "配置与数据合同：从 YAML 到 DataConfig", "理解 YAML 如何展开成 TrainConfig、DataConfig，以及 BrainCo policy 层如何定义机器人数据语义。", "engineering"),
     Post("ENG02", "03_data_pipeline_and_batch.md", "03-data-pipeline-and-batch", "从 Dataset 到 Batch", "跟踪一条 LeRobot 样本经过 transform、collate 和 sharding，最终成为模型训练 batch 的全过程。", "engineering"),
     Post("ENG03", "01_train_entry_and_jax.md", "01-train-entry-and-jax", "JAX 训练入口", "从 scripts/train.py 出发，梳理编译缓存、PRNG、mesh、sharding、checkpoint 与训练循环。", "engineering"),
@@ -144,6 +152,21 @@ POSTS = [
         published_zh="2026.10",
         level="前沿",
     ),
+    Post(
+        "TOUCH09",
+        "34_trex_paper_reading_notes.md",
+        "trex-tactile-reactive-dexterous-manipulation",
+        "T-Rex 精读：高频触觉反应与级联 Flow Matching",
+        "从三专家 MoT、future-latent queries 和时空触觉编码出发，拆解低频视觉规划、高频触觉修正、KV 缓存与分段 Flow Matching。",
+        "tactile",
+        published_en="September 2026",
+        published_zh="2026.09",
+        level="前沿",
+    ),
+    Post("TOUCH10", "39_tactile_input_representation.md", "tactile-input-representation", "从原始触觉到策略条件", "从压阻、三维力和视触觉出发，连接标定、数值 atlas、区域 token、时间对齐与条件融合。", "tactile", published_en="October 2026", published_zh="2026.10", level="核心"),
+    Post("TOUCH11", "38_cgp_paper_reading_notes.md", "cgp-contact-grounded-policy", "CGP 精读：状态、触觉与接触一致的控制", "区分未来机器人状态、触觉 latent 和控制命令，拆解联合扩散、接触映射及 Visuotactile DP 对照。", "tactile", published_en="October 2026", published_zh="2026.10", level="进阶"),
+    Post("TOUCH12", "40_policy_memory_and_object_centric_tactile_state.md", "policy-memory-and-object-centric-tactile-state", "策略记忆：从历史观测到对象级触觉状态", "串联滑窗、GRU、缓存和 memory tokens，再理解遮挡中的身份 anchor、动态 slot 与接触归属。", "tactile", published_en="October 2026", published_zh="2026.10", level="进阶"),
+    Post("TOUCH13", "41_tactile_memory_experiment_design.md", "tactile-memory-experiment-design", "触觉记忆的实验设计：从假设到控制证据", "把数据、辅助监督、公平 baseline、遮挡扰动和联合成功指标连接成可验证的研究过程。", "tactile", published_en="October 2026", published_zh="2026.10", level="实践"),
 ]
 
 
@@ -168,14 +191,14 @@ CHAINS = {
         "title_en": "Part 2: Imitation Learning",
         "label_zh": "模仿学习",
         "label_en": "Imitation Learning",
-        "description": "从 demonstration 和 Behavior Cloning 出发，理解机器人数据、action chunk 与不同动作生成目标。",
+        "description": "从示范与 Behavior Cloning 出发，连接机器人数据、DP / ACT、概率生成目标与少步采样。",
     },
     "architectures": {
         "title": "第三卷：VLA 核心架构",
         "title_en": "Part 3: VLA Architectures",
         "label_zh": "VLA 架构",
         "label_en": "VLA Architectures",
-        "description": "使用统一坐标拆解 Flow Matching、PI0.5、GR00T、VLASH 和 VLA-JEPA。",
+        "description": "从 Flow Matching 与 PI0.5 前向结构进入 FAST/KI 的动作监督和梯度路径，再对照 GR00T、VLASH 与 VLA-JEPA。",
     },
     "engineering": {
         "title": "第四卷：OpenPI / BrainCo 工程实践",
@@ -196,7 +219,7 @@ CHAINS = {
         "title_en": "Part 6: Tactile Representation and VLA",
         "label_zh": "触觉 VLA",
         "label_en": "Tactile VLA",
-        "description": "从 TVL、AnyTouch 的表征和 Octopi 的推理，进入 FuSe、VLA-Touch、OmniVTLA、Tactile-VLA 与 RDP 的动作和控制。",
+        "description": "连接触觉输入、跨模态表示、动作与闭环反馈，再进入 CGP、对象级记忆和实验设计；阅读地图提供基础与论文两条路线。",
     },
 }
 
@@ -280,17 +303,90 @@ def reading_time(source_text: str) -> int:
 
 
 def protect_math(text: str) -> tuple[str, dict[str, str]]:
-    """Keep MathJax delimiters from being consumed as Markdown escapes."""
-    replacements = {
-        "MATHDISPLAYOPEN42": r"\[",
-        "MATHDISPLAYCLOSE42": r"\]",
-        "MATHINLINEOPEN42": r"\(",
-        "MATHINLINECLOSE42": r"\)",
-    }
-    protected = text
-    for marker, delimiter in replacements.items():
-        protected = protected.replace(delimiter, marker)
+    """Protect complete formulas after fenced code has been stashed by Markdown."""
+    replacements: dict[str, str] = {}
+    prefix = "BLOGMATH42"
+    while prefix in text:
+        prefix += "X"
+    code_spans = [
+        match.span()
+        for match in re.finditer(BACKTICK_RE, text, re.DOTALL)
+        if match.group(3)
+    ]
+
+    def replace(match: re.Match[str]) -> str:
+        if any(start < match.end() and match.start() < end for start, end in code_spans):
+            return match.group(0)
+        line_start = text.rfind("\n", 0, match.start()) + 1
+        if re.match(r"(?: {4}|\t)", text[line_start:match.start()]):
+            return match.group(0)
+        marker = f"{prefix}{len(replacements)}END"
+        replacements[marker] = match.group(0)
+        return marker
+
+    protected = re.sub(r"\\\[.*?\\\]|\\\(.*?\\\)", replace, text, flags=re.DOTALL)
     return protected, replacements
+
+
+def restore_math(text: str, replacements: dict[str, str]) -> str:
+    """Restore TeX as text, so comparisons and alignment markers remain safe HTML."""
+    for marker, formula in replacements.items():
+        text = text.replace(marker, html.escape(formula, quote=False))
+    return text
+
+
+class MathExtension(Extension):
+    """Keep TeX opaque to tables and inline Markdown, including TOC labels."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.replacements: dict[str, str] = {}
+
+    def extendMarkdown(self, md: markdown.Markdown) -> None:
+        replacements = self.replacements
+
+        class MathPreprocessor(Preprocessor):
+            def run(self, lines: list[str]) -> list[str]:
+                protected, formulas = protect_math("\n".join(lines))
+                replacements.update(formulas)
+                return protected.split("\n")
+
+        class MathPostprocessor(Postprocessor):
+            def run(self, text: str) -> str:
+                return restore_math(text, replacements)
+
+        md.registerExtension(self)
+        # Fenced code runs at 25; formulas must be opaque before table parsing.
+        md.preprocessors.register(MathPreprocessor(md), "protect_math", 24)
+        # TOC rendering invokes postprocessors too, restoring its formula labels.
+        md.postprocessors.register(MathPostprocessor(md), "restore_math", 5)
+
+    def reset(self) -> None:
+        self.replacements.clear()
+
+    def heading_slug(self, value: str, separator: str) -> str:
+        # Preserve links to existing formula headings from the delimiter-only renderer.
+        for marker, formula in self.replacements.items():
+            value = value.replace(marker, formula)
+        # TOC may already have restored formulas while extracting heading text.
+        for delimiter, legacy in (
+            (r"\[", "MATHDISPLAYOPEN42"),
+            (r"\]", "MATHDISPLAYCLOSE42"),
+            (r"\(", "MATHINLINEOPEN42"),
+            (r"\)", "MATHINLINECLOSE42"),
+        ):
+            value = value.replace(delimiter, legacy)
+        return slugify(value, separator)
+
+
+def render_markdown(text: str) -> tuple[str, str]:
+    math_extension = MathExtension()
+    md = markdown.Markdown(
+        extensions=["fenced_code", "tables", "toc", "sane_lists", math_extension],
+        extension_configs={"toc": {"slugify": math_extension.heading_slug}},
+    )
+    body = md.convert(text)
+    return body, md.toc
 
 
 def diagram_embed(diagram_name: str, diagram_dir: Path) -> str:
@@ -461,7 +557,7 @@ def index_page(reading_times: dict[str, int]) -> str:
       <main class="archive-main" id="main-content">
         <header class="archive-intro">
           <h2><span data-lang="en">Learning paths</span><span data-lang="zh">从模仿学习到 VLA</span></h2>
-          <p><span data-lang="en">A dependency-first map of machine-learning foundations, imitation learning, VLA architectures, engineering, runtime systems, and tactile robotics. Articles are grouped by learning path rather than publication order.</span><span data-lang="zh">这里不再按笔记产生时间排成一条长列表，而是按知识依赖分成六卷。初学者建议从 F01 开始；已有基础的读者可以直接选择 VLA、工程、部署或触觉分支。</span></p>
+          <p><span data-lang="en">Six connected paths through representations, action generation, VLA architectures, training, runtime, and tactile robotics. Follow PI0.5 into FAST/KI supervision and fine-tuning, or connect DP/ACT to tactile memory and experiments.</span><span data-lang="zh">按知识依赖分成六卷。从 F01 建立总地图，沿 IL04 理解 DP / ACT，再从 VLA02 的 PI0.5 结构进入 VLA03 的 FAST/KI 训练与微调；触觉阅读地图继续连接输入表示、历史记忆和实验验证。</span></p>
         </header>
         <div class="series-grid">{series_cards}</div>
         <div class="archive-filters" role="group" aria-label="按知识链筛选文章">
@@ -524,15 +620,11 @@ def main() -> None:
         reading_times[post.code] = reading_time(raw)
         raw_without_title = re.sub(r"^[ \t]*# .+?\n+", "", raw, count=1)
         rewritten = rewrite_links(raw_without_title, posts_by_source)
-        rewritten, math_replacements = protect_math(rewritten)
-        md = markdown.Markdown(extensions=["fenced_code", "tables", "toc", "sane_lists"])
-        body = md.convert(rewritten)
-        for marker, delimiter in math_replacements.items():
-            body = body.replace(marker, delimiter)
+        body, toc = render_markdown(rewritten)
         diagram = diagram_embed(post.diagram, diagram_dir) if post.diagram else ""
         previous = POSTS[index - 1] if index else None
         following = POSTS[index + 1] if index + 1 < len(POSTS) else None
-        output = article_page(post, body, md.toc, diagram, previous, following, reading_times[post.code])
+        output = article_page(post, body, toc, diagram, previous, following, reading_times[post.code])
         (blog_dir / f"{post.slug}.html").write_text(output, encoding="utf-8")
 
     for legacy_slug, target_slug in LEGACY_REDIRECTS.items():

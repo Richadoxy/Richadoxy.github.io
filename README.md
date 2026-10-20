@@ -49,3 +49,5 @@ To explicitly refresh matching engineering notes and Draw.io diagrams from the e
 ```
 
 The archive is organized into six dependency-first series: foundations, imitation learning, VLA architectures, engineering, runtime/deployment, and tactile VLA. Article codes such as `F01`, `IL01`, and `VLA01` express the reading path while legacy foundation URLs redirect to their consolidated replacements.
+
+The PI0.5 path separates forward architecture (`VLA02`) from FAST/KI training and fine-tuning (`VLA03`), then connects to the engineering notes. Official openpi code references in the training article are pinned to a commit; BrainCo-IL-specific configuration examples remain identified as project extensions.

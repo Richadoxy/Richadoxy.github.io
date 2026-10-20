@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="从压阻、三维力和视触觉出发，连接标定、数值 atlas、区域 token、时间对齐与条件融合。" />
+    <title>从原始触觉到策略条件 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#0">0. 输入设计与可学习的信息</a></li>
+<li><a href="#1">1. 先区分触觉中的几种物理量</a><ul>
+<li><a href="#11">1.1 压阻阵列提供的是许多位置上的传感器响应</a></li>
+<li><a href="#12">1.2 三维力、六维力/力矩与压力图各有侧重</a></li>
+<li><a href="#13">1.3 视触觉图像记录的是传感器表面的视觉变化</a></li>
+</ul>
+</li>
+<li><a href="#2">2. 硬件配置决定输入形式</a></li>
+<li><a href="#3">3. 把原始读数组织成可学习的空间输入</a><ul>
+<li><a href="#31-cnn">3.1 规则阵列：先用二维 CNN</a></li>
+<li><a href="#32-numeric-atlas">3.2 Numeric atlas：保留数值的二维排布</a></li>
+<li><a href="#33-taxel">3.3 不规则排布：把几何附到 taxel 特征上</a></li>
+</ul>
+</li>
+<li><a href="#4">4. 坐标系决定“这里”和“这个方向”的含义</a></li>
+<li><a href="#5-tokens">5. 区域 tokens：在保留位置和控制计算量之间折中</a></li>
+<li><a href="#6">6. 标定、归一化和时间同步属于模型设计</a><ul>
+<li><a href="#61">6.1 保留绝对幅值</a></li>
+<li><a href="#62">6.2 当前值与变化率互补</a></li>
+<li><a href="#63">6.3 对齐“决策时已经收到”的信息</a></li>
+</ul>
+</li>
+<li><a href="#7-embeddingtoken">7. Embedding、token 与条件描述的是不同层面</a></li>
+<li><a href="#8">8. 一个小模型的完整输入示例</a></li>
+<li><a href="#9">9. 选择表示时的判断顺序</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span> · TOUCH10</p>
+          <h1>从原始触觉到策略条件</h1>
+          <p class="article-meta"><span data-lang="en">核心 · October 2026 · 12 min read</span><span data-lang="zh">核心 · 2026.10 · 约 12 分钟阅读</span></p>
+          <p class="article-deck">从压阻、三维力和视触觉出发，连接标定、数值 atlas、区域 token、时间对齐与条件融合。</p>
+          <div class="article-content">
+            <blockquote>
+<p>本文整理触觉模仿学习中的输入设计：先辨认传感器测到了什么，再保留空间、时间与有效性，最后把它变成策略可读取的条件。重点是小型视觉—触觉策略，具体维度均为可替换的设计示例。</p>
+<p>后续阅读：<a href="policy-memory-and-object-centric-tactile-state.html">策略记忆与对象级触觉状态</a>、<a href="tactile-memory-experiment-design.html">触觉记忆的实验设计</a>。论文实例可参考 <a href="rdp-reactive-diffusion-policy.html">RDP</a>、<a href="trex-tactile-reactive-dexterous-manipulation.html">T-Rex</a> 与 <a href="tactile-vla-physical-knowledge-force-control.html">Tactile-VLA</a>。</p>
+</blockquote>
+<h2 id="0">0. 输入设计与可学习的信息</h2>
+<p>假设掌面左右两侧都可能接触物体。若把整张压力图只压成“总读数 100”，左侧接触与右侧接触就可能变成相同输入。之后即使换更大的网络，也无法从这个数还原被提前丢掉的位置。</p>
+<p>另一种情况是逐帧把压力除以本帧最大值。轻触和重压只要形状相似，就可能得到几乎一样的归一化图。模型仍能看见接触轮廓，却不容易判断这次到底压得多重。</p>
+<p>因此，触觉输入首先是一个信息保留问题：</p>
+<pre><code class="language-text">真实接触
+   ↓ 传感器响应与标定
+数值、图像、有效性、时间戳
+   ↓ 保留位置与物理含义
+局部特征 / 区域 tokens
+   ↓ 与视觉、本体状态、历史融合
+策略条件
+   ↓ 动作生成与执行
+新的接触
+</code></pre>
+<p>这里每一步都可能丢信息。好的表示不需要保留所有原始细节，但应保留当前任务用得上的差异。</p>
+<h2 id="1">1. 先区分触觉中的几种物理量</h2>
+<h3 id="11">1.1 压阻阵列提供的是许多位置上的传感器响应</h3>
+<p>一个触觉感知单元通常称为 taxel，类似图像中的 pixel。压阻阵列输出可写成：</p>
+<p>\[
+r_t=[r_{t,1},\ldots,r_{t,N}].
+\]</p>
+<p>这里的 \(r_{t,i}\) 可能是电阻、ADC 值或厂商处理后的响应。它是否能写成压力 \(p_{t,i}\)，要看是否做过相应标定。</p>
+<p>如果没有明确的单位与标定关系，把它称为“压力响应”或“归一化触觉读数”更准确。不能仅因数值随按压增大，就把它标成牛顿。</p>
+<p>对于已经标定为压力、且每个单元有效面积 \(A_i\) 已知的阵列，可以在适用的接触假设下估算局部法向力：</p>
+<p>\[
+f_{n,i}\approx p_i A_i.
+\]</p>
+<p>若各单元位于同一平面且法向一致，求和可近似描述该面的法向载荷。对于弯曲、分布在不同手指上的传感器，还需要各自法向、坐标变换和传感器响应模型；不能把所有通道数值相加后直接称为物体所受合力。</p>
+<h3 id="12">1.2 三维力、六维力/力矩与压力图各有侧重</h3>
+<p>三维力传感器通常输出某个传感器坐标系中的：</p>
+<p>\[
+f_t=[f_x,f_y,f_z].
+\]</p>
+<p>六维 wrench 则额外包含三个力矩分量：</p>
+<p>\[
+w_t=[f_x,f_y,f_z,\tau_x,\tau_y,\tau_z].
+\]</p>
+<p>三维力提供方向信息，但单个合力向量通常不包含完整的接触分布。掌面阵列提供接触在空间上如何分布，却不能仅凭标量法向响应唯一恢复切向力。</p>
+<p>例如，一个物体在掌面上接触面积相同、法向压力相近，却可能承受不同方向的切向作用。指尖三维力可以补充相关线索，但它测到的是该指尖处的受力，不能直接当成整个掌面的剪切场。</p>
+<h3 id="13">1.3 视触觉图像记录的是传感器表面的视觉变化</h3>
+<p>视触觉可能提供 RGB、marker 位移、形变图，或由重建算法得到的深度。图像亮暗、几何形变、力值之间需要具体传感器模型连接。</p>
+<p>尤其要区分：</p>
+<table>
+<thead>
+<tr>
+<th>数据</th>
+<th>可以直接表达什么</th>
+<th>不能直接假定什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>原始视触觉 RGB</td>
+<td>颜色、纹理与接触形变线索</td>
+<td>每个像素已经对应物理力</td>
+</tr>
+<tr>
+<td>marker 位移场</td>
+<td>跟踪点的图像位移</td>
+<td>位移数值已经以牛顿计量</td>
+</tr>
+<tr>
+<td>经标定的几何深度</td>
+<td>约定坐标系下的几何量</td>
+<td>深度本身就是压力</td>
+</tr>
+<tr>
+<td>8-bit depth 可视化</td>
+<td>一种灰度编码后的外观</td>
+<td>灰度差 1 就对应固定米制深度差</td>
+</tr>
+</tbody>
+</table>
+<p><a href="https://arxiv.org/abs/2503.02881">RDP 原文</a>将光学触觉特征与机器人力/力矩作为不同输入路线使用；它们能服务相似控制任务，但数据含义并不相同。读论文或接数据集时，应先确认原始信号，再确认 encoder。</p>
+<h2 id="2">2. 硬件配置决定输入形式</h2>
+<p>下面两种配置都可以研究触觉策略，但需要不同的数据入口：</p>
+<table>
+<thead>
+<tr>
+<th>可替换案例</th>
+<th>实际输入</th>
+<th>合理的第一版编码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A：掌面压阻＋指尖三维力</td>
+<td>掌面标量阵列、各指尖力向量</td>
+<td>掌面小 CNN＋指尖共享 MLP</td>
+</tr>
+<tr>
+<td>B：掌面和指节压阻＋指尖视触觉</td>
+<td>多区域标量阵列、各指尖图像</td>
+<td>区域阵列编码＋指尖共享 CNN</td>
+</tr>
+</tbody>
+</table>
+<p>案例 A 中没有指节密集阵列，就不应给模型设计一个“指节压力图”输入；案例 B 的指尖图像也不应被默认为三维力。</p>
+<p>更换硬件、mapping 或传感器固件时，应保存对应版本信息，例如 taxel 数量、通道到区域的映射、左右手、单位、图像编码与失效通道。这样，同样名为 <code>tactile</code> 的字段才不会在不同数据中代表完全不同的东西。</p>
+<h2 id="3">3. 把原始读数组织成可学习的空间输入</h2>
+<h3 id="31-cnn">3.1 规则阵列：先用二维 CNN</h3>
+<p>如果掌面传感器本身是规则的 \(H_p\times W_p\) 网格，可以构造：</p>
+<p>\[
+X_t^{\rm palm}\in\mathbb R^{B\times C\times H_p\times W_p}.
+\]</p>
+<p>一个实用的三通道起点是：</p>
+<ol>
+<li>归一化压力响应；</li>
+<li>当前测量有效性；</li>
+<li>静态几何占位，即该网格位置是否真实存在传感器。</li>
+</ol>
+<p>这三层区分了“没有 taxel”“taxel 当前坏了”和“taxel 正常且没有接触”。无效位置可以填固定值，但必须让 mask 与它一起进入编码器。</p>
+<p>在此基础上，小 CNN 输出若干局部特征，再按掌面区域池化。对于第一版模型，不必立即使用大型视觉主干。</p>
+<h3 id="32-numeric-atlas">3.2 Numeric atlas：保留数值的二维排布</h3>
+<p>Atlas 可以理解为把各传感器区域排到一张约定的二维地图上。<strong>地图承载的是数值与对应关系，不必先渲染成彩色热力图。</strong></p>
+<p>彩色热力图适合人看，但 colormap 会增加无关的颜色变换，甚至受到绘图范围和压缩影响。直接存数值、mask 与 mapping 更容易保持可复现性。</p>
+<p>Atlas 的邻接也需要解释。两个手指区域在画布上相邻，不意味着它们在真实手上贴在一起。可以给区域之间留间隔、分别编码后融合，或者通过明确的几何邻接建立交互。</p>
+<h3 id="33-taxel">3.3 不规则排布：把几何附到 taxel 特征上</h3>
+<p>对于不同 link 上分布不均匀的 taxel，可以组织：</p>
+<p>\[
+u_{t,i}=
+[\bar r_{t,i},\dot{\bar r}_{t,i},v_{t,i},\Delta t_{t,i},
+e_{\rm link(i)},p_i,n_i].
+\]</p>
+<p>其中 \(v\) 是有效性，\(\Delta t\) 是观测年龄，\(e_{\rm link}\) 是区域或 link 身份，\(p_i,n_i\) 是已标定的位置与法向。没有可靠几何标定时，可以先使用区域 ID，不必填入臆造的坐标。</p>
+<p>共享 MLP、局部图网络或局部 attention 都可以读取这种输入。<a href="https://arxiv.org/abs/2410.24091">3D-ViTac</a>提供了一个相关实例：在统一三维空间内保留视觉与触觉的空间关系，再接扩散策略。它支持“几何关系值得保留”这一设计方向，不意味着所有平台都必须采用同一种点云网络。</p>
+<h2 id="4">4. 坐标系决定“这里”和“这个方向”的含义</h2>
+<p>手指弯曲后，传感器还在原来的 link 上，但它相对于掌面的方向已经改变。若要比较不同手型下的触觉，必须提供关节状态，或显式使用正运动学更新几何。</p>
+<p>设 \(\ell\) 为传感器所在 link，\(P\) 为手掌坐标系：</p>
+<p>\[
+\begin{aligned}
+p_i^P &amp;= R_{P\ell}(q_t)p_i^\ell+t_{P\ell}(q_t),\\
+n_i^P &amp;= R_{P\ell}(q_t)n_i^\ell.
+\end{aligned}
+\]</p>
+<p>位置需要旋转和平移，法向只需要旋转。三维力向量同样只做旋转：</p>
+<p>\[
+f^P=R_{PS}(q_t)f^S.
+\]</p>
+<p>若处理六维 wrench，改变力矩参考原点时还会涉及力臂项，不能把六个数一律当作两个无关三维向量。</p>
+<p>一种便于维护的输入方案是同时保留固定的局部身份，以及当前关节状态。需要跨区域几何融合时，再增加掌坐标中的位置和法向。双手系统还应明确左右手与共享基座坐标，不要仅凭图像左右翻转来推断物理方向。</p>
+<h2 id="5-tokens">5. 区域 tokens：在保留位置和控制计算量之间折中</h2>
+<p>几百个 taxel 不一定都要直接进入全局 attention。可以先局部编码，再生成少量区域 token：</p>
+<pre><code class="language-text">每个 taxel 的数值与有效性
+            ↓ 局部 CNN / 共享 MLP / 局部图
+局部接触特征
+            ↓ 按物理区域池化
+掌区 1、掌区 2、指尖 1、指尖 2……的 tokens
+            ↓ 小型融合网络
+当前触觉表示
+</code></pre>
+<p>区域池化可以组合均值、最大值或可学习 attention。只取均值可能掩盖一个很小的高压点，因此还可以保留峰值、接触比例和有效覆盖率作为补充。</p>
+<p>对于规则平面阵列，在接触量足够、读数可比较时，可以计算压力加权中心：</p>
+<p>\[
+\bar p_t=
+\frac{\sum_i v_{t,i}w_{t,i}p_i}
+{\sum_i v_{t,i}w_{t,i}+\epsilon}.
+\]</p>
+<p>这里 \(w_i\) 必须是非负权重，并先扣除无接触基线、按传感器标定处理接触阈值。不要直接代入 z-score 标准化后含负数的输入，否则分母可能相互抵消。如果采用未经物理标定的响应，只能称为响应加权中心；若要解释为压力中心，应使用局部法向力作为权重，例如压力乘以 taxel 有效面积，并说明阵列的平面和坐标约定。</p>
+<p>没有接触时，中心没有可靠意义，需要单独的有效标志。多个接触斑块的加权中心也不等于任何一个物体的中心。</p>
+<p><strong>统计量适合作为补充，而不宜过早替代完整的空间编码。</strong> 两个分离的接触点与一个中央接触点，可能具有相似均值和中心，却需要完全不同的动作。</p>
+<h2 id="6">6. 标定、归一化和时间同步属于模型设计</h2>
+<h3 id="61">6.1 保留绝对幅值</h3>
+<p>可以用训练集拟合的固定统计量进行标准化：</p>
+<p>\[
+\bar r_{t,i}=\frac{r_{t,i}-\mu_i}{\max(\sigma_i,\epsilon)}.
+\]</p>
+<p>也可以使用固定量程缩放。关键是保持训练与部署的一致性，避免每帧独立缩放抹掉载荷变化。无效通道不参与统计拟合；若不同通道尚未物理标定，标准化也不会自动让它们具有相同力学含义。</p>
+<p>原始数据应保留，以便重新标定。夹紧到固定范围可以限制异常值影响，但应记录饱和或裁剪标志，否则模型无法区分“刚达到上限”和“已经远超上限”。</p>
+<h3 id="62">6.2 当前值与变化率互补</h3>
+<p>变化率可以用相邻有效测量和真实时间差计算：</p>
+<p>\[
+\dot r_{t,i}\approx
+\frac{r_{t,i}-r_{t-1,i}}{t_i-t_{i,\rm prev}}.
+\]</p>
+<p>它有助于表达接触建立、释放和迁移，但会放大噪声。两个样本相隔太久、其中一个无效或处于饱和状态时，变化率也应标为不可用。</p>
+<p>压阻迟滞、零点漂移和加载速度都可能影响读数。应通过重复加载/卸载与静置测试了解这些现象，避免把传感器自身的历史效应误认成物体运动。神经网络可以学习补偿的一部分，但前提是数据覆盖了这些情况。</p>
+<h3 id="63">6.3 对齐“决策时已经收到”的信息</h3>
+<p>视觉、压力、指尖力和机器人状态通常不是同时到达。一个因果的起点是：在决策时刻读取各流最近一次已经到达的有效测量，并提供观测年龄。</p>
+<p>离线记录中知道未来会来哪一帧，不代表线上可以提前使用它。居中平滑、使用未来样本的插值，以及事后补齐的物体位置，都需要检查是否会泄漏未来信息。</p>
+<p>若在高频触觉降采样时提取均值、峰值或接触事件，统计窗口也只能覆盖当前及过去。频率应来自真实时间戳和链路测量，不能直接把文件的帧索引速率当成所有传感器的采样率。</p>
+<h2 id="7-embeddingtoken">7. Embedding、token 与条件描述的是不同层面</h2>
+<p>Embedding 是数值表示；token 强调它作为序列中的一个元素；条件描述它在生成模型中的作用。同一个向量可以同时是触觉 embedding、一个 tactile token，以及动作生成的条件。</p>
+<p>设当前视觉、触觉和本体特征分别为 \(z_t^v,z_t^T,z_t^q\)，最简单的条件是：</p>
+<p>\[
+c_t=\operatorname{MLP}([z_t^v;z_t^T;z_t^q]).
+\]</p>
+<p>随后，扩散策略根据它生成动作：</p>
+<p>\[
+\epsilon_\theta(A_t^k,k,c_t).
+\]</p>
+<p>输入中 \(A_t^k\) 是带噪动作，\(k\) 是去噪步，\(c_t\) 是固定于这次动作采样的观测条件。触觉并不需要变成离散词表，才有资格影响生成。</p>
+<p>常见的读取接口包括：</p>
+<table>
+<thead>
+<tr>
+<th>接口</th>
+<th>计算形式</th>
+<th>它做的事</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>拼接与 MLP</td>
+<td>\(c=F([z^v;z^T;z^q])\)</td>
+<td>合成统一条件向量</td>
+</tr>
+<tr>
+<td>FiLM</td>
+<td>\(h'=\gamma(c)\odot h+\beta(c)\)</td>
+<td>用条件调节中间特征</td>
+</tr>
+<tr>
+<td>Cross-attention</td>
+<td>动作特征作 Q，观测 tokens 作 K/V</td>
+<td>从不同观测条目中读取信息</td>
+</tr>
+</tbody>
+</table>
+<p><a href="https://github.com/real-stanford/diffusion_policy/blob/main/diffusion_policy/model/diffusion/conditional_unet1d.py">DP 官方 U-Net</a>有全局条件入口，并在条件残差块中使用特征调制；实际是否预测 scale 与 bias 由配置决定。这说明加入触觉可以先改变条件分支，不必重写整个动作生成器。</p>
+<h2 id="8">8. 一个小模型的完整输入示例</h2>
+<p>以案例 A 为例，下面给出可实现的第一版；\(B\) 为 batch size，\(J\) 为装有三维力传感器的指尖数：</p>
+<pre><code class="language-text">掌面压力 / validity / 几何占位 [B,3,H_p,W_p]
+    → 小 CNN → 掌区特征 [B,R_p,64]
+
+各指尖力 / validity / 观测年龄 / 指尖身份
+    → 共享 MLP → 指尖特征 [B,J,64]
+
+掌区与指尖特征
+    → 区域融合 → 当前触觉 z_T [B,128]
+
+图像 → 视觉编码器 → z_v
+关节状态、腕部状态 → MLP → z_q
+
+[z_T,z_v,z_q] → 条件 MLP → c [B,256]
+                                      ↓
+                              条件动作生成器
+</code></pre>
+<p>这里的 64、128、256 都只是起步维度。若使用案例 B，应把指尖力 MLP 换成符合真实图像格式的 CNN，并增加实际存在的压力区域；不要把两套配置的所有输入默认堆在一起。</p>
+<p>需要历史时，在条件分支加入记忆模块，同时保留当前触觉直达策略的路径。这样，策略既能读取长期线索，也能及时响应眼前变化。其训练与运行方式见<a href="policy-memory-and-object-centric-tactile-state.html">下一篇</a>。</p>
+<h2 id="9">9. 选择表示时的判断顺序</h2>
+<p>先确定任务依赖哪些差异：接触位置、绝对载荷、方向、短时变化，还是多物体归属。然后检查真实传感器能提供哪些证据，再选择空间表示和时间模块。</p>
+<p>规则掌面阵列通常可以从小 CNN 开始；固定数量的三维力向量可以从 MLP 开始；跨 link 的不规则传感器在几何标定充分时可以增加几何特征。区域 token 为后续时序记忆保留了可区分的接触位置。</p>
+<p>表示是否有效，最终要看它是否帮助后续决策。接触分类或重建做得好，可以说明 encoder 学到了一部分规律；要证明它改善了操作，还需要有效动作示范和独立闭环实验，见<a href="tactile-memory-experiment-design.html">实验设计篇</a>。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="trex-tactile-reactive-dexterous-manipulation.html">← TOUCH09 · T-Rex 精读：高频触觉反应与级联 Flow Matching</a>
+            <a href="cgp-contact-grounded-policy.html">TOUCH11 · CGP 精读：状态、触觉与接触一致的控制 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

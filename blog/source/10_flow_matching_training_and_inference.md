@@ -12,7 +12,62 @@ a：数据集中的真实 action chunk，shape [B,H,D]
 t：flow timestep，每个训练样本采一个标量
 ```
 
-模型不直接监督“预测最终 action”，而是在噪声和 action 之间构造中间点 `x_t`，监督模型预测该位置的速度方向。
+本篇使用速度参数化：在噪声和 action 之间构造中间点 `x_t`，监督模型预测该位置的生成速度。它是动作生成的一种参数化，并不排除直接预测干净动作的其他生成模型。
+
+### 1.1 从一个答案到一条生成路径
+
+确定性行为克隆输入 observation，直接输出一个动作块；flow 输入 observation、当前带噪动作和生成阶段，输出动作张量下一步应怎样变化。前者学习一个点预测，后者学习如何搬运整个噪声分布。
+
+同一个观测下，可以从障碍物左侧绕，也可以从右侧绕。直接 MSE 回归容易把两条路线平均；生成模型则允许不同的随机起点最终形成不同路线。随机性提供表达多个模式的入口，但实际是否学到这些模式仍取决于数据和训练。
+
+在线性路径约定 \(x_s=(1-s)\epsilon+sA\) 下，单个训练样本的速度是 \(A-\epsilon\)。网络并不知道采样时对应的两个真实端点；MSE 训练的理想预测是给定 \(x_s,s,c\) 后的条件平均速度。把许多样本的局部监督汇总起来，才形成推理时可用的速度场。[Flow Matching 原论文](https://arxiv.org/abs/2210.02747)
+
+### 1.2 噪声、干净动作和速度是不同参数化
+
+先写一个通用的带噪样本：
+
+\[
+x_s=\alpha_s A+\sigma_s\epsilon.
+\]
+
+如果模型预测噪声，则在 \(\alpha_s\ne0\) 时可以换算成干净动作估计：
+
+\[
+\hat A=\frac{x_s-\sigma_s\hat\epsilon}{\alpha_s}.
+\]
+
+这就是预测噪声能够服务于去噪的直接联系。两种预测使用相同的带噪输入与条件；它们都不同于只根据 observation 输出动作的一次性回归。
+
+不过，“预测可以互相换算”并不意味着未加权的 loss 完全相同。对按上式转换的预测，有：
+
+\[
+\|\hat A-A\|^2
+=\frac{\sigma_s^2}{\alpha_s^2}\|\hat\epsilon-\epsilon\|^2.
+\]
+
+相同预测误差会被噪声阶段重新加权。时间采样分布、SNR 和 loss 权重会共同影响训练；在系数为零的端点也不能直接除法换算。[DDPM 原论文](https://arxiv.org/abs/2006.11239)
+
+对于噪声到动作的直线路径，速度 \(u=A-\epsilon\) 又满足：
+
+\[
+A=x_s+(1-s)u,\qquad \epsilon=x_s-su.
+\]
+
+所以预测速度也能推导出端点估计。若只优化对应的动作重建误差，则它相对于速度 MSE 多出 \((1-s)^2\) 的权重。选择参数化时，必须同时考虑路径、损失和采样器，不能仅比较输出名字。
+
+扩散文献中的一种 \(v\)-prediction 定义为 \(v=\alpha_s\epsilon-\sigma_s A\)。它与一般路径导数 \(\alpha'_s A+\sigma'_s\epsilon\) 的关系取决于调度和时间参数；不能因为都叫 velocity 就直接等同于线性 FM 的 \(A-\epsilon\)。这种扩散参数化可见 [Progressive Distillation](https://arxiv.org/abs/2202.00512)。
+
+### 1.3 三种时间与两种速度
+
+| 量 | 含义 | 典型单位或索引 |
+| --- | --- | --- |
+| 机器人时间 \(\tau\) | 观测采集和控制执行经过的时间 | 秒、控制周期 |
+| 动作块位置 \(h\) | 未来第几个命令 | \(0,\ldots,H-1\) |
+| 生成时间 \(s\) 或离散步 \(k\) | 动作张量从噪声变为样本的阶段 | 无量纲区间或采样索引 |
+| 关节速度 \(\dot q\) | 机器人关节随实际时间变化 | rad/s 等 |
+| 生成速度 \(dx_s/ds\) | 带噪动作张量随生成时间变化 | 取决于动作表示和归一化 |
+
+如果 action 本身定义成速度命令，生成模型的最终输出可以交给速度控制器；但模型内部预测的 flow velocity 仍然是生成路径上的导数。两者处在不同层级。
 
 ## 2. PI0.5 的约定
 
@@ -66,7 +121,7 @@ t = 1：真实 action
 
 不能只看“t=0”或“t=1”判断实现是否相同。
 
-## 4. timestep 为什么不是监督目标
+## 4. timestep 提供噪声阶段条件
 
 训练监督仍然是：
 
@@ -92,7 +147,7 @@ v_θ(x_t, t, image, language, state)
 
 “条件”表示在给定 t、图像、语言和 state 的情况下预测速度；它不表示这些输入都是 loss target。
 
-## 5. 训练时存在推理去噪步数吗
+## 5. 单次训练前向与多步推理
 
 通常不存在“一次训练样本内部跑 10 次去噪”的过程。
 
@@ -115,7 +170,7 @@ t_0 -> t_1 -> ... -> t_10
 
 有些实现会把 t 离散成 bucket 用于 embedding，例如 GR00T 的 1000 个 timestep buckets。这仍不等于推理必须执行 1000 步。
 
-## 6. 40k training steps 对应多少次 loss
+## 6. 训练步数、样本数与损失聚合
 
 如果训练配置是：
 
@@ -139,7 +194,7 @@ num_train_steps = 40,000
 
 如果使用梯度累积，则 micro-batch forward 次数可能更多，但 optimizer step 仍以配置和训练循环定义为准。
 
-## 7. 训练时反向更新什么
+## 7. 梯度路径与参数更新
 
 计算：
 
@@ -147,7 +202,7 @@ num_train_steps = 40,000
 L_FM = MSE(v_pred, velocity_target)
 ```
 
-自动求导会沿预测路径更新所有允许训练的参数，例如：
+反向传播沿预测路径计算梯度，优化器更新纳入参数组且具有有效梯度的参数，例如：
 
 - action input/output projection；
 - Action Expert 或 DiT；
@@ -157,7 +212,7 @@ L_FM = MSE(v_pred, velocity_target)
 
 噪声、t、真实 action 和 target velocity 都是构造出来的训练数据，不是可训练参数。
 
-## 8. 推理如何从噪声得到 action
+## 8. 推理：从噪声到动作的数值积分
 
 推理没有真实 action，先采样：
 
@@ -214,7 +269,7 @@ noise -> iterative denoising -> action chunk
 
 VLASH 不需要改变 PI0.5 的 flow objective；它改变的是训练样本的时间对齐和部署调度条件。
 
-## 11. 阅读 Flow Matching 代码的检查表
+## 11. 从路径定义到部署接口
 
 看到一个新 VLA 的 action generator 时，依次检查：
 
@@ -228,3 +283,5 @@ VLASH 不需要改变 PI0.5 的 flow objective；它改变的是训练样本的�
 8. 最终输出是否需要 slice、unnormalize 或坐标变换。
 
 PI0.5 的完整结构和公式也可以配合 [pi05_structure.drawio](pi05_structure.drawio) 阅读。
+
+这条知识链的分工是：**概率路径定义中间样本，训练目标定义局部监督，网络学习条件速度场，积分器生成动作块，执行系统把命令放到真实时间轴。** 采样加速可以继续阅读 [生成一致性与采样蒸馏](37_generative_consistency_and_sampling_distillation.md)，与经典策略的比较见 [DP 与 ACT](36_diffusion_policy_and_act.md)。

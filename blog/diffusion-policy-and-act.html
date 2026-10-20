@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="拆解 DP 的 U-Net 与 Transformer、条件特征和噪声预测，再对照 ACT 的 CVAE、动作块与预训练。" />
+    <title>Diffusion Policy 与 ACT：小型策略的训练和推理 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 方法、网络与控制接口分开理解</a></li>
+<li><a href="#2">2. 三个时间尺度与一组张量</a></li>
+<li><a href="#3-embedding">3. 观测 embedding 如何成为条件</a></li>
+<li><a href="#4-dp">4. DP 的训练：人为加噪，再预测这份噪声</a><ul>
+<li><a href="#41">4.1 噪声预测如何实现去噪</a></li>
+<li><a href="#42">4.2 直接回归动作与预测干净样本</a></li>
+</ul>
+</li>
+<li><a href="#5-u-net-dp">5. U-Net DP：沿动作时间轴做卷积</a></li>
+<li><a href="#6-transformer-dp-token">6. Transformer DP：动作 token 读取观测条件</a><ul>
+<li><a href="#61-token">6.1 因果注意力不等于逐 token 生成动作</a></li>
+</ul>
+</li>
+<li><a href="#7">7. 推理：采样器把噪声预测变成动作</a></li>
+<li><a href="#8-act-cvae">8. ACT：用 CVAE 训练动作分块策略</a><ul>
+<li><a href="#81">8.1 训练网络的输入输出</a></li>
+<li><a href="#82-kl">8.2 重建项与 KL 的分工</a></li>
+</ul>
+</li>
+<li><a href="#9-act-temporal-ensembling-dp">9. ACT 的 temporal ensembling 与 DP 的滚动执行</a></li>
+<li><a href="#10">10. 参数量与预训练需要分层记录</a></li>
+<li><a href="#11">11. 开源数据与“必须预训练”的关系</a></li>
+<li><a href="#12">12. 知识关系</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span> · IL04</p>
+          <h1>Diffusion Policy 与 ACT：小型策略的训练和推理</h1>
+          <p class="article-meta"><span data-lang="en">核心 · October 2026 · 16 min read</span><span data-lang="zh">核心 · 2026.10 · 约 16 分钟阅读</span></p>
+          <p class="article-deck">拆解 DP 的 U-Net 与 Transformer、条件特征和噪声预测，再对照 ACT 的 CVAE、动作块与预训练。</p>
+          <div class="article-content">
+            <p>Diffusion Policy（DP）和 Action Chunking with Transformers（ACT）都能从示范中的 observation–action 对学习机器人策略。两者都会预测一段动作，但内部生成过程不同：DP 多次修正一段带噪动作，ACT 用条件变分自编码器的训练方式学习一次输出整段动作的策略。</p>
+<p>阅读顺序可以是：<a href="imitation-learning-behavior-cloning.html">模仿学习基础</a> → <a href="action-generation-mse-token-diffusion-flow.html">动作生成方法总览</a> → 本文 → <a href="10-flow-matching-training-inference.html">Flow Matching</a> 与 <a href="generative-consistency-and-sampling-distillation.html">生成一致性和采样蒸馏</a>。</p>
+<h2 id="1">1. 方法、网络与控制接口分开理解</h2>
+<p>一个机器人策略可以拆成三层：</p>
+<pre><code class="language-text">传感器输入
+    ↓ 感知与历史编码
+决策条件 c
+    ↓ 动作生成网络及其训练目标
+一段动作 A
+    ↓ 选择执行前缀、反归一化、控制接口
+机器人执行并产生新观测
+</code></pre>
+<p>DP 指的是用条件扩散生成动作的策略方法。动作网络可以是 U-Net，也可以是 Transformer。它既可以独立接图像和本体状态，也可以接在更大的感知模型后面。因此，DP 没有一个由名字决定的固定参数量，原始 DP 也不是必须依赖 VLM 的 action expert。</p>
+<p>原始 DP 研究机器人视觉运动模仿学习，将动作扩散、视觉条件和滚动执行结合起来。ACT 则来自 ALOHA 的精细双臂操作研究，将动作分块和 CVAE 训练结合起来。它们的原始任务背景分别见 <a href="https://diffusion-policy.cs.columbia.edu/">DP 项目页</a> 和 <a href="https://tonyzhaozh.github.io/aloha/">ACT 项目页</a>。</p>
+<p>本文的具体维度例子用于解释张量流向，不是全部论文实验的统一配置。原论文的设计、官方实现中可选的分支，以及示意尺寸，会分别说明。</p>
+<h2 id="2">2. 三个时间尺度与一组张量</h2>
+<p>定义：</p>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>含义</th>
+<th>典型形状</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>\(t\)</td>
+<td>机器人真实运行的时刻</td>
+<td>标量或时间戳</td>
+</tr>
+<tr>
+<td>\(T_o\)</td>
+<td>输入的观测历史长度</td>
+<td>例如2帧</td>
+</tr>
+<tr>
+<td>\(H\)</td>
+<td>模型预测的动作序列长度</td>
+<td>例如16步</td>
+</tr>
+<tr>
+<td>\(T_a\)</td>
+<td>重规划前执行的动作步数</td>
+<td>例如4步或8步</td>
+</tr>
+<tr>
+<td>\(k\)</td>
+<td>扩散噪声级，不是机器人时间</td>
+<td>每个训练样本一个整数</td>
+</tr>
+<tr>
+<td>\(D_a\)</td>
+<td>单步动作维度</td>
+<td>由机器人接口决定</td>
+</tr>
+<tr>
+<td>\(A^0\)</td>
+<td>数据集中的归一化动作序列</td>
+<td>\([B,H,D_a]\)</td>
+</tr>
+<tr>
+<td>\(A^k\)</td>
+<td>第 \(k\) 个噪声级的动作</td>
+<td>\([B,H,D_a]\)</td>
+</tr>
+<tr>
+<td>\(c\)</td>
+<td>由观测得到的条件</td>
+<td>向量或 token 序列</td>
+</tr>
+</tbody>
+</table>
+<p>例如，一段长度16的动作序列可以由8次去噪生成，再只执行其中4步。这里的16、8、4分别描述预测长度、采样计算次数和真实执行长度，彼此不能代替。</p>
+<p>动作维度也需要看控制器：它可能包含关节位置、末端位姿、夹爪开度等。模型输出的目标关节位置与实际测得的关节位置不是同一类数据，后者通常属于 observation。</p>
+<h2 id="3-embedding">3. 观测 embedding 如何成为条件</h2>
+<p>“Embedding”描述数据的表示形式；“condition”描述它在概率模型中的作用。一个观测 embedding 被用于决定生成什么动作时，它就是条件特征。</p>
+<p>\[
+Z_o=E_{\mathrm{obs}}(O),\qquad p_\theta(A\mid Z_o).
+\]</p>
+<p>以图像和本体状态为例：</p>
+<pre><code class="language-text">图像历史                   [B, To, Ncam, 3, Himg, Wimg]
+    ↓ 各帧视觉编码
+每时刻的视觉特征           [B, To, Dv]
+    + 本体状态              [B, To, Dq]
+    ↓ 拼接或投影
+观测特征 Zo                [B, To, Do]
+
+U-Net 分支：展平历史 → c    [B, To × Do]
+Transformer 分支：逐步投影  [B, To, d]
+</code></pre>
+<p>条件可以通过拼接、FiLM 或 cross-attention 被读取，不必始终变成一个额外 token。FiLM 等通用机制见 <a href="19-attention-openclip-tactile-groot.html">从表示到 Policy 融合</a>。</p>
+<p>DP 的常见视觉条件配置只给动作加噪，图像特征不参与动作去噪。一次采样中，观测编码通常只做一次，随后重复调用动作网络。训练时如果视觉编码器未冻结，动作损失仍会反传到视觉分支。</p>
+<p>原论文主配置使用未预训练的 ResNet-18，采用空间 softmax 保留位置信息，并用 GroupNorm 替换 BatchNorm。论文也讨论了其他预训练和微调选择，因此这是一种具体实验配置，不是所有 DP 的规定。<a href="https://arxiv.org/html/2303.04137v5#S3.SS2">DP 论文第3.2节</a></p>
+<p>连续动作通常先归一化，再经过线性层或卷积。这个过程不需要文本词表，也不必把动作量化成离散ID。“一个动作时刻对应一个 token”可以只是把该时刻的连续向量投影到 hidden width，token 在这里不等于词。<a href="multimodal-encoder-alignment-infonce.html">输入单元与编码器的区别</a></p>
+<h2 id="4-dp">4. DP 的训练：人为加噪，再预测这份噪声</h2>
+<p>采用标准 DDPM 记号：</p>
+<p>\[
+\alpha_k=1-\beta_k,\qquad
+\bar\alpha_k=\prod_{j=1}^{k}\alpha_j.
+\]</p>
+<p>随机采样真实动作 \(A^0\)、噪声级 \(k\) 和高斯噪声 \(\epsilon\)，直接构造：</p>
+<p>\[
+A^k=\sqrt{\bar\alpha_k}A^0+
+\sqrt{1-\bar\alpha_k}\epsilon,
+\qquad \epsilon\sim\mathcal N(0,I).
+\]</p>
+<p>模型输出：</p>
+<p>\[
+\hat\epsilon=\epsilon_\theta(A^k,k,c).
+\]</p>
+<p>常见简化损失为：</p>
+<p>\[
+\mathcal L_{\mathrm{DP}}
+=\mathbb E_{(O,A^0),k,\epsilon}
+\left[\left\|\epsilon_\theta(A^k,k,E_{\mathrm{obs}}(O))-\epsilon\right\|_2^2\right].
+\]</p>
+<p>式中的期望表示对训练样本、噪声级和噪声采样求平均。监督目标是<strong>这一轮实际采出来的噪声张量</strong>，不是高斯噪声的均值0，也不是传感器测得的环境噪声。</p>
+<pre><code class="language-text">专家动作 A0 ──────┐
+                 ├→ 按噪声级 k 加噪 → Ak ──┐
+随机噪声 ε ──────┘                         │
+                                           ↓
+观测 O → Encoder → c ───────────────→ 去噪网络 → ε_pred
+噪声级 k ──────────────────────────→             │
+                                                ↓
+                                  与本次采样的 ε 做 MSE
+                                                ↓
+                         更新去噪网络和允许训练的观测编码器
+</code></pre>
+<p>加噪公式可以一步得到任意 \(k\) 的输入，不必先循环加噪100次。一次训练样本通常只抽一个 \(k\)，完成一次去噪网络前向。上述形式来自 <a href="https://arxiv.org/abs/2006.11239">DDPM 训练目标</a>，DP 将其中的生成对象替换为动作，并增加观测条件。</p>
+<h3 id="41">4.1 噪声预测如何实现去噪</h3>
+<p>从加噪公式移项，可以构造干净动作估计：</p>
+<p>\[
+\hat A^0=
+\frac{A^k-\sqrt{1-\bar\alpha_k}\hat\epsilon}
+{\sqrt{\bar\alpha_k}}.
+\]</p>
+<p>因此，预测噪声是一种表达去噪结果的方式。网络先估计需要扣除的分量，采样器再根据噪声级把它换算成下一步动作。</p>
+<p>这并不意味着模型能从一份接近纯噪声的输入中，唯一找回训练时配对的那条动作。同样的观测可能对应多条合理轨迹；模型学习的是不同噪声级下的条件分布信息，再通过采样产生其中一种结果。</p>
+<h3 id="42">4.2 直接回归动作与预测干净样本</h3>
+<p>下面两个网络虽然都输出动作数值，输入问题却不同：</p>
+<p>\[
+\hat A=g_\theta(c)
+\quad\text{与}\quad
+\hat A^0=f_\theta(A^k,k,c).
+\]</p>
+<p>第一个只有观测条件，用单点 MSE 训练时趋向于预测条件均值。例如，从障碍左边绕行和右边绕行都合理，平均轨迹可能穿过障碍。</p>
+<p>第二个还读取当前带噪样本和噪声级，可以作为扩散的 \(x_0\)-prediction 参数化继续迭代采样。直接输出干净动作并不自动意味着普通单步 BC。</p>
+<p>如果通过上式将噪声预测换算为 \(\hat A^0\)，可得到：</p>
+<p>\[
+\|\hat\epsilon-\epsilon\|^2
+=\frac{\bar\alpha_k}{1-\bar\alpha_k}
+\|\hat A^0-A^0\|^2.
+\]</p>
+<p>这个关系说明：两种输出在非退化噪声级可以转换，但未经权重调整的 MSE 对各噪声级施加的重视程度不同。进一步与 flow velocity 的关系见 <a href="10-flow-matching-training-inference.html">Flow Matching</a>。</p>
+<h2 id="5-u-net-dp">5. U-Net DP：沿动作时间轴做卷积</h2>
+<p>这里的 U-Net 是 <strong>1D temporal U-Net</strong>。卷积沿动作序列长度移动，动作维度作为输入通道；图像的二维卷积已经发生在视觉编码器中。</p>
+<p>以下按官方 <code>ConditionalUnet1D</code> 的全局条件分支展示一组示意配置：\(H=16\)、\(D_a=7\)、<code>down_dims=[128,256,512]</code>。实际训练可以选择其他通道数。</p>
+<pre><code class="language-text">Ak                                           [B,16,7]
+    ↓ 转置
+                                             [B,7,16]
+    ↓ ConditionalResBlock 7→128
+    ↓ ConditionalResBlock 128→128
+                                             [B,128,16]
+    ↓ Downsample ×1/2
+                                             [B,128,8]
+    ↓ ConditionalResBlock 128→256
+    ↓ ConditionalResBlock 256→256
+                    保存 S1                  [B,256,8]
+    ↓ Downsample ×1/2
+                                             [B,256,4]
+    ↓ ConditionalResBlock 256→512
+    ↓ ConditionalResBlock 512→512
+                    保存 S2                  [B,512,4]
+    ↓ 两个中间 ConditionalResBlock
+                                             [B,512,4]
+    ↓ 与 S2 在通道维拼接
+                                             [B,1024,4]
+    ↓ ConditionalResBlock 1024→256
+    ↓ ConditionalResBlock 256→256
+    ↓ Upsample ×2
+                                             [B,256,8]
+    ↓ 与 S1 在通道维拼接
+                                             [B,512,8]
+    ↓ ConditionalResBlock 512→128
+    ↓ ConditionalResBlock 128→128
+    ↓ Upsample ×2
+                                             [B,128,16]
+    ↓ Conv1d block + 1×1 Conv，128→7
+                                             [B,7,16]
+    ↓ 转置
+预测噪声                                     [B,16,7]
+</code></pre>
+<p>每个条件残差块都接收同一份全局条件，但有自己的条件投影参数：</p>
+<p>\[
+c_k=[\operatorname{TimeEmbed}(k);c].
+\]</p>
+<p>单个残差块的主要计算为：</p>
+<pre><code class="language-text">h                                  [B,Cin,L]
+    ↓ Conv1d + GroupNorm + Mish
+u                                  [B,Cout,L]
+    ↓ 使用 c_k 产生 scale / bias     [B,Cout,1]
+u' = scale × u + bias               [B,Cout,L]
+    ↓ Conv1d + GroupNorm + Mish
+    + h 的恒等或 1×1 卷积支路
+输出                               [B,Cout,L]
+</code></pre>
+<p>长度为1的调制参数广播到全部时间位置。它改变每个通道的响应，不需要把观测复制成长度16的动作 token。官方实现也支持只加条件偏置；是否同时预测scale由 <code>cond_predict_scale</code> 控制。上图选用的是包含scale的分支。<a href="https://github.com/real-stanford/diffusion_policy/blob/main/diffusion_policy/model/diffusion/conditional_unet1d.py">官方 U-Net 实现</a></p>
+<p>下采样扩大了时间感受野，上采样恢复动作分辨率，跳连保留不同尺度的序列特征。图中的通道宽度只是教学示例：官方某个训练配置使用更大的 <code>[512,1024,2048]</code>，不能据本文示意尺寸推断原实验参数量。<a href="https://github.com/real-stanford/diffusion_policy/blob/main/diffusion_policy/config/train_diffusion_unet_hybrid_workspace.yaml">官方训练配置</a></p>
+<h2 id="6-transformer-dp-token">6. Transformer DP：动作 token 读取观测条件</h2>
+<p>以下对应官方实现中 <code>time_as_cond=True</code> 且有观测条件的分支。设 \(H=16\)、\(D_a=7\)、\(T_o=2\)、hidden width为256：</p>
+<pre><code class="language-text">动作主路：
+Ak [B,16,7]
+    ↓ Linear 7→256 + action position embedding
+X  [B,16,256]
+
+条件支路：
+观测 Zo [B,2,Do] → Linear Do→256       [B,2,256]
+噪声级 k → sinusoidal embedding       [B,1,256]
+    ↓ 拼接 + condition position embedding
+                                      [B,3,256]
+    ↓ MLP 或条件 Transformer Encoder
+条件 memory M                         [B,3,256]
+
+动作 X + 条件 M
+    ↓ 多层 Transformer Decoder Block
+动作 hidden states                    [B,16,256]
+    ↓ LayerNorm + Linear 256→7
+预测噪声                              [B,16,7]
+</code></pre>
+<p>这里的 <code>memory</code> 是 Transformer cross-attention 的条件序列，不自动表示跨控制时刻保存的长期记忆。</p>
+<p>每个动作 decoder block 保持动作序列的形状：</p>
+<table>
+<thead>
+<tr>
+<th>子层</th>
+<th>Query来源</th>
+<th>Key/Value来源</th>
+<th>输入输出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Self-attention＋残差</td>
+<td>动作hidden states</td>
+<td>动作hidden states</td>
+<td>\([B,H,d]\rightarrow[B,H,d]\)</td>
+</tr>
+<tr>
+<td>Cross-attention＋残差</td>
+<td>更新后的动作hidden states</td>
+<td>条件memory</td>
+<td>\([B,H,d]\rightarrow[B,H,d]\)</td>
+</tr>
+<tr>
+<td>FFN＋残差</td>
+<td>逐token变换</td>
+<td>不适用</td>
+<td>\(d\rightarrow4d\rightarrow d\)</td>
+</tr>
+</tbody>
+</table>
+<p>官方这一路使用pre-norm：先LayerNorm，再子层计算和残差相加。条件编码器层数为0时使用MLP，否则使用Transformer编码器。噪声级在其他实现里也可以放到动作序列或调制支路，读架构图时应与具体配置对应。<a href="https://github.com/real-stanford/diffusion_policy/blob/main/diffusion_policy/model/diffusion/transformer_for_diffusion.py">官方 Transformer 实现</a></p>
+<h3 id="61-token">6.1 因果注意力不等于逐 token 生成动作</h3>
+<p>原论文使用了因果动作注意力；官方实现也提供相应开关。它规定动作位置之间的信息可见范围。</p>
+<p>但每个扩散步仍然同时提供整段 \(A^k\)，并行输出全部位置的噪声：</p>
+<pre><code class="language-text">DP：整段带噪动作 → 整段噪声预测 → 整段更新 → 下一扩散步
+AR：前缀token → 下一token → 扩展前缀 → 再预测下一token
+</code></pre>
+<p>因此，看见 causal mask 或 Transformer decoder，不能据此认定使用了自回归动作token交叉熵。DP的这条计算链仍然是扩散噪声预测。</p>
+<h2 id="7">7. 推理：采样器把噪声预测变成动作</h2>
+<p>训练时有真实动作，推理时只有观测和随机初始化：</p>
+<p>\[
+A^K\sim\mathcal N(0,I).
+\]</p>
+<p>标准DDPM的一种反向更新形式为：</p>
+<p>\[
+A^{k-1}=\frac{1}{\sqrt{\alpha_k}}
+\left(A^k-\frac{\beta_k}{\sqrt{1-\bar\alpha_k}}
+\epsilon_\theta(A^k,k,c)\right)+\sigma_k z.
+\]</p>
+<p>其中 \(z\sim\mathcal N(0,I)\)，末步不再加入随机噪声，\(\sigma_k\) 由采样器的方差设置决定。这说明去噪不是简单地在每步执行 <code>A -= noise_pred</code>，缩放和噪声日程也是算法的一部分。</p>
+<p>DDIM可以使用更少的噪声级。以确定性版本、从 \(k\) 跳到更低噪声级 \(s\) 为例，先计算 \(\hat A^0\)，再更新：</p>
+<p>\[
+A^s=\sqrt{\bar\alpha_s}\hat A^0+
+\sqrt{1-\bar\alpha_s}\hat\epsilon.
+\]</p>
+<p>这个表达省略了某些实现中的裁剪处理；使用带随机项的DDIM时还需加入对应项。DDIM改变采样过程，可以沿用相应的扩散训练模型，并不要求先做教师—学生蒸馏。<a href="https://arxiv.org/abs/2010.02502">DDIM 论文</a></p>
+<pre><code class="language-text">新观测 → 编码得到 c ───────────────────────────┐
+                                              │ 每步读取同一条件
+随机初始化 AK → 去噪步 K → … → 去噪末步 → A0   │
+                   ↑             ↑            │
+                   └─────────────┴────────────┘
+                              ↓
+                 选择可执行段并反归一化
+                              ↓
+                 执行短前缀 → 获取新观测 → 重规划
+</code></pre>
+<p>观测历史长度、预测长度和可执行段的起始位置需要与数据对齐。官方某些DP policy的动作张量包含历史对齐位置，执行段从 <code>n_obs_steps - 1</code> 开始，不能在所有实现中机械地取 <code>A[:, :n_action_steps]</code>。<a href="https://github.com/real-stanford/diffusion_policy/blob/main/diffusion_policy/policy/diffusion_unet_hybrid_image_policy.py">官方图像策略实现</a></p>
+<p>训练噪声级数量也不是固定推理步数。配置里的100可能表示训练日程有100级，不代表每条训练样本执行100次前向；推理使用DDPM还是DDIM、取多少步，要看该实验的scheduler配置。</p>
+<h2 id="8-act-cvae">8. ACT：用 CVAE 训练动作分块策略</h2>
+<p>ACT训练时有两条分支：</p>
+<ol>
+<li><strong>后验编码器</strong>读取专家动作和本体状态，得到潜变量分布。</li>
+<li><strong>动作策略</strong>读取图像、本体状态和潜变量，预测动作chunk。</li>
+</ol>
+<p>\[
+q_\phi(z\mid A,q)
+=\mathcal N\left(\mu_\phi(A,q),
+\operatorname{diag}(\sigma_\phi^2(A,q))\right).
+\]</p>
+<p>通过重参数化采样：</p>
+<p>\[
+z=\mu_\phi+\sigma_\phi\odot\xi,
+\qquad \xi\sim\mathcal N(0,I),
+\qquad \hat A=\pi_\theta(I,q,z).
+\]</p>
+<p>这里的VAE encoder不是视觉encoder。它编码的是动作示范及本体状态；视觉另有ResNet分支。CVAE描述的是包含潜变量、后验和解码器的生成学习框架，Transformer则描述其内部网络结构。<a href="https://github.com/tonyzhaozh/act/blob/main/detr/models/detr_vae.py">ACT 后验与策略实现</a></p>
+<h3 id="81">8.1 训练网络的输入输出</h3>
+<p>以下采用一般符号，\(N_v\) 是所有相机视觉特征展开后的token数：</p>
+<pre><code class="language-text">训练专用后验分支：
+专家动作 A              [B,H,Da] → Linear → [B,H,d]
+本体状态 q              [B,Dq]   → Linear → [B,1,d]
+CLS                                              [B,1,d]
+    ↓ 拼接 + 位置编码
+                                                 [B,H+2,d]
+    ↓ Transformer Encoder
+CLS输出                                         [B,d]
+    ↓ 两个参数投影
+μ、log σ²                                       [B,Dz]
+    ↓ 重参数化采样
+z                                               [B,Dz]
+
+动作策略分支：
+多相机图像 → ResNet → 空间展开 + 位置编码         [B,Nv,d]
+q → Linear                                      [B,1,d]
+z → Linear                                      [B,1,d]
+    ↓ 拼接后经过 Transformer Encoder
+融合后的 memory                                 [B,Nv+2,d]
+    ↓ 由 H 个动作query通过 Transformer Decoder读取
+动作hidden states                               [B,H,d]
+    ↓ 动作投影
+预测动作 Â                                      [B,H,Da]
+</code></pre>
+<p>动作query代表各个待预测的时间位置；它们不需要输入此前生成的动作token。因此，ACT在一次策略调用中并行输出整个chunk。</p>
+<h3 id="82-kl">8.2 重建项与 KL 的分工</h3>
+<p>按官方 <code>policy.py</code>，主要损失是masked L1重建项加KL正则：</p>
+<p>\[
+\mathcal L_{\mathrm{ACT}}
+=\mathbb E_{z\sim q_\phi}
+\left[\operatorname{MaskedL1}(\pi_\theta(I,q,z),A)\right]
++\beta D_{\mathrm{KL}}
+\left(q_\phi(z\mid A,q)\|\mathcal N(0,I)\right).
+\]</p>
+<p>对于对角高斯，KL可以写成：</p>
+<p>\[
+D_{\mathrm{KL}}
+=\frac12\sum_j
+\left(\mu_j^2+\sigma_j^2-\log\sigma_j^2-1\right).
+\]</p>
+<p>L1要求动作接近示范；KL约束后验分布不要任意偏离推理使用的先验。尾部padding动作不应形成普通有效监督，具体损失归约方式需要与实现一致。<a href="https://github.com/tonyzhaozh/act/blob/main/policy.py">ACT 官方损失</a></p>
+<p>训练时后验看到真实动作是CVAE构造的一部分，但这个分支不能在推理时继续要求真实动作。原版ACT推理舍弃后验编码器，令 \(z=0\)，即标准高斯先验的均值：</p>
+<pre><code class="language-text">训练：专家动作 + q → 后验 → 采样 z ─┐
+                                   ├→ 策略 → Â → L1 + KL
+              图像 + q ────────────┘
+
+推理：                  z = 0 ─────┐
+                                   ├→ 策略 → 动作chunk
+              图像 + q ────────────┘
+</code></pre>
+<p>一般CVAE可以从先验采样，但“原版ACT默认推理随机采样style”并不准确。使用先验均值也不等于输出示范动作的算术平均，因为解码器是非线性的。<a href="https://tonyzhaozh.github.io/aloha/">ACT 训练与推理说明</a></p>
+<h2 id="9-act-temporal-ensembling-dp">9. ACT 的 temporal ensembling 与 DP 的滚动执行</h2>
+<p>动作分块只是输出格式，不决定多久读取一次新观测。</p>
+<p>DP常见做法是生成一个chunk，执行短前缀后重新规划。ACT的temporal ensembling则允许频繁生成重叠chunk，收集不同调用对<strong>同一个执行时刻</strong>的预测：</p>
+<p>\[
+\hat a_t^{(t)},\quad
+\hat a_t^{(t-1)},\quad
+\hat a_t^{(t-2)},\ldots
+\]</p>
+<p>再加权融合：</p>
+<p>\[
+a_t=\frac{\sum_{s\in\mathcal S_t}w_{t,s}\hat a_t^{(s)}}
+{\sum_{s\in\mathcal S_t}w_{t,s}}.
+\]</p>
+<p>它融合的是对同一目标时刻的多个估计，不是把未来不同时间的动作直接平均。原论文的指数权重按其定义的预测顺序索引；不能看到指数衰减就自动断言越新的预测权重越大。<a href="https://arxiv.org/html/2304.13705v1#S4.SS1">ACT 论文第IV-A节</a></p>
+<p>平滑和快速反应之间仍有取舍。接触发生突变时，历史预测可能已经过时；更频繁地调用策略也需要真实算力支持。chunk长度、实际更新频率和传感器到命令的延迟应一起报告。</p>
+<h2 id="10">10. 参数量与预训练需要分层记录</h2>
+<p>模型“小”与是否需要预训练没有必然关系。应分别记录：</p>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>需要确认的内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>视觉/触觉encoder</td>
+<td>随机初始化，还是加载ImageNet、触觉或其他权重</td>
+</tr>
+<tr>
+<td>动作网络</td>
+<td>从任务示范训练，还是已有机器人策略初始化</td>
+</tr>
+<tr>
+<td>历史/融合模块</td>
+<td>新增随机参数，还是从已有模型迁移</td>
+</tr>
+<tr>
+<td>训练阶段</td>
+<td>哪些参数更新，哪些参数冻结</td>
+</tr>
+<tr>
+<td>参数统计</td>
+<td>全模型、可训练参数、部署保留参数分别多少</td>
+</tr>
+</tbody>
+</table>
+<p>DP论文主视觉配置从零训练，不意味着所有DP都必须如此。ACT论文写到每个任务独立训练策略，但官方视觉backbone代码使用torchvision预训练权重；<code>FrozenBatchNorm2d</code>也不等于冻结整个ResNet。描述复现实验时，应明确具体初始化与 <code>requires_grad</code> 设置。<a href="https://github.com/tonyzhaozh/act/blob/main/detr/models/backbone.py">ACT 官方 backbone</a></p>
+<p>参数量应在实际实例化后统计：</p>
+<pre><code class="language-python">total_params = sum(p.numel() for p in model.parameters())
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+</code></pre>
+<p>统计时还要说明是否包含多相机encoder、ACT训练专用后验，以及是否有共享权重。扩散网络重复执行10次并不会变成10套参数，却会增加计算量。反过来，参数更少的模型也不一定比一次前向的较大模型更快。</p>
+<h2 id="11">11. 开源数据与“必须预训练”的关系</h2>
+<p>DP官方项目提供代码、实验数据及复现入口，涉及Push-T、Robomimic等机器人任务。ACT项目也提供代码、仿真和任务数据入口。这些是示范学习资源，不等于存在一个所有DP或ACT必须使用的统一机器人预训练数据集。<a href="https://diffusion-policy.cs.columbia.edu/">DP 代码与数据入口</a>、<a href="https://github.com/tonyzhaozh/act">ACT 官方仓库</a></p>
+<p>一个任务策略可以只用该任务的有效示范训练，也可以先做视觉、触觉或多任务动作预训练。是否采用预训练，取决于数据量、域差异、模型容量和迁移收益，而不是仅由DP/ACT这个方法名决定。</p>
+<p>对触觉扩展而言，最直接的做法是增加触觉encoder，把输出加入观测条件。若要记住遮挡前的对象身份或接触变化，还需要时间模块：有限观测窗口和跨时刻递归记忆是不同机制。新增触觉或记忆分支后，应通过对应的序列数据继续训练，不能只在推理时拼接随机特征。</p>
+<h2 id="12">12. 知识关系</h2>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>在本文中的作用</th>
+<th>与其他概念的联系</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Behavior Cloning</td>
+<td>使用专家示范训练策略</td>
+<td>DP和ACT是不同的条件动作模型</td>
+</tr>
+<tr>
+<td>Condition</td>
+<td>决定当前该生成什么动作</td>
+<td>可以是embedding，通过FiLM或attention读取</td>
+</tr>
+<tr>
+<td>U-Net / Transformer</td>
+<td>实现动作生成网络</td>
+<td>不单独决定loss或采样方法</td>
+</tr>
+<tr>
+<td>噪声预测</td>
+<td>DP的一种训练参数化</td>
+<td>可以换算干净动作估计，需配合噪声日程</td>
+</tr>
+<tr>
+<td>CVAE</td>
+<td>ACT的潜变量训练框架</td>
+<td>后验训练时看动作，推理采用先验约定</td>
+</tr>
+<tr>
+<td>Action chunk</td>
+<td>一次预测多个时刻</td>
+<td>与是否自回归、是否扩散是不同维度</td>
+</tr>
+<tr>
+<td>滚动执行 / temporal ensemble</td>
+<td>将预测接入真实控制</td>
+<td>影响平滑、反应速度和闭环延迟</td>
+</tr>
+<tr>
+<td>预训练</td>
+<td>参数初始化与学习阶段</td>
+<td>不等于必须冻结，也不由模型大小决定</td>
+</tr>
+</tbody>
+</table>
+<p>继续理解生成目标，可回到 <a href="action-generation-mse-token-diffusion-flow.html">动作生成方法</a>；理解预测速度，可接着读 <a href="10-flow-matching-training-inference.html">Flow Matching</a>；理解如何减少重复网络调用，则进入 <a href="generative-consistency-and-sampling-distillation.html">生成一致性与采样蒸馏</a>。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="action-generation-mse-token-diffusion-flow.html">← IL03 · 动作生成方法：从连续回归到概率生成</a>
+            <a href="generative-consistency-and-sampling-distillation.html">IL05 · 生成一致性与采样蒸馏：从多步到少步生成 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

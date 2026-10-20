@@ -42,6 +42,22 @@ o_t = images + language + proprioceptive state + history
 
 这里 robot state 是 observation 的组成部分，不是 action。
 
+### 2.1 为什么策略还需要历史：以 GRU 为例
+
+单帧观测未必能决定动作。例如，球在当前画面中都位于中央，但向左运动和向右运动时，机器人接球的方向可能不同。历史观测帮助策略判断当前帧里没有直接给出的速度、接触变化或任务进度。
+
+一种做法是输入最近几帧；另一种做法是用 **GRU（Gated Recurrent Unit，门控循环单元）**，把历史逐步压缩到隐藏状态中：
+
+\[
+x_t=E(o_t),\qquad
+h_t=\operatorname{GRU}(x_t,h_{t-1}),\qquad
+\hat a_t=g(h_t).
+\]
+
+这里 \(o_t\) 表示当前观测，\(E\) 是观测编码器，\(g\) 是动作预测头。**GRU 负责更新记忆，\(h_t\) 承载记忆。** 同一个 episode 内，下一步会接着使用这个状态；新 episode 开始时则重新初始化。它保存的是为动作预测学出来的历史摘要，不是完整录像。
+
+使用 GRU 后，学习目标仍然可以是下面的 Behavior Cloning：让每一步预测接近专家动作。动作误差也会训练 GRU，使它有机会学会保留有用的历史。门控机制、序列训练与触觉应用见[策略记忆与对象级触觉状态](40_policy_memory_and_object_centric_tactile_state.md)。
+
 ## 3. Behavior Cloning
 
 Behavior Cloning 把模仿学习转成监督学习：

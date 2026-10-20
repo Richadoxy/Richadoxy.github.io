@@ -220,9 +220,9 @@ FuSe总目标写成：
 
 \[
 \mathcal{L}
-= \mathcal{L}\_{\mathrm{BC}}
-+ \beta \mathcal{L}\_{\mathrm{gen}}
-+ \lambda \mathcal{L}\_{\mathrm{contrast}}
+= \mathcal{L}_{\mathrm{BC}}
++ \beta \mathcal{L}_{\mathrm{gen}}
++ \lambda \mathcal{L}_{\mathrm{contrast}}
 \]
 
 实验中作者取 \(\beta=1\)、\(\lambda=1\)。这不是四种任务各有一个action loss再组合，而是同一个batch上同时计算动作监督和两种语言辅助监督；不同模态组合内部再求平均。
@@ -244,7 +244,7 @@ action readout + MSEActionHead
 其核心是直接回归：
 
 \[
-\mathcal{L}\_{\mathrm{BC}}=\lVert \hat{a}-a\rVert^2
+\mathcal{L}_{\mathrm{BC}}=\lVert \hat{a}-a\rVert^2
 \]
 
 这里没有加噪动作、diffusion timestep或反复去噪，推理时一次前向即可得到动作块。
@@ -279,7 +279,7 @@ CLIP-style contrastive loss：配对样本靠近，batch内不匹配文本远离
 这与TVL的区别是：TVL主要对齐独立的原始模态encoder输出，目标近似为
 
 \[
-x\_T \approx x\_V \approx x\_L.
+x_T \approx x_V \approx x_L.
 \]
 
 FuSe对齐的则是**policy看过传感器之后形成的高层观测表示**与文本语义。它更关心“这些信息是否已进入策略内部”，而不是只得到一个可检索的触觉encoder。
@@ -323,13 +323,13 @@ Octo本身不是LLM，因此这里的生成器是一个轻量附加head，不是
 原始Octo的典型动作头先让Transformer产生action readout condition，再由一个残差MLP式diffusion网络预测动作噪声：
 
 \[
-a\_t=\sqrt{\bar{\alpha}\_t}a\_0+
-\sqrt{1-\bar{\alpha}\_t}\epsilon,
+a_t=\sqrt{\bar{\alpha}_t}a_0+
+\sqrt{1-\bar{\alpha}_t}\epsilon,
 \]
 
 \[
-\mathcal{L}\_{\mathrm{diff}}
-=\lVert \epsilon-\epsilon\_\theta(a\_t,t,c)\rVert^2.
+\mathcal{L}_{\mathrm{diff}}
+=\lVert \epsilon-\epsilon_\theta(a_t,t,c)\rVert^2.
 \]
 
 它不是π0.5或GR00T那种Transformer Action Expert；noisy action和时间步进入的是动作头内部的diffusion MLP。
@@ -376,7 +376,7 @@ Beyond Sight正文明确把最终目标中的动作项称为MSE imitation loss�
 因此FuSe不是简单要求：
 
 \[
-x\_V=x\_T=x\_A.
+x_V=x_T=x_A.
 \]
 
 它要求不同传感器在与任务有关的高层含义上能被同一语言描述和查询。

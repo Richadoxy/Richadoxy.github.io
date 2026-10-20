@@ -38,17 +38,17 @@
       <main class="archive-main" id="main-content">
         <header class="archive-intro">
           <h2><span data-lang="en">Learning paths</span><span data-lang="zh">从模仿学习到 VLA</span></h2>
-          <p><span data-lang="en">A dependency-first map of machine-learning foundations, imitation learning, VLA architectures, engineering, runtime systems, and tactile robotics. Articles are grouped by learning path rather than publication order.</span><span data-lang="zh">这里不再按笔记产生时间排成一条长列表，而是按知识依赖分成六卷。初学者建议从 F01 开始；已有基础的读者可以直接选择 VLA、工程、部署或触觉分支。</span></p>
+          <p><span data-lang="en">Six connected paths through representations, action generation, VLA architectures, training, runtime, and tactile robotics. Follow PI0.5 into FAST/KI supervision and fine-tuning, or connect DP/ACT to tactile memory and experiments.</span><span data-lang="zh">按知识依赖分成六卷。从 F01 建立总地图，沿 IL04 理解 DP / ACT，再从 VLA02 的 PI0.5 结构进入 VLA03 的 FAST/KI 训练与微调；触觉阅读地图继续连接输入表示、历史记忆和实验验证。</span></p>
         </header>
         <div class="series-grid"><a class="series-card" href="#foundations">
           <span class="series-card-label"><span data-lang="en">Part 1: Foundations</span><span data-lang="zh">第一卷：基础概念</span></span>
           <span>先建立多模态 VLA 与模仿学习的统一范式，再依次理解表示接口、公共空间、监督配方与 Policy 融合。</span>
         </a><a class="series-card" href="#imitation">
           <span class="series-card-label"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span></span>
-          <span>从 demonstration 和 Behavior Cloning 出发，理解机器人数据、action chunk 与不同动作生成目标。</span>
+          <span>从示范与 Behavior Cloning 出发，连接机器人数据、DP / ACT、概率生成目标与少步采样。</span>
         </a><a class="series-card" href="#architectures">
           <span class="series-card-label"><span data-lang="en">Part 3: VLA Architectures</span><span data-lang="zh">第三卷：VLA 核心架构</span></span>
-          <span>使用统一坐标拆解 Flow Matching、PI0.5、GR00T、VLASH 和 VLA-JEPA。</span>
+          <span>从 Flow Matching 与 PI0.5 前向结构进入 FAST/KI 的动作监督和梯度路径，再对照 GR00T、VLASH 与 VLA-JEPA。</span>
         </a><a class="series-card" href="#engineering">
           <span class="series-card-label"><span data-lang="en">Part 4: OpenPI / BrainCo Engineering</span><span data-lang="zh">第四卷：OpenPI / BrainCo 工程实践</span></span>
           <span>从配置、数据和 JAX 训练闭环进入 28D/56D 双臂双手改造。</span>
@@ -57,7 +57,7 @@
           <span>理解在线延迟、同步与异步执行、chunk handoff，以及 VLASH 的时间对齐方法。</span>
         </a><a class="series-card" href="#tactile">
           <span class="series-card-label"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span></span>
-          <span>从 TVL、AnyTouch 的表征和 Octopi 的推理，进入 FuSe、VLA-Touch、OmniVTLA、Tactile-VLA 与 RDP 的动作和控制。</span>
+          <span>连接触觉输入、跨模态表示、动作与闭环反馈，再进入 CGP、对象级记忆和实验设计；阅读地图提供基础与论文两条路线。</span>
         </a></div>
         <div class="archive-filters" role="group" aria-label="按知识链筛选文章">
           <button class="archive-filter is-active" type="button" data-filter="all" aria-pressed="true"><span data-lang="en">All</span><span data-lang="zh">全部</span></button>
@@ -68,7 +68,7 @@
           <p class="archive-series-description">先建立多模态 VLA 与模仿学习的统一范式，再依次理解表示接口、公共空间、监督配方与 Policy 融合。</p>
           <div class="archive-list"><article class="archive-post" data-category="foundations">
               <h3><a href="vla-overview-reading-map.html"><span class="archive-category">F01</span> 多模态 VLA 与模仿学习：统一研究范式</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">入门 · 11 min read</span><span data-lang="zh">入门 · 阅读约 11 分钟</span></p>
+              <p class="archive-reading-time"><span data-lang="en">入门 · 12 min read</span><span data-lang="zh">入门 · 阅读约 12 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
               <p class="archive-summary">从数据、表示、对齐、任务融合、动作生成到闭环执行，先建立阅读和研究多模态策略的总地图。</p>
             </article><article class="archive-post" data-category="foundations">
@@ -78,21 +78,21 @@
               <p class="archive-summary">串联 token、encoder、ViT、CLIP、CLS/readout、projector、语义锚点与 InfoNCE，理解多模态表示怎样建立共同坐标。</p>
             </article><article class="archive-post" data-category="foundations">
               <h3><a href="multimodal-consistency-supervision.html"><span class="archive-category">F03</span> 多模态表示的监督配方</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">核心 · 11 min read</span><span data-lang="zh">核心 · 阅读约 11 分钟</span></p>
+              <p class="archive-reading-time"><span data-lang="en">核心 · 14 min read</span><span data-lang="zh">核心 · 阅读约 14 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
               <p class="archive-summary">统一跨模态对齐、时间连续性、增强或遮挡一致性，并说明 reconstruction、future prediction 与任务监督的分工。</p>
             </article><article class="archive-post" data-category="foundations">
               <h3><a href="19-attention-openclip-tactile-groot.html"><span class="archive-category">F04</span> 从对齐表示到 Policy 融合</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">核心 · 15 min read</span><span data-lang="zh">核心 · 阅读约 15 分钟</span></p>
+              <p class="archive-reading-time"><span data-lang="en">核心 · 19 min read</span><span data-lang="zh">核心 · 阅读约 19 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
               <p class="archive-summary">把 Transformer 基础放回策略数据流，系统理解 self/cross/joint attention、readout、projector、gate、AdaNorm 与 Action Head。</p>
             </article></div>
         </section><section class="archive-year archive-series" id="imitation" data-series="imitation" aria-labelledby="heading-imitation">
           <h2 id="heading-imitation"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span></h2>
-          <p class="archive-series-description">从 demonstration 和 Behavior Cloning 出发，理解机器人数据、action chunk 与不同动作生成目标。</p>
+          <p class="archive-series-description">从示范与 Behavior Cloning 出发，连接机器人数据、DP / ACT、概率生成目标与少步采样。</p>
           <div class="archive-list"><article class="archive-post" data-category="imitation">
               <h3><a href="imitation-learning-behavior-cloning.html"><span class="archive-category">IL01</span> 模仿学习与 Behavior Cloning 入门</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">入门 · 3 min read</span><span data-lang="zh">入门 · 阅读约 3 分钟</span></p>
+              <p class="archive-reading-time"><span data-lang="en">入门 · 4 min read</span><span data-lang="zh">入门 · 阅读约 4 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
               <p class="archive-summary">从 demonstration、policy 和 BC 出发，理解离线监督、闭环 rollout 与分布偏移。</p>
             </article><article class="archive-post" data-category="imitation">
@@ -101,36 +101,51 @@
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
               <p class="archive-summary">统一 state/action 语义、episode、action chunk、horizon、控制频率、归一化和 mask。</p>
             </article><article class="archive-post" data-category="imitation">
-              <h3><a href="action-generation-mse-token-diffusion-flow.html"><span class="archive-category">IL03</span> 动作生成方法：MSE、Token、Diffusion 与 Flow Matching</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">进阶 · 3 min read</span><span data-lang="zh">进阶 · 阅读约 3 分钟</span></p>
+              <h3><a href="action-generation-mse-token-diffusion-flow.html"><span class="archive-category">IL03</span> 动作生成方法：从连续回归到概率生成</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">进阶 · 11 min read</span><span data-lang="zh">进阶 · 阅读约 11 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
-              <p class="archive-summary">比较四类动作生成目标，区分网络架构、训练 target 与推理采样方式。</p>
+              <p class="archive-summary">串联回归、自回归、CVAE、GAN、扩散、Flow Matching 与生成一致性，区分训练目标、采样和执行。</p>
+            </article><article class="archive-post" data-category="imitation">
+              <h3><a href="diffusion-policy-and-act.html"><span class="archive-category">IL04</span> Diffusion Policy 与 ACT：小型策略的训练和推理</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">核心 · 16 min read</span><span data-lang="zh">核心 · 阅读约 16 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: October 2026</span><span data-lang="zh">发布于：2026 年 10 月</span></p>
+              <p class="archive-summary">拆解 DP 的 U-Net 与 Transformer、条件特征和噪声预测，再对照 ACT 的 CVAE、动作块与预训练。</p>
+            </article><article class="archive-post" data-category="imitation">
+              <h3><a href="generative-consistency-and-sampling-distillation.html"><span class="archive-category">IL05</span> 生成一致性与采样蒸馏：从多步到少步生成</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">进阶 · 14 min read</span><span data-lang="zh">进阶 · 阅读约 14 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: October 2026</span><span data-lang="zh">发布于：2026 年 10 月</span></p>
+              <p class="archive-summary">理解生成轨迹、端点一致性、边界条件和 teacher/student，以及少步生成与闭环反馈的关系。</p>
             </article></div>
         </section><section class="archive-year archive-series" id="architectures" data-series="architectures" aria-labelledby="heading-architectures">
           <h2 id="heading-architectures"><span data-lang="en">Part 3: VLA Architectures</span><span data-lang="zh">第三卷：VLA 核心架构</span></h2>
-          <p class="archive-series-description">使用统一坐标拆解 Flow Matching、PI0.5、GR00T、VLASH 和 VLA-JEPA。</p>
+          <p class="archive-series-description">从 Flow Matching 与 PI0.5 前向结构进入 FAST/KI 的动作监督和梯度路径，再对照 GR00T、VLASH 与 VLA-JEPA。</p>
           <div class="archive-list"><article class="archive-post" data-category="architectures">
               <h3><a href="10-flow-matching-training-inference.html"><span class="archive-category">VLA01</span> Flow Matching：训练、timestep 与推理</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">进阶 · 4 min read</span><span data-lang="zh">进阶 · 阅读约 4 分钟</span></p>
+              <p class="archive-reading-time"><span data-lang="en">进阶 · 7 min read</span><span data-lang="zh">进阶 · 阅读约 7 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
               <p class="archive-summary">从插值路径、velocity target 和 timestep condition 出发，区分训练采样与推理积分。</p>
             </article><article class="archive-post" data-category="architectures">
-              <h3><a href="04-pi05-architecture.html"><span class="archive-category">VLA02</span> PI0.5：VLM Prefix 与 Action Expert</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">进阶 · 4 min read</span><span data-lang="zh">进阶 · 阅读约 4 分钟</span></p>
+              <h3><a href="04-pi05-architecture.html"><span class="archive-category">VLA02</span> PI0.5：前向结构与 Action Expert</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">进阶 · 6 min read</span><span data-lang="zh">进阶 · 阅读约 6 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
-              <p class="archive-summary">拆解 VLM Prefix Expert、Action Expert、联合 attention 和 flow-matching action generation。</p>
+              <p class="archive-summary">拆解 Prefix、Action Expert、联合 attention 与连续动作路径，再连接 FAST/KI 训练专题。</p>
             </article><article class="archive-post" data-category="architectures">
-              <h3><a href="11-groot-dit-architecture.html"><span class="archive-category">VLA03</span> GR00T：VLM Memory 与 DiT Action Head</a></h3>
+              <h3><a href="fast-ki-pi-training.html"><span class="archive-category">VLA03</span> FAST 与 KI：动作监督、梯度与微调</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">核心 · 11 min read</span><span data-lang="zh">核心 · 阅读约 11 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: October 2026</span><span data-lang="zh">发布于：2026 年 10 月</span></p>
+              <p class="archive-summary">连接动作 token、双损失、两阶段与联合训练，区分 KI、冻结、LoRA 和官方 openpi 微调。</p>
+            </article><article class="archive-post" data-category="architectures">
+              <h3><a href="11-groot-dit-architecture.html"><span class="archive-category">VLA04</span> GR00T：VLM Memory 与 DiT Action Head</a></h3>
               <p class="archive-reading-time"><span data-lang="en">进阶 · 4 min read</span><span data-lang="zh">进阶 · 阅读约 4 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
               <p class="archive-summary">梳理 VLM memory、state/action encoders、AlternateVLDiT、AdaLN 与 action decoder 的数据流。</p>
             </article><article class="archive-post" data-category="architectures">
-              <h3><a href="14-architecture-comparison-reading-guide.html"><span class="archive-category">VLA04</span> PI0.5、GR00T、VLASH 与 VLA-JEPA 对照</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">进阶 · 4 min read</span><span data-lang="zh">进阶 · 阅读约 4 分钟</span></p>
+              <h3><a href="14-architecture-comparison-reading-guide.html"><span class="archive-category">VLA05</span> PI0.5、GR00T、VLASH 与 VLA-JEPA 对照</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">进阶 · 5 min read</span><span data-lang="zh">进阶 · 阅读约 5 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
               <p class="archive-summary">把架构、异步框架和 world-model supervision 放到正确层级，并形成统一比较坐标。</p>
             </article><article class="archive-post" data-category="architectures">
-              <h3><a href="13-jepa-vla-jepa.html"><span class="archive-category">VLA05</span> JEPA、World Model 与 VLA-JEPA</a></h3>
+              <h3><a href="13-jepa-vla-jepa.html"><span class="archive-category">VLA06</span> JEPA、World Model 与 VLA-JEPA</a></h3>
               <p class="archive-reading-time"><span data-lang="en">前沿 · 5 min read</span><span data-lang="zh">前沿 · 阅读约 5 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
               <p class="archive-summary">理解 teacher/student/predictor、latent world-model supervision、leakage-free training 和联合 action loss。</p>
@@ -155,7 +170,7 @@
               <p class="archive-summary">从 scripts/train.py 出发，梳理编译缓存、PRNG、mesh、sharding、checkpoint 与训练循环。</p>
             </article><article class="archive-post" data-category="engineering">
               <h3><a href="05-train-state-jit-checkpoint.html"><span class="archive-category">ENG04</span> TrainState、JIT 与 Checkpoint</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">进阶 · 2 min read</span><span data-lang="zh">进阶 · 阅读约 2 分钟</span></p>
+              <p class="archive-reading-time"><span data-lang="en">进阶 · 3 min read</span><span data-lang="zh">进阶 · 阅读约 3 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: August 2026</span><span data-lang="zh">发布于：2026 年 8 月</span></p>
               <p class="archive-summary">理解参数初始化、优化器状态、JIT 编译边界、分片方式以及训练恢复流程。</p>
             </article><article class="archive-post" data-category="engineering">
@@ -185,10 +200,10 @@
             </article></div>
         </section><section class="archive-year archive-series" id="tactile" data-series="tactile" aria-labelledby="heading-tactile">
           <h2 id="heading-tactile"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span></h2>
-          <p class="archive-series-description">从 TVL、AnyTouch 的表征和 Octopi 的推理，进入 FuSe、VLA-Touch、OmniVTLA、Tactile-VLA 与 RDP 的动作和控制。</p>
+          <p class="archive-series-description">连接触觉输入、跨模态表示、动作与闭环反馈，再进入 CGP、对象级记忆和实验设计；阅读地图提供基础与论文两条路线。</p>
           <div class="archive-list"><article class="archive-post" data-category="tactile">
               <h3><a href="16-tactile-vla-reading-guide.html"><span class="archive-category">TOUCH00</span> 触觉 VLA 与模仿学习阅读地图</a></h3>
-              <p class="archive-reading-time"><span data-lang="en">入门 · 12 min read</span><span data-lang="zh">入门 · 阅读约 12 分钟</span></p>
+              <p class="archive-reading-time"><span data-lang="en">入门 · 14 min read</span><span data-lang="zh">入门 · 阅读约 14 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
               <p class="archive-summary">按表征与数据、Language-Action、力控闭环、灵巧手和前沿专题，组织触觉 VLA 的渐进阅读顺序。</p>
             </article><article class="archive-post" data-category="tactile">
@@ -231,6 +246,31 @@
               <p class="archive-reading-time"><span data-lang="en">前沿 · 13 min read</span><span data-lang="zh">前沿 · 阅读约 13 分钟</span></p>
               <p class="archive-date"><span data-lang="en">Published: October 2026</span><span data-lang="zh">发布于：2026 年 10 月</span></p>
               <p class="archive-summary">从 Fig. 5 的反馈时序和 Fig. 6 的两阶段训练出发，理解慢速潜在扩散、快速触觉解码、TactAR 数据采集及示范质量边界。</p>
+            </article><article class="archive-post" data-category="tactile">
+              <h3><a href="trex-tactile-reactive-dexterous-manipulation.html"><span class="archive-category">TOUCH09</span> T-Rex 精读：高频触觉反应与级联 Flow Matching</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">前沿 · 20 min read</span><span data-lang="zh">前沿 · 阅读约 20 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: September 2026</span><span data-lang="zh">发布于：2026 年 9 月</span></p>
+              <p class="archive-summary">从三专家 MoT、future-latent queries 和时空触觉编码出发，拆解低频视觉规划、高频触觉修正、KV 缓存与分段 Flow Matching。</p>
+            </article><article class="archive-post" data-category="tactile">
+              <h3><a href="tactile-input-representation.html"><span class="archive-category">TOUCH10</span> 从原始触觉到策略条件</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">核心 · 12 min read</span><span data-lang="zh">核心 · 阅读约 12 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: October 2026</span><span data-lang="zh">发布于：2026 年 10 月</span></p>
+              <p class="archive-summary">从压阻、三维力和视触觉出发，连接标定、数值 atlas、区域 token、时间对齐与条件融合。</p>
+            </article><article class="archive-post" data-category="tactile">
+              <h3><a href="cgp-contact-grounded-policy.html"><span class="archive-category">TOUCH11</span> CGP 精读：状态、触觉与接触一致的控制</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">进阶 · 17 min read</span><span data-lang="zh">进阶 · 阅读约 17 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: October 2026</span><span data-lang="zh">发布于：2026 年 10 月</span></p>
+              <p class="archive-summary">区分未来机器人状态、触觉 latent 和控制命令，拆解联合扩散、接触映射及 Visuotactile DP 对照。</p>
+            </article><article class="archive-post" data-category="tactile">
+              <h3><a href="policy-memory-and-object-centric-tactile-state.html"><span class="archive-category">TOUCH12</span> 策略记忆：从历史观测到对象级触觉状态</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">进阶 · 16 min read</span><span data-lang="zh">进阶 · 阅读约 16 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: October 2026</span><span data-lang="zh">发布于：2026 年 10 月</span></p>
+              <p class="archive-summary">串联滑窗、GRU、缓存和 memory tokens，再理解遮挡中的身份 anchor、动态 slot 与接触归属。</p>
+            </article><article class="archive-post" data-category="tactile">
+              <h3><a href="tactile-memory-experiment-design.html"><span class="archive-category">TOUCH13</span> 触觉记忆的实验设计：从假设到控制证据</a></h3>
+              <p class="archive-reading-time"><span data-lang="en">实践 · 15 min read</span><span data-lang="zh">实践 · 阅读约 15 分钟</span></p>
+              <p class="archive-date"><span data-lang="en">Published: October 2026</span><span data-lang="zh">发布于：2026 年 10 月</span></p>
+              <p class="archive-summary">把数据、辅助监督、公平 baseline、遮挡扰动和联合成功指标连接成可验证的研究过程。</p>
             </article></div>
         </section>
         <p class="archive-empty" hidden><span data-lang="en">There are no posts in this category yet.</span><span data-lang="zh">这个分类下暂时还没有文章。</span></p>

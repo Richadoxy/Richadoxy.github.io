@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="理解生成轨迹、端点一致性、边界条件和 teacher/student，以及少步生成与闭环反馈的关系。" />
+    <title>生成一致性与采样蒸馏：从多步到少步生成 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 三个不同层面的“一致”</a></li>
+<li><a href="#2">2. 少步采样的三条路线</a></li>
+<li><a href="#3">3. 从“走一步的方向”到“这条路的终点”</a></li>
+<li><a href="#4">4. 边界条件给生成端点一个明确含义</a></li>
+<li><a href="#5-consistency-distillation">5. Consistency Distillation：利用已训练的扩散教师</a><ul>
+<li><a href="#51-stop-gradientema">5.1 Stop-gradient与EMA作用不同</a></li>
+</ul>
+</li>
+<li><a href="#6-consistency-training">6. Consistency Training：直接从数据构造监督</a><ul>
+<li><a href="#61-ct">6.1 CT仍然有目标分支，但未必有预训练教师</a></li>
+</ul>
+</li>
+<li><a href="#7">7. 推理：一次生成与少步细化</a><ul>
+<li><a href="#71">7.1 一步生成</a></li>
+<li><a href="#72">7.2 少步细化</a></li>
+</ul>
+</li>
+<li><a href="#8">8. 采样蒸馏比生成一致性范围更广</a><ul>
+<li><a href="#81">8.1 用学生一步拟合教师两步</a></li>
+<li><a href="#82">8.2 拟合教师的完整生成结果</a></li>
+<li><a href="#83">8.3 初始噪声与目标需要有对应关系</a></li>
+<li><a href="#84-flow-matching">8.4 Flow Matching也能被蒸馏</a></li>
+</ul>
+</li>
+<li><a href="#9">9. 动作条件与记忆在一次采样中保持一致</a></li>
+<li><a href="#10">10. 少步生成与真实闭环延迟</a></li>
+<li><a href="#11">11. 质量评价从生成误差延伸到动作结果</a></li>
+<li><a href="#12">12. 知识关系</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span> · IL05</p>
+          <h1>生成一致性与采样蒸馏：从多步到少步生成</h1>
+          <p class="article-meta"><span data-lang="en">进阶 · October 2026 · 14 min read</span><span data-lang="zh">进阶 · 2026.10 · 约 14 分钟阅读</span></p>
+          <p class="article-deck">理解生成轨迹、端点一致性、边界条件和 teacher/student，以及少步生成与闭环反馈的关系。</p>
+          <div class="article-content">
+            <p>扩散和Flow Matching的常见实现使用多次网络计算，逐步生成动作。这有利于构造复杂动作分布，也带来采样延迟。生成一致性模型和采样蒸馏试图把一段生成过程压缩成更少的网络调用。</p>
+<p>本篇承接 <a href="action-generation-mse-token-diffusion-flow.html">动作生成方法</a>、<a href="diffusion-policy-and-act.html">DP与ACT</a> 和 <a href="10-flow-matching-training-inference.html">Flow Matching</a>。文中的机器人动作例子用于解释方法迁移，不代表原始图像生成论文已经验证了触觉控制性能。</p>
+<h2 id="1">1. 三个不同层面的“一致”</h2>
+<p>一致性是一个关系：必须先说明哪些输入、哪些输出应该一致。</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>希望保持一致的对象</th>
+<th>主要用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>表示学习</td>
+<td>同一状态的不同模态、增强或遮挡视图的特征</td>
+<td>学习稳健的encoder</td>
+</tr>
+<tr>
+<td>生成一致性</td>
+<td>同一生成轨迹上不同噪声级对应的最终样本</td>
+<td>一步或少步生成</td>
+</tr>
+<tr>
+<td>控制时序平滑</td>
+<td>相邻执行时刻的动作变化符合任务需求</td>
+<td>避免不必要的抖动</td>
+</tr>
+</tbody>
+</table>
+<p>例如，遮挡图像与未遮挡图像编码成相近语义特征，是 <a href="multimodal-consistency-supervision.html">多模态表示监督</a> 中的consistency。把同一条去噪轨迹上的两个中间状态映射到相同端点，是本篇的generative consistency。</p>
+<p>二者可以同时出现在一个机器人系统中，但损失约束的位置不同：</p>
+<pre><code class="language-text">观测 → Encoder → 条件 c → 动作生成器 → 动作
+          ↑                     ↑
+      表示一致性             生成一致性
+</code></pre>
+<p>“相邻物理时刻动作应该相同”也不是生成一致性的定义。物体滑动后，策略可能需要立刻改变动作；不能为了“一致”而把必要的纠正压平。</p>
+<h2 id="2">2. 少步采样的三条路线</h2>
+<p>多步生成可以写成：</p>
+<p>\[
+x_{n-1}=\operatorname{Step}(x_n,f_\theta(x_n,t_n,c),t_n,t_{n-1}).
+\]</p>
+<p>减少计算有三种不同做法：</p>
+<table>
+<thead>
+<tr>
+<th>路线</th>
+<th>改动位置</th>
+<th>是否需要重新学习模型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>更少的采样步或更合适的求解器</td>
+<td>采样日程与数值更新</td>
+<td>可以沿用已有模型，效果需验证</td>
+</tr>
+<tr>
+<td>采样蒸馏</td>
+<td>学生学习教师多步生成的结果或跳步映射</td>
+<td>通常需要额外训练</td>
+</tr>
+<tr>
+<td>直接训练生成一致性模型</td>
+<td>学习不同噪声级到端点的映射</td>
+<td>需要相应一致性训练</td>
+</tr>
+</tbody>
+</table>
+<p>DDIM就是能改变扩散采样过程的一条路线，使用更少步数不等于已经发生知识蒸馏。<a href="https://arxiv.org/abs/2010.02502">DDIM 论文</a></p>
+<p>蒸馏也不必把网络变小。学生可以保留相近的U-Net或Transformer结构，通过减少每次生成所需的调用次数降低延迟。</p>
+<h2 id="3">3. 从“走一步的方向”到“这条路的终点”</h2>
+<p>Flow Matching通常预测局部速度：</p>
+<p>\[
+\frac{d x_t}{dt}=v_\theta(x_t,t,c).
+\]</p>
+<p>给出这个方向后，数值积分器继续向前走。生成一致性函数则直接描述从当前点到生成终点的映射。</p>
+<p>为避免把物理时间和噪声时间混淆，本篇以 \(\sigma\) 表示噪声尺度，最小尺度为 \(\sigma_{\min}&gt;0\)。在原始Consistency Models采用的加性噪声约定下：</p>
+<p>\[
+x_\sigma=x_0+\sigma z,\qquad z\sim\mathcal N(0,I).
+\]</p>
+<p>与这一族边缘分布对应的概率流ODE可以连接不同噪声级。固定条件 \(c\)，理想一致性函数满足：</p>
+<p>\[
+f(x_\sigma,\sigma,c)=x_{\sigma_{\min}}.
+\]</p>
+<p>如果 \(x_{\sigma_a}\) 与 \(x_{\sigma_b}\) 位于同一条ODE轨迹上，则：</p>
+<p>\[
+f(x_{\sigma_a},\sigma_a,c)
+=f(x_{\sigma_b},\sigma_b,c).
+\]</p>
+<pre><code class="language-text">一条生成轨迹：
+
+高噪声点 xσ3 → 中噪声点 xσ2 → 低噪声点 xσ1 → 端点 xσmin
+      │               │               │
+      └── f(·,σ3,c) ──┼───────────────→│
+                      └─ f(·,σ2,c) ───┼──→ 同一个端点
+                                      └─ f(·,σ1,c) ─→
+</code></pre>
+<p>不同生成轨迹可以到达不同端点。因此，“输出一致”只约束同一条轨迹，保留了从不同初始噪声生成不同合理样本的可能性。有限的 \(\sigma_{\min}\) 对应低噪声端点，严格地说不必恰好等于无噪声的 \(x_0\)。<a href="https://proceedings.mlr.press/v202/song23a/song23a.pdf">Consistency Models 原论文</a></p>
+<p>这里的加性噪声约定与DP中常见的 \(\sqrt{\bar\alpha_k}x_0+\sqrt{1-\bar\alpha_k}\epsilon\) 写法不同。迁移实现时要一起转换输入缩放、噪声参数和采样方程，不能直接把一个scheduler的时间数字传给另一个网络。</p>
+<h2 id="4">4. 边界条件给生成端点一个明确含义</h2>
+<p>仅要求两个输出相同，很容易得到无意义解，例如所有输入都输出常数。生成一致性模型还需要满足：</p>
+<p>\[
+\boxed{f_\theta(x,\sigma_{\min},c)=x.}
+\]</p>
+<p>这表示输入已经到达低噪声边界时，就应该返回输入本身。常见参数化是：</p>
+<p>\[
+f_\theta(x,\sigma,c)
+=c_{\mathrm{skip}}(\sigma)x
++c_{\mathrm{out}}(\sigma)F_\theta(x,\sigma,c),
+\]</p>
+<p>并要求：</p>
+<p>\[
+c_{\mathrm{skip}}(\sigma_{\min})=1,
+\qquad c_{\mathrm{out}}(\sigma_{\min})=0.
+\]</p>
+<p>其中 \(F_\theta\) 可以是输出与输入同形状的U-Net或Transformer。边界处，网络支路被系数关掉，只剩恒等支路；其他噪声级再由网络学习必要的变化。官方实现明确提供了满足边界条件的scaling函数。<a href="https://github.com/openai/consistency_models/blob/main/cm/karras_diffusion.py">官方边界参数化与去噪实现</a></p>
+<p>边界条件排除了“在全部输入和噪声级上输出同一个常数”的解，但不等于实际训练必然稳定。噪声采样分布、权重、目标分支、模型容量和优化都仍然影响结果。</p>
+<p>对于动作生成，张量形状可以完全不变：</p>
+<pre><code class="language-text">输入带噪动作 xσ              [B,H,Da]
+    ↓ 动作网络 Fθ
+网络输出                     [B,H,Da]
+    ↓ 与输入按噪声级加权组合
+低噪声动作估计 fθ            [B,H,Da]
+</code></pre>
+<p>动作的条件 \(c\) 可以来自图像、触觉、本体状态和历史记忆。边界条件只规定生成映射，不决定观测encoder如何设计。</p>
+<h2 id="5-consistency-distillation">5. Consistency Distillation：利用已训练的扩散教师</h2>
+<p>Consistency Distillation（CD）先有一个学好的扩散或score模型，再利用它构造相邻噪声级之间的生成轨迹关系。</p>
+<p>这一过程涉及三个角色：</p>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>角色</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>\(s_\phi\) 或等价去噪器</td>
+<td>冻结的预训练扩散教师</td>
+<td>提供ODE方向，构造相邻轨迹点</td>
+</tr>
+<tr>
+<td>\(f_\theta\)</td>
+<td>在线一致性模型</td>
+<td>接受梯度更新</td>
+</tr>
+<tr>
+<td>\(f_{\theta^-}\)</td>
+<td>一致性目标分支</td>
+<td>提供停止梯度的训练目标</td>
+</tr>
+</tbody>
+</table>
+<p>扩散教师与一致性目标分支是两个不同角色，不能只用一个含糊的“teacher”统称。</p>
+<p>设 \(\sigma_{n+1}&gt;\sigma_n\)。训练时从数据构造较高噪声样本 \(x_{n+1}\)，再用教师及ODE求解器走到近邻噪声级：</p>
+<p>\[
+\widetilde x_n
+=\operatorname{ODEStep}_{\phi}
+(x_{n+1},\sigma_{n+1}\rightarrow\sigma_n;c).
+\]</p>
+<p>在线分支和目标分支都预测低噪声端点：</p>
+<p>\[
+\mathcal L_{\mathrm{CD}}
+=\mathbb E\left[
+\lambda_n\,d\left(
+f_\theta(x_{n+1},\sigma_{n+1},c),
+\operatorname{sg}\left[f_{\theta^-}
+(\widetilde x_n,\sigma_n,c)\right]
+\right)\right].
+\]</p>
+<p>\(d\) 是比较两个输出的距离，\(\lambda_n\) 是噪声级权重，\(\operatorname{sg}\) 表示stop-gradient。动作示例可以先用加权L2，但具体距离要与动作的归一化和各维语义一致，不应机械照搬图像感知距离。</p>
+<pre><code class="language-text">真实动作 x0 + 噪声 → 高噪声点 x(n+1)
+                         │             │
+                         │             └→ 冻结扩散教师 + ODE步进
+                         │                                ↓
+                         │                         近邻点 x̃n
+                         ↓                                ↓
+                 在线一致性模型 fθ              目标一致性模型 fθ-
+                         ↓                                ↓
+                    端点预测 y                     stop-gradient(y-)
+                         └────────── 距离损失 ────────────┘
+                                        ↓
+                                  更新在线参数 θ
+</code></pre>
+<p>原始CD使用移动平均更新目标分支；教师方向、数值步进与端点一致性共同提供监督。<a href="https://proceedings.mlr.press/v202/song23a/song23a.pdf">原始 CD 定义</a>、<a href="https://github.com/openai/consistency_models/blob/main/cm/karras_diffusion.py">官方教师与目标分支实现</a></p>
+<h3 id="51-stop-gradientema">5.1 Stop-gradient与EMA作用不同</h3>
+<p>Stop-gradient控制本次反向传播：目标数值参加损失计算，但不沿目标分支反传。</p>
+<p>EMA控制两次训练迭代之间如何更新目标参数，例如：</p>
+<p>\[
+\theta^-\leftarrow\mu\theta^-+(1-\mu)\theta.
+\]</p>
+<p>因此，“目标没有梯度”不等于“目标永远不变”。它仍然可以由EMA跟随在线模型，也可以按照另一种训练配方复制参数。</p>
+<p>对于共享条件encoder，也要明确target使用的条件是否detach、教师读取哪个版本的条件，以及哪些参数允许更新。形式相似的损失，梯度路径不同，优化行为就可能不同。</p>
+<h2 id="6-consistency-training">6. Consistency Training：直接从数据构造监督</h2>
+<p>Consistency Training（CT）可以不依赖预训练扩散教师。原始离散CT使用同一个干净样本和同一份噪声，构造相邻两个噪声级：</p>
+<p>\[
+x_{n+1}=x_0+\sigma_{n+1}z,
+\qquad x_n=x_0+\sigma_n z.
+\]</p>
+<p>然后优化：</p>
+<p>\[
+\mathcal L_{\mathrm{CT}}
+=\mathbb E\left[
+\lambda_n\,d\left(
+f_\theta(x_{n+1},\sigma_{n+1},c),
+\operatorname{sg}[f_{\theta^-}(x_n,\sigma_n,c)]
+\right)\right].
+\]</p>
+<pre><code class="language-text">                    同一真实动作 x0、同一噪声 z
+                               │
+                ┌──────────────┴──────────────┐
+                ↓                             ↓
+       x0 + σ(n+1)z                    x0 + σn z
+                ↓                             ↓
+         在线模型 fθ                   目标分支 fθ-
+                ↓                             ↓
+           端点预测                  停止梯度的端点预测
+                └────────── 一致性损失 ────────┘
+</code></pre>
+<p>需要区分“训练构造”和“理想性质”：上面的共享噪声直线配对，并不保证两个样本恰好位于真实概率流ODE的同一条轨迹上。它是直接从数据构造的局部训练配方；相邻噪声级、损失权重和离散化方案是方法的一部分，不能把任意两份带噪样本都拉到相同结果。<a href="https://proceedings.mlr.press/v202/song23a/song23a.pdf">原始 CT 算法与理论关系</a></p>
+<h3 id="61-ct">6.1 CT仍然有目标分支，但未必有预训练教师</h3>
+<p>在CT中，目标分支可以来自在线模型自身，而不是一个已经训练完成的扩散生成器。原始CT与后续改进CT的目标更新、噪声采样和距离函数也不完全相同。</p>
+<p>例如，Improved Consistency Training移除了目标一致性分支的EMA滞后，目标仍然停止梯度，并引入Pseudo-Huber等训练改进。这与是否另外保存一份用于评估的EMA权重是不同问题。因而“所有一致性模型都需要EMA teacher”或“都必须先训练一个扩散模型”都不是通用规则。<a href="https://arxiv.org/abs/2310.14189">Improved Techniques for Training Consistency Models</a></p>
+<p>实际复现应记录：</p>
+<ul>
+<li>使用CT还是CD，以及对应论文和代码版本；</li>
+<li>边界参数化、噪声上下界和离散化方案；</li>
+<li>在线分支与目标分支怎样共享或更新参数；</li>
+<li>距离函数、噪声权重和条件输入；</li>
+<li>训练后评估使用在线权重还是另外保存的平均权重。</li>
+</ul>
+<p>这些选项决定了训练问题，不能仅凭一行 <code>loss = mse(output1, output2)</code> 判断方法相同。</p>
+<h2 id="7">7. 推理：一次生成与少步细化</h2>
+<h3 id="71">7.1 一步生成</h3>
+<p>在上述加性噪声约定下，从足够大的噪声尺度初始化：</p>
+<p>\[
+x_{\sigma_{\max}}\sim
+\mathcal N(0,\sigma_{\max}^2I),
+\qquad
+\hat x=f_\theta(x_{\sigma_{\max}},\sigma_{\max},c).
+\]</p>
+<pre><code class="language-text">新观测 → 条件encoder → c ─────────┐
+                                  ↓
+随机噪声 → 一致性网络一次前向 → 动作chunk
+                                  ↓
+                         反归一化并执行短前缀
+</code></pre>
+<p>这里的“一步”指一次生成网络评估，不代表机器人只执行一个动作时刻。一次输出仍然可以有 \(H\) 个动作，也不表示视觉encoder、记忆更新和控制通信没有计算成本。</p>
+<h3 id="72">7.2 少步细化</h3>
+<p>原始一致性采样允许先得到一个低噪声估计，再注入适量新噪声并重新映射到端点。对一个选定尺度 \(\sigma_i&gt;\sigma_{\min}\)：</p>
+<p>\[
+\widetilde x_i
+=\hat x+\sqrt{\sigma_i^2-\sigma_{\min}^2}\,z_i,
+\qquad
+\hat x\leftarrow f_\theta(\widetilde x_i,\sigma_i,c).
+\]</p>
+<pre><code class="language-text">高噪声 → 一次端点预测
+              ↓ 加入较低尺度的噪声
+          再次端点预测
+              ↓ 可选继续细化
+          最终动作chunk
+</code></pre>
+<p>它与普通DDPM每步沿反向扩散更新的过程不同。少步采样日程需要与训练和参数化匹配，也不能保证随意增加调用次数就单调改善质量。<a href="https://github.com/openai/consistency_models/blob/main/cm/karras_diffusion.py">Consistency Models 官方采样代码</a></p>
+<h2 id="8">8. 采样蒸馏比生成一致性范围更广</h2>
+<h3 id="81">8.1 用学生一步拟合教师两步</h3>
+<p>Progressive Distillation把确定性教师的连续两次采样更新，压缩成学生的一次更新，再逐轮减少采样步数：</p>
+<pre><code class="language-text">教师：xt → xm → xs
+学生：xt ─────→ x̂s
+                  ↕
+             匹配教师结果
+</code></pre>
+<p>若用 \(\operatorname{Step}_\theta\) 表示学生更新，可以抽象写成：</p>
+<p>\[
+\mathcal L_{\mathrm{step}}
+=\mathbb E\left[
+\left\|\operatorname{Step}_\theta(x_t,t\rightarrow s,c)
+-\operatorname{sg}[T_\phi^{(2)}(x_t,c)]\right\|^2
+\right].
+\]</p>
+<p>这是帮助理解的更新结果匹配式。具体算法会按自己的噪声参数化把教师结果转换成学生的监督目标，而不是保证直接照抄这行MSE就复现论文。<a href="https://arxiv.org/html/2202.00512v2">Progressive Distillation 原论文</a></p>
+<h3 id="82">8.2 拟合教师的完整生成结果</h3>
+<p>另一个概念上直接的蒸馏方式是让学生读取初始噪声和条件，预测教师从这份噪声生成的最终动作：</p>
+<p>\[
+A_T=T_\phi(z,c),\qquad
+\mathcal L_{\mathrm{endpoint}}
+=\mathbb E_{z,c}
+\left[\left\|G_\theta(z,c)-\operatorname{sg}[A_T]\right\|^2\right].
+\]</p>
+<p>这里假设教师采用确定性采样器；如果教师中途还要采样随机数，就需要固定这些随机数，或把它们也作为学生输入的一部分。这样，同一份输入才对应确定的教师目标，否则平方损失仍可能把多个结果平均。</p>
+<p>这里写的是通用教师端点回归示意，不是原始Consistency Models的完整训练算法。它未必对所有中间噪声级施加一致性，也未必具有前述边界参数化。</p>
+<h3 id="83">8.3 初始噪声与目标需要有对应关系</h3>
+<p>如果随机采一份与专家动作独立的噪声 \(z\)，然后直接用：</p>
+<p>\[
+\mathbb E_{z,A\mid c}\|G_\theta(z,c)-A\|^2,
+\]</p>
+<p>在平方损失下，理想解可以忽略 \(z\)，只输出 \(\mathbb E[A\mid c]\)。加入随机数本身并没有建立“这份噪声应该生成哪种行为”的关系。</p>
+<p>教师端点蒸馏用 \(T_\phi(z,c)\) 建立这种对应；一致性训练通过噪声级之间的结构与边界学习生成映射。两者都比简单地给普通BC输入多拼一份随机数多了一层监督结构。</p>
+<h3 id="84-flow-matching">8.4 Flow Matching也能被蒸馏</h3>
+<p>教师可以先使用速度场与ODE积分生成动作，学生再学习较大的时间跳跃或最终结果。此时必须区分输出语义：</p>
+<pre><code class="language-text">原教师网络输出：局部 velocity
+求解器输出：积分后的动作
+学生输出：取决于设计，可是动作、跳步结果或另一种参数化
+</code></pre>
+<p>即便学生保留了教师的Transformer结构，也不能因为网络形状相同，就把速度标签、动作标签和一致性标签混用。把已有FM推理步数改为1，也不等于已经训练出了一步蒸馏模型。</p>
+<h2 id="9">9. 动作条件与记忆在一次采样中保持一致</h2>
+<p>设动作条件为：</p>
+<p>\[
+c_t=E(I_t,P_t,q_t,m_t),
+\]</p>
+<p>其中 \(P_t\) 是触觉，\(m_t\) 是历史记忆。一次生成内部的噪声级配对，应共享同一个决策条件 \(c_t\)。否则两个分支面对的是不同控制问题，不再只是同一条件分布下的生成轨迹关系。</p>
+<p>尤其要区分：</p>
+<pre><code class="language-text">物理时间：新传感器观测到来 → 更新记忆 → 新的决策条件
+生成时间：固定决策条件 → 在不同噪声级上计算 → 产生一个动作chunk
+</code></pre>
+<p>蒸馏训练也要检查教师是否依赖部署时不可得的信息。若教师使用隐藏物体位姿，而学生只有遮挡后的触觉和历史，那么学生可能无法区分教师看到的两个不同状态。这个缺口是可观测性问题，不能仅靠增加蒸馏损失解决。</p>
+<p>生成模型的条件中可以包含对象级记忆，但这种记忆负责“当前世界处于什么状态”，一致性模型负责“如何更快生成动作”。二者处在不同层级。</p>
+<h2 id="10">10. 少步生成与真实闭环延迟</h2>
+<p>一次决策的串行耗时可以粗略拆成：</p>
+<p>\[
+T_{\mathrm{decision}}
+\approx T_{\mathrm{sync}}+T_{\mathrm{encoder}}
++N_{\mathrm{eval}}T_{\mathrm{generator}}
++T_{\mathrm{postprocess}}+T_{\mathrm{communication}}.
+\]</p>
+<p>其中 \(N_{\mathrm{eval}}\) 是生成网络评估次数。蒸馏主要减少这一项，并不自动缩短相机曝光、触觉读取、同步等待或通信时间。</p>
+<p>例如，假设encoder耗时8ms，每次生成网络耗时2ms，其他开销共4ms：</p>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th>计算</th>
+<th>总耗时</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10次生成评估</td>
+<td>\(8+10\times2+4\)</td>
+<td>32ms</td>
+</tr>
+<tr>
+<td>2次生成评估</td>
+<td>\(8+2\times2+4\)</td>
+<td>16ms</td>
+</tr>
+</tbody>
+</table>
+<p>这是说明计算关系的假设数值。网络评估次数减少到五分之一，整次决策只快了两倍。若采用异步流水线，还需按实际关键路径和观测年龄测量，不能简单套用串行求和。</p>
+<p>采样更快也不自动意味着闭环反应更快。若仍然连续执行很长的旧chunk，策略仍可能迟迟没有使用新触觉。因此需要同时考虑生成步数、执行前缀、重新规划频率，以及动作真正下发时所依据的观测有多旧。</p>
+<h2 id="11">11. 质量评价从生成误差延伸到动作结果</h2>
+<p>少步学生可能在平均动作误差上接近教师，却在少量关键接触时刻丢失纠正能力。评估至少覆盖以下几组量：</p>
+<table>
+<thead>
+<tr>
+<th>评价层</th>
+<th>需要观察的内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模仿与分布</td>
+<td>条件动作误差、模式覆盖、是否只剩一种动作方案</td>
+</tr>
+<tr>
+<td>采样计算</td>
+<td>网络评估次数、batch=1时延、预热条件、硬件与精度</td>
+</tr>
+<tr>
+<td>真实控制</td>
+<td>传感器到命令延迟、p50/p95、实际重规划频率</td>
+</tr>
+<tr>
+<td>任务表现</td>
+<td>闭环成功、恢复、错误释放、保护对象保持</td>
+</tr>
+<tr>
+<td>公平对照</td>
+<td>相同观测、记忆、动作接口、数据和执行策略</td>
+</tr>
+</tbody>
+</table>
+<p>教师本身的质量、蒸馏时覆盖的条件分布以及学生容量都会影响结果。蒸馏可以减少计算，也可能改变模式选择和细节精度；一步、两步或更多步需要通过同一任务的实测比较确定。</p>
+<p>若研究主线是触觉对象记忆，先固定采样器比较记忆结构，再单独比较采样加速，通常更容易判断收益来自哪里。图像生成的FID结果可以证明生成方法在对应数据上的能力，不能直接替代机器人闭环证据。</p>
+<h2 id="12">12. 知识关系</h2>
+<pre><code class="language-text">扩散 / Flow Matching
+    ├→ 学习局部去噪或速度信息
+    │       ↓ 数值采样
+    │   多步生成动作
+    │       ├→ 更换求解器 / 减少采样步
+    │       └→ 以教师生成过程训练学生
+    │               ├→ 更新步骤蒸馏
+    │               ├→ 最终结果蒸馏
+    │               └→ Consistency Distillation
+    │
+数据 + 相应训练配方
+    └→ Consistency Training
+            ↓
+      学习不同噪声级到端点的映射
+            ↓
+       一步或少步生成动作
+</code></pre>
+<p>生成一致性定义了一种跨噪声级的映射性质；蒸馏描述如何从教师转移生成能力。CD同时属于两者，CT可以直接从数据学习，而一般的步骤蒸馏不必成为一致性模型。</p>
+<p>把这些方法接到机器人上时，仍然沿用 <a href="imitation-learning-behavior-cloning.html">模仿学习</a> 的数据与闭环评价要求。观测表示的稳健性继续由 <a href="multimodal-consistency-supervision.html">多模态表示监督</a> 讨论，动作条件如何进入网络则见 <a href="19-attention-openclip-tactile-groot.html">Policy融合</a>。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="diffusion-policy-and-act.html">← IL04 · Diffusion Policy 与 ACT：小型策略的训练和推理</a>
+            <a href="10-flow-matching-training-inference.html">VLA01 · Flow Matching：训练、timestep 与推理 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

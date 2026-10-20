@@ -55,6 +55,7 @@
 <li><a href="#5vlash-future-image">误区 5：VLASH 预测 future image</a></li>
 <li><a href="#6vla-jepa-world-model">误区 6：VLA-JEPA 推理时运行 world model</a></li>
 <li><a href="#7pi05-multi-expert-router-moe">误区 7：PI0.5 multi-expert 是 router MoE</a></li>
+<li><a href="#8-attention-mask-ki">误区 8：冻结参数或设置 attention mask 就等于 KI</a></li>
 </ul>
 </li>
 <li><a href="#9-vla">9. 阅读一篇新 VLA 论文的顺序</a><ul>
@@ -75,9 +76,9 @@
       </aside>
       <main class="article-main">
         <article class="blog-article">
-          <p class="article-series"><span data-lang="en">Part 3: VLA Architectures</span><span data-lang="zh">第三卷：VLA 核心架构</span> · VLA04</p>
+          <p class="article-series"><span data-lang="en">Part 3: VLA Architectures</span><span data-lang="zh">第三卷：VLA 核心架构</span> · VLA05</p>
           <h1>PI0.5、GR00T、VLASH 与 VLA-JEPA 对照</h1>
-          <p class="article-meta"><span data-lang="en">进阶 · August 2026 · 4 min read</span><span data-lang="zh">进阶 · 2026.08 · 约 4 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">进阶 · August 2026 · 5 min read</span><span data-lang="zh">进阶 · 2026.08 · 约 5 分钟阅读</span></p>
           <p class="article-deck">把架构、异步框架和 world-model supervision 放到正确层级，并形成统一比较坐标。</p>
           <div class="article-content">
             <p>这一章不是再介绍一个新模型，而是把前面的概念压缩成一张知识地图，帮助阅读新 VLA 论文和代码。</p>
@@ -179,7 +180,7 @@ runtime: execute old chunk while inferring next chunk
 </tr>
 <tr>
 <td>主要训练 loss</td>
-<td>flow matching</td>
+<td>公开微调：flow；论文训练另含 FAST，见下文</td>
 <td>flow matching</td>
 <td>flow loss不变、改样本 offset</td>
 <td><code>L_FM + βL_WM</code></td>
@@ -193,6 +194,7 @@ runtime: execute old chunk while inferring next chunk
 </tr>
 </tbody>
 </table>
+<p>表中 PI0.5 的 flow matching 指公开 openpi 的连续动作微调路径。原始论文还使用 FAST 离散目标，发布 checkpoint 使用后续 KI 配方；完整训练需要把动作表示、阶段安排和梯度路径一起比较，详见 <a href="fast-ki-pi-training.html">FAST 与 KI</a>。</p>
 <h2 id="4-hidden-widths">4. 典型 hidden widths</h2>
 <table>
 <thead>
@@ -288,6 +290,16 @@ VLA-JEPA world predictor：
 <td>不需要真实 action，只需要初始 noise</td>
 </tr>
 <tr>
+<td>PI0.5 FAST 动作目标 / CE</td>
+<td>论文联合训练与 KI 配方使用；公开 flow-only 微调不含</td>
+<td>连续动作部署路径不生成这些 token</td>
+</tr>
+<tr>
+<td>KI 的 K/V stop-gradient</td>
+<td>指定梯度边界，VLM 仍由离散目标更新</td>
+<td>不改变前向数值，无需额外采样步骤</td>
+</tr>
+<tr>
 <td>VLASH temporal offset dataset</td>
 <td>需要</td>
 <td>不需要 dataset offset sampling</td>
@@ -334,6 +346,8 @@ both
 <p>论文标准部署路径不需要。world predictor 和 frozen target encoder主要用于训练监督。</p>
 <h3 id="7pi05-multi-expert-router-moe">误区 7：PI0.5 multi-expert 是 router MoE</h3>
 <p>错误。Prefix/Action expert 由模态固定分配，不是 router top-k 选择。</p>
+<h3 id="8-attention-mask-ki">误区 8：冻结参数或设置 attention mask 就等于 KI</h3>
+<p>冻结决定参数是否更新，attention mask 决定前向能读哪些位置，KI 的 stop-gradient 决定 flow 损失能否回传到 VLM。完整 KI 还用离散动作监督使主干继续适应机器人任务。</p>
 <h2 id="9-vla">9. 阅读一篇新 VLA 论文的顺序</h2>
 <p>建议不要从模型名字开始，而是依次回答以下问题。</p>
 <h3 id="_1">第一步：输入与输出</h3>
@@ -360,6 +374,8 @@ flow matching/diffusion？
 latent prediction？
 world-model loss？
 哪些参数被冻结？
+每个 loss 更新哪些参数？
+论文训练配方与公开微调代码相同吗？
 </code></pre>
 <h3 id="_4">第五步：推理与部署</h3>
 <pre><code class="language-text">去噪几步？
@@ -394,6 +410,7 @@ world-model loss？
 <li><a href="assets/diagrams/vlash.drawio">VLASH 训练与异步运行图</a></li>
 <li><a href="assets/diagrams/vla_jepa_structure.drawio">VLA-JEPA 结构图</a></li>
 <li><a href="04-pi05-architecture.html">PI0.5 代码架构说明</a></li>
+<li><a href="fast-ki-pi-training.html">FAST 与 KI：动作监督、梯度与微调</a></li>
 <li><a href="07-vlash-integration.html">BrainCo-IL VLASH 实现说明</a></li>
 </ul>
 <p>如果只记住一条主线，可以记成：</p>
@@ -406,8 +423,8 @@ world-model loss？
 </code></pre>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="11-groot-dit-architecture.html">← VLA03 · GR00T：VLM Memory 与 DiT Action Head</a>
-            <a href="13-jepa-vla-jepa.html">VLA05 · JEPA、World Model 与 VLA-JEPA →</a>
+            <a href="11-groot-dit-architecture.html">← VLA04 · GR00T：VLM Memory 与 DiT Action Head</a>
+            <a href="13-jepa-vla-jepa.html">VLA06 · JEPA、World Model 与 VLA-JEPA →</a>
           </nav>
         </article>
       </main>

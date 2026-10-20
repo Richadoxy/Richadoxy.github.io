@@ -1,10 +1,24 @@
-# 04. PI0.5：VLM Prefix 与 Action Expert
+# PI0.5：前向结构与 Action Expert
 
-> 建议先读：[VLA 总览](27_vla_overview.md)、[动作生成方法](25_action_generation_families.md)与[Flow Matching](10_flow_matching_training_and_inference.md)。本文默认读者已经理解 token、attention 和 action chunk。
+> 建议先读：[VLA 总览](27_vla_overview.md)、[动作生成方法](25_action_generation_families.md)与[Flow Matching](10_flow_matching_training_and_inference.md)。本文先追踪连续动作路径，再接到 [FAST 与 KI：动作监督、梯度与微调](42_fast_ki_and_pi_training.md)。
 
 可以先用一句话理解 PI0.5：
 
 > VLM 负责理解“看到了什么、任务是什么、机器人当前在哪里”，Action Expert 负责生成“接下来怎么动”。
+
+## 0. 这张架构图覆盖哪一部分
+
+配套结构图描述 openpi / BrainCo-IL 中的 **flow 动作前向路径**：观测进入 Prefix，带噪动作进入 Action Expert，最后得到速度场。图里的 `SentencePiece tokenizer` 处理文字与当前 state，`action_in_proj` 把带噪动作投影为连续 hidden；它们都不承担 FAST 动作编码。
+
+理解 π₀.₅还需要区分三个层次：
+
+| 层次 | 阅读时要确认 |
+| --- | --- |
+| 原始 π₀.₅论文 | FAST 离散目标预训练，后训练加入连续 expert 并保留联合 token/flow 目标 |
+| 后续 KI 与发布 checkpoint | 两种动作监督同时训练；flow 到 VLM 的梯度被隔离 |
+| 公开 openpi 微调代码 | 只实现 π₀.₅的 flow head 训练与推理；不会因为加载 KI checkpoint 就自动运行 FAST 或 KI |
+
+前两行是训练配方，第三行是公开实现范围。[原始论文](https://arxiv.org/abs/2504.16054)、[KI 论文](https://arxiv.org/abs/2505.23705)和[官方 README](https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/README.md)需要分别阅读。本文以三路相机、离散 state prompt 为示例；具体张量长度由配置决定。
 
 ## 1. 先纠正输入术语
 
@@ -45,7 +59,7 @@ prompt + 当前 state ─> 离散化/tokenizer ─> tokens ─┤
                                            predicted velocity
 ```
 
-代码入口是 [`Pi0`](../../src/openpi/models/pi0.py)。
+代码入口是[官方 `Pi0`](https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py)。本站工程篇还链接到 [BrainCo-IL 的对应实现](../../src/openpi/models/pi0.py)，其中机器人配置与额外功能应单独核对。
 
 ## 3. Prefix 和 suffix 是什么
 
@@ -89,6 +103,8 @@ Suffix 看到：Prefix + Suffix
 
 也就是说，Action Expert 可以根据图像、任务和当前状态修正动作；VLM prefix 不会反过来读取 noisy action，从而避免条件信息被噪声动作干扰。
 
+这条 attention mask 规则描述前向可见性。只要 expert 读取的 prefix K/V 没有 `stop-gradient`，flow loss 仍可沿它们更新 VLM。KI 的梯度边界需要另外画，详见 [FAST / KI 训练图](pi05_fast_ki_training.drawio)。
+
 ## 4. 图像如何进入 VLM
 
 三路图像都先缩放到：
@@ -113,11 +129,11 @@ Suffix 看到：Prefix + Suffix
 
 ## 5. prompt 和 state 如何进入 VLM
 
-PI0.5 不用一个连续线性层直接接收 `[B, D]` state，而是：
+在 `discrete_state_input=True` 的常见 PI0.5 路径中，`[B, D]` state 这样进入 VLM：
 
 ```text
 归一化 state
-  -> 每个值离散到 0~255
+  -> 按 [-1, 1] 上的 256 个区间离散化
   -> 拼进文本
   -> SentencePiece tokenizer
   -> padding/truncation 到 max_token_len
@@ -130,19 +146,21 @@ Task: pick up the bread, State: 143 82 227 ...;
 Action:
 ```
 
-当前配置中最终 token IDs 的 shape 固定为：
+设文本容量为 `L = max_token_len`，最终 token IDs 的 shape 为：
 
 ```text
-[B, 256]
+[B, L]
 ```
 
 经过 Gemma embedding 后为：
 
 ```text
-[B, 256, 2048]
+[B, L, 2048]
 ```
 
 图像 tokens 与 prompt/state tokens 拼成 VLM prefix。padding token 会被 mask，不参与有效注意力。
+
+原结构图中的 `L=256` 来自 BrainCo 示例配置；不是 π₀.₅的固定架构常数。核对的官方配置在 `pi05=True` 时默认取 200，还允许覆盖。若某个数据配置关闭 `discrete_state_input`，需要另查实际 state 入口，不能假定它自动切回 π₀的连续 `state_proj`。[官方配置](https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0_config.py)
 
 ## 6. `action_in_proj` 做什么
 
@@ -216,7 +234,7 @@ timestep t
 
 ## 9. 训练：学习速度场
 
-[`compute_loss()`](../../src/openpi/models/pi0.py) 构造：
+[官方 `compute_loss()`](https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py) 构造：
 
 ```text
 真实动作 a
@@ -247,6 +265,8 @@ v_t = action_out_proj(ActionExpert(...))
 loss = mean((v_t - u_t)^2)
 ```
 
+这是当前公开 π₀.₅微调的目标。使用全参或 LoRA 时，梯度可以继续进入可训练的 VLM 参数；冻结哪些参数由训练配置决定。不能从“输出来自 Action Expert”推断损失只更新 Action Expert。
+
 ## 10. 推理：从噪声生成 action
 
 推理没有真实 action，先生成纯随机噪声：
@@ -268,7 +288,7 @@ suffix：从随机噪声开始，每一步 Euler 更新后都会变化
 x_t <- x_t + dt * v_t
 ```
 
-默认执行 10 步，最终得到 action chunk。
+这里 `t=1` 是噪声、`t=0` 是动作，因此 `dt` 为负。默认执行 10 步，最终得到 action chunk。
 
 因此推理可以概括为：
 
@@ -291,3 +311,9 @@ token IDs [B, max_token_len]
 所以 VLM 的网络宽度不需要变化，变化的是 token 内容。结构上能够接收不代表已经理解新关节语义；模型仍需通过一致的数据顺序和训练建立对应关系。
 
 还要检查 token 是否超过 `max_token_len`，否则后部 state 可能被截断。
+
+## 12. 从前向路径走到训练机制
+
+同一段真实未来动作在完整训练方案中可以派生两种目标：FAST 编码用于 VLM 的 token 预测，加入噪声后用于 expert 的速度场预测。这是两条监督分支；是否先后训练、哪些梯度回到 VLM，是另外两个问题。
+
+下一篇 [FAST 与 KI](42_fast_ki_and_pi_training.md) 按“动作表示 → 两种损失 → 训练阶段 → 梯度隔离 → 公开微调代码”展开。完成后应能在图上分别标出前向连接、训练目标和参数更新路径，再进入 [TrainState 与训练步](05_train_state_jit_checkpoint.md) 验证代码行为。

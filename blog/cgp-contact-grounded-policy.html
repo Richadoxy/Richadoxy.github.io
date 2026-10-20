@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="区分未来机器人状态、触觉 latent 和控制命令，拆解联合扩散、接触映射及 Visuotactile DP 对照。" />
+    <title>CGP 精读：状态、触觉与接触一致的控制 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 实际状态与目标命令之间的距离</a></li>
+<li><a href="#2">2. 变量地图：输入、生成对象与最终输出</a></li>
+<li><a href="#3-visuotactile-dp">3. 相比 Visuotactile DP，改变发生在哪里</a></li>
+<li><a href="#4">4. 三处触觉网络各有职责</a><ul>
+<li><a href="#41">4.1 当前观测编码：用于条件输入</a></li>
+<li><a href="#42-vae">4.2 触觉 VAE：为未来生成准备连续空间</a></li>
+<li><a href="#43">4.3 接触映射：仿真与真实路径不同</a></li>
+</ul>
+</li>
+<li><a href="#5">5. 训练链路：不同标签教会不同模块</a><ul>
+<li><a href="#51">5.1 学会压缩触觉</a></li>
+<li><a href="#52">5.2 学会从接触与实际状态恢复控制目标</a></li>
+<li><a href="#53">5.3 学会生成未来状态与触觉</a></li>
+</ul>
+</li>
+<li><a href="#6">6. 推理链路：先联合采样，再映射执行</a></li>
+<li><a href="#7">7. 数据与实验：闭环、映射与压缩三层证据</a><ul>
+<li><a href="#71">7.1 闭环操作：生成目标的收益</a></li>
+<li><a href="#72">7.2 单独检查映射：触觉与本体的互补信息</a></li>
+<li><a href="#73">7.3 检查压缩：局部指标与闭环指标需要一起看</a></li>
+</ul>
+</li>
+<li><a href="#8">8. 预训练、冻结与开源状态</a></li>
+<li><a href="#9">9. 方法边界与可迁移的思考方式</a></li>
+<li><a href="#10">10. 知识点之间的联系</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span> · TOUCH11</p>
+          <h1>CGP 精读：状态、触觉与接触一致的控制</h1>
+          <p class="article-meta"><span data-lang="en">进阶 · October 2026 · 17 min read</span><span data-lang="zh">进阶 · 2026.10 · 约 17 分钟阅读</span></p>
+          <p class="article-deck">区分未来机器人状态、触觉 latent 和控制命令，拆解联合扩散、接触映射及 Visuotactile DP 对照。</p>
+          <div class="article-content">
+            <p>CGP（Contact-Grounded Policy）把动作生成拆成两件事：先预测未来机器人实际会处于什么姿态、产生什么触觉，再把这组预测转换成底层控制器的目标。它连接了三个经常被混在一起的概念：<strong>实际状态、接触反馈、控制命令</strong>。</p>
+<p>理解这篇论文的关键，在于看清“预测什么”和“怎样执行”。其生成器沿用 U-Net 扩散模型；变化主要发生在生成目标和控制接口上。</p>
+<blockquote>
+<p>阅读位置：<a href="diffusion-policy-and-act.html">Diffusion Policy 与 ACT</a> → 本文 → <a href="tactile-input-representation.html">触觉输入与表示</a>。本文以 arXiv v3 PDF 为精读版本，版本日期为 2026-05-08；论文已收录于 <a href="https://www.roboticsproceedings.org/rss22/p005.html">RSS 2026 论文集</a>。开源状态核查日期为 2026-10-17。</p>
+</blockquote>
+<h2 id="1">1. 实际状态与目标命令之间的距离</h2>
+<p>机器人数据集中的 action 常常是“发给控制器的目标”，例如手指目标关节角、机械臂目标末端位姿。机器人最后到达的状态还受到物体阻挡、摩擦、控制器增益和运动惯性的影响。</p>
+<p>设一个手指关节采用 PD 控制，简化关系为：</p>
+<p>\[
+\tau=K_p(q_{\mathrm{target}}-q_{\mathrm{actual}})
++K_d(\dot q_{\mathrm{target}}-\dot q_{\mathrm{actual}}).
+\]</p>
+<p>目标角度像弹簧的另一端。手指被物体挡住后，实际角度可能变化不大，但目标角度继续向内，控制器就可能产生更大的作用力。在忽略速度项的示意例子里，若 \(K_p=2\,\mathrm{N\cdot m/rad}\)，角度误差为 \(0.05\,\mathrm{rad}\)，对应的比例项力矩为 \(0.1\,\mathrm{N\cdot m}\)。该数值只用于解释控制原理，不是论文的硬件参数。</p>
+<p>由此产生两个学习任务：</p>
+<ul>
+<li><strong>未来实际状态预测</strong>：希望手和机械臂实际处于怎样的位置。</li>
+<li><strong>控制目标预测</strong>：为了达到这种位置和接触效果，需要给控制器怎样的参考值。</li>
+</ul>
+<p>如果直接把预测的实际角度当成目标角度，可能抹去维持接触力所需的偏差。CGP 用触觉描述接触结果，再学习这两种状态之间的关系。</p>
+<p>目标与实际状态的差距也包含重力、摩擦和普通跟踪误差，不能把每一点差距都解释为接触力，更不能直接当成力传感器读数。论文附录中的真实机器人可视化也区分了接触前的跟踪偏差和接触后的变化。</p>
+<h2 id="2">2. 变量地图：输入、生成对象与最终输出</h2>
+<p>论文使用以下符号：</p>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>含义</th>
+<th>在模型中的用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>\(i_t\)</td>
+<td>外部相机与腕部相机图像</td>
+<td>观测条件</td>
+</tr>
+<tr>
+<td>\(u_t\)</td>
+<td>原始触觉数组或触觉图像</td>
+<td>当前观测，也用于构造未来触觉标签</td>
+</tr>
+<tr>
+<td>\(x_t\)</td>
+<td>实际机器人状态：末端位姿与手指关节角</td>
+<td>当前观测，也是未来生成目标的一部分</td>
+</tr>
+<tr>
+<td>\(h_t\)</td>
+<td>VAE 压缩得到的连续触觉 latent</td>
+<td>未来生成目标的另一部分</td>
+</tr>
+<tr>
+<td>\(a_t\)</td>
+<td>发给柔顺控制器的目标状态</td>
+<td>接触映射的监督标签与最终执行输出</td>
+</tr>
+</tbody>
+</table>
+<p>这里的 \(x_t\) 是<strong>机器人状态</strong>，不包含一个显式的物体位置或物体姿态预测头。</p>
+<p>当前条件为一小段观测历史：</p>
+<p>\[
+O_t=\{(i_s,u_s,x_s)\}_{s=t-T_o+1}^{t}.
+\]</p>
+<p>待生成的干净序列为：</p>
+<p>\[
+Y_t^0=[X_t,H_t]
+=\left[x_{t+1:t+T},h_{t+1:t+T}\right].
+\]</p>
+<p>论文将未来时刻写为 \(t+1\) 到 \(t+T\)；复现时还需要将数据窗口的索引与执行窗口对齐。</p>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th>仿真</th>
+<th>真实机器人</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>机械臂与手</td>
+<td>UR5＋Tesollo DG-5F，20 个手关节</td>
+<td>Franka Panda＋Allegro V5，16 个手关节</td>
+</tr>
+<tr>
+<td>触觉</td>
+<td>748 个全手触觉点，每点三维力</td>
+<td>4 个 Digit360 指尖 RGB 触觉图像</td>
+</tr>
+<tr>
+<td>单帧实际状态 \(d_x\)</td>
+<td>\(3+4+20=27\)</td>
+<td>\(3+4+16=23\)</td>
+</tr>
+<tr>
+<td>单帧控制目标 \(d_a\)</td>
+<td>\(3+6+20=29\)</td>
+<td>\(3+6+16=25\)</td>
+</tr>
+<tr>
+<td>触觉 latent \(d_h\)</td>
+<td>32</td>
+<td>80，即每个传感器 20 维</td>
+</tr>
+<tr>
+<td>生成序列形状</td>
+<td>\([B,16,59]\)</td>
+<td>\([B,16,103]\)</td>
+</tr>
+<tr>
+<td>最终控制目标序列</td>
+<td>\([B,16,29]\)</td>
+<td>\([B,16,25]\)</td>
+</tr>
+</tbody>
+</table>
+<p>上表生成序列的末维由论文公布的 \(d_x+d_h\) 推得；它不是论文公布的某个源码张量名称。实际状态旋转采用四元数，控制目标旋转采用 rot6D，所以两个状态的维度不同。</p>
+<p>这种形状检查很有用：它直接说明 CGP 去噪的是“状态＋触觉 latent”，而普通 Visuotactile DP 去噪的是控制目标序列。相关定义见 <a href="https://arxiv.org/pdf/2603.05687v3">论文 v3，第 III 节与表 V</a>。</p>
+<h2 id="3-visuotactile-dp">3. 相比 Visuotactile DP，改变发生在哪里</h2>
+<p>两种方法都可以利用视觉、触觉和本体观测。CGP 的区别是把未来接触放进了生成与执行路径。</p>
+<pre><code class="language-text">Visuotactile DP
+
+当前观测历史
+    ↓ 视觉／触觉编码与条件融合
+条件 U-Net：对控制目标序列去噪
+    ↓
+未来控制目标 A
+    ↓
+机械臂阻抗控制＋手指 PD 控制
+
+
+CGP
+
+当前观测历史
+    ↓ 视觉／触觉编码与条件融合
+条件 U-Net：对“实际状态＋触觉 latent”序列去噪
+    ↓
+未来实际状态 X ＋ 未来触觉 latent H
+    ↓ 逐时刻接触一致性映射
+未来控制目标 A
+    ↓
+机械臂阻抗控制＋手指 PD 控制
+</code></pre>
+<p>论文的两项主要贡献可以归纳为：</p>
+<ol>
+<li><strong>将状态、接触与控制目标连接起来。</strong> 生成器学习未来实际状态与触觉的联合分布，接触映射学习怎样将这组结果变成控制参考值。</li>
+<li><strong>在紧凑触觉空间中进行生成。</strong> VAE 把高维触觉压缩成连续 latent，使联合预测的计算量可控；论文还检查了 KL 正则对后续生成与闭环操作的影响。</li>
+</ol>
+<p>未来触觉在这里直接参与控制目标计算。若只给一个普通策略加上“预测未来触觉”的辅助损失，却在推理时丢弃预测结果，数据流就与 CGP 不同。</p>
+<p>论文中的 Visuotactile DP baseline 与 CGP 使用相同架构和大小的共享模块，包括视觉编码器、触觉条件编码器及 U-Net backbone。这能减轻“只是换了更强编码器”的解释。CGP 另有 VAE 与映射模块，因此“共享模块匹配”不等于总参数量、所有训练目标和总训练开销完全相同。<a href="https://arxiv.org/pdf/2603.05687v3">论文 v3，第 V-A、V-D 节</a></p>
+<h2 id="4">4. 三处触觉网络各有职责</h2>
+<p>CGP 里出现了多个 tactile encoder，容易被误认为同一个预训练模块的反复调用。论文明确说明：相关模块采用相似的架构模板，但由于训练目的与阶段不同，<strong>不同组件之间不共享 encoder 权重</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>处理什么</th>
+<th>学习目的</th>
+<th>推理时的作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>条件触觉编码器</td>
+<td>当前观测触觉</td>
+<td>为未来生成提供有用条件</td>
+<td>告诉扩散模型当前接触情况</td>
+</tr>
+<tr>
+<td>触觉 VAE 编码器与解码器</td>
+<td>原始触觉与压缩 latent</td>
+<td>重建触觉，并约束 latent 分布</td>
+<td>定义未来触觉的生成空间；部分路径需要解码</td>
+</tr>
+<tr>
+<td>接触映射中的触觉编码器</td>
+<td>原始／重建的触觉数组</td>
+<td>帮助预测控制器目标</td>
+<td>仿真数组路径中使用；真实图像路径直接读取 latent</td>
+</tr>
+</tbody>
+</table>
+<h3 id="41">4.1 当前观测编码：用于条件输入</h3>
+<p>仿真中，触觉是 \(748\times3\) 数组。1D ResNet 沿触觉点索引维度做卷积，三维力作为通道。该选择依赖触觉点的排列；1D 卷积本身不会自动获得真实三维几何邻接关系。</p>
+<p>真实系统中，每个 Digit360 图像经过同一个 2D ResNet 风格编码器，各传感器的特征再通过跨传感器 self-attention 融合。</p>
+<pre><code class="language-text">仿真：触觉数组 → 独立的条件 ResNet1D ──────────────┐
+                                                    │
+真实：4 张触觉图像 → 共享的单传感器 ResNet2D          │
+                     → 跨传感器 self-attention ─────┤
+                                                    ↓
+视觉特征 ＋ 触觉特征 ＋ 实际机器人状态 → 条件向量
+                                                    ↓
+                                    FiLM 调制扩散 U-Net
+</code></pre>
+<p>“单传感器之间共享权重”与“不同组件之间不共享权重”并不冲突。前者让四个指尖使用同一种图像处理规则；后者让条件编码、触觉压缩和控制映射分别学习自己的表示。</p>
+<h3 id="42-vae">4.2 触觉 VAE：为未来生成准备连续空间</h3>
+<p>VAE 是一个带概率 latent 的编码—解码框架。它可以处理触觉数组，也可以处理触觉图像，并不限于视觉任务。</p>
+<p>\[
+q_\psi(h\mid u),\qquad \hat u=G_\omega(h).
+\]</p>
+<p>其目标可按标准形式理解为：</p>
+<p>\[
+\mathcal L_{\mathrm{VAE}}
+=\mathbb E_{h\sim q_\psi(h\mid u)}
+\left[\ell_{\mathrm{recon}}(G_\omega(h),u)\right]
++\beta D_{\mathrm{KL}}\left(q_\psi(h\mid u)\|\mathcal N(0,I)\right).
+\]</p>
+<p>这是对“重建＋KL 正则”训练思想的整理。论文没有给出足以还原全部实现的重建损失、归一化和采样细节，不应把上式中的 \(\ell_{\mathrm{recon}}\) 擅自替换为某个确定的源码实现。</p>
+<p>重建项让 latent 保存接触信息；KL 项约束编码分布。论文的消融出现了一个重要现象：去掉 KL 后，重建误差可能更低，但后续策略成功率更差。也就是说，<strong>一个容易重建的编码空间，不一定也是容易生成的编码空间</strong>。</p>
+<p>CGP 使用连续 latent，没有文本词表，也没有把动作或触觉量化为离散 token ID。这里的压缩器与语言模型 tokenizer 的职责不同。更完整的表示区分见 <a href="tactile-input-representation.html">触觉输入与表示</a>。</p>
+<h3 id="43">4.3 接触映射：仿真与真实路径不同</h3>
+<p>论文将映射抽象为：</p>
+<p>\[
+a_t=M_\phi(x_t,u_t).
+\]</p>
+<p>它在给定实际机器人状态和触觉时预测相应控制目标，并采用残差形式。针对维度相同的关节角分量，可以写成：</p>
+<p>\[
+q_t^{\mathrm{target}}
+=q_t^{\mathrm{actual}}+\Delta q_\phi(x_t,u_t).
+\]</p>
+<p>对完整状态不能直接写成 27 维向量加 29 维残差；旋转表达需要先转换到兼容空间。论文没有展开完整旋转残差实现，复现时需单独确定。</p>
+<p>两种传感器的具体路径为：</p>
+<pre><code class="language-text">仿真触觉数组：
+预测 latent → VAE Decoder → 重建 748×3 触觉
+                               ↓
+                      映射专用触觉 Encoder
+                               ↓
+                   拼接预测实际状态 → MLP → 控制目标
+
+真实触觉图像：
+预测 80 维 latent ＋ 预测实际状态
+                               ↓
+                             MLP → 控制目标
+</code></pre>
+<p>真实路径省去了整段触觉图像重建，降低运行开销。不能把“VAE 有 decoder”理解为“真实机器人每次控制都必须先生成四张触觉图片”。以上组件区别来自 <a href="https://arxiv.org/pdf/2603.05687v3">论文 v3，第 III-D、III-E 节</a>。</p>
+<h2 id="5">5. 训练链路：不同标签教会不同模块</h2>
+<p>一段可用于这套方法的示范需要同时记录：相机图像、原始触觉、实际机器人状态、实际发出的控制目标，并保持时间对齐。只保留末端实际轨迹，会丢失学习控制映射所需的目标标签。</p>
+<p>以下按数据依赖整理训练过程；论文说明模块在不同阶段、以不同目标训练，但没有公开完整优化器调度，因此这不是逐行还原的训练脚本。</p>
+<h3 id="51">5.1 学会压缩触觉</h3>
+<pre><code class="language-text">示范触觉 u → VAE Encoder → latent h → VAE Decoder → 重建触觉
+                               ↓
+                      重建目标＋KL 正则
+</code></pre>
+<p>论文的触觉重建实验使用与策略训练相同来源的示范数据，并按 episode 划分训练与验证。VAE 提供的 latent 坐标系随后供联合生成使用。</p>
+<h3 id="52">5.2 学会从接触与实际状态恢复控制目标</h3>
+<pre><code class="language-text">实际状态 x ＋ 触觉 u（真实图像路径使用其 latent）
+                         ↓
+                  接触一致性映射 M
+                         ↓
+                  预测控制目标 a_hat
+                         ↓
+                  与记录的目标 a 比较
+</code></pre>
+<p>该学习任务可以概括为：</p>
+<p>\[
+\mathcal L_{\mathrm{map}}
+=\mathbb E\left[\ell_{\mathrm{target}}
+\left(M_\phi(x_t,u_t),a_t\right)\right].
+\]</p>
+<p>这里保留一般回归损失符号。论文用关节角 MAE 评价映射效果，但评价指标不等于已经披露了训练所用的精确 loss。</p>
+<h3 id="53">5.3 学会生成未来状态与触觉</h3>
+<p>先从示范未来帧构造干净标签 \(Y_t^0=[X_t,H_t]\)，再随机采样扩散步 \(k\) 和高斯噪声：</p>
+<p>\[
+Y_t^k=\alpha_kY_t^0+\sigma_k\epsilon,
+\qquad\epsilon\sim\mathcal N(0,I).
+\]</p>
+<p>U-Net 预测注入的噪声：</p>
+<p>\[
+\mathcal L_{\mathrm{diff}}
+=\mathbb E_{O_t,Y_t^0,k,\epsilon}
+\left[\left\|\epsilon-
+\epsilon_\theta(Y_t^k,k,O_t)\right\|_2^2\right].
+\]</p>
+<p>\(t\) 是机器人轨迹的物理时间；\(k\) 是人为设置的扩散噪声等级。训练时，一次样本通常随机选一个噪声等级来学习去噪，不需要先执行一整段真实机器人动作。</p>
+<p>这个目标属于噪声预测式扩散训练。文章中的“contact consistency”描述接触与控制目标的关系，和生成模型中的 Consistency Models 不是同一种方法；CGP 也没有因此改成 flow matching。</p>
+<p>未来触觉和未来实际状态是<strong>训练标签</strong>。在线条件仍然来自当前与过去的观测，不能把训练标签送入部署时不可获得的输入分支。</p>
+<h2 id="6">6. 推理链路：先联合采样，再映射执行</h2>
+<p>以真实机器人为例，整条路径为：</p>
+<pre><code class="language-text">最近 2 帧：双相机图像、4 路触觉图像、23 维实际状态
+    ↓ 当前观测编码与融合
+条件 c
+
+高斯噪声 Y^K：[B,16,103]
+    ↓ U-Net + 固定的当前条件 c，8 步 DDIM
+干净预测 Y_hat：[B,16,103]
+    ├── X_hat：[B,16,23]   未来实际机器人状态
+    └── H_hat：[B,16,80]   未来触觉 latent
+              ↓ 拼接后逐时刻 MLP 映射
+控制目标 A_hat：[B,16,25]
+              ↓ 执行其中 8 个目标
+机械臂阻抗控制＋手指 PD 控制
+              ↓ 采集新观测，重新规划
+</code></pre>
+<p>DDIM 每一步修改的是待生成的未来序列，当前这次规划的观测条件通常保持不变。执行一部分动作后，真实传感器带来新的信息，下一轮规划再使用更新后的条件。</p>
+<p>论文表 V 的统一设置为：观测窗口 2、预测窗口 16、执行窗口 8、每次采样 8 步 DDIM；表中报告 policy rollout frequency 为 5 Hz。<strong>动作采样率、整段重新规划频率、DDIM 迭代步数和底层控制器频率是不同的量。</strong> 不宜把表中的 5 Hz 直接扩写为“底层 PD 每秒只更新五次”或“必然每秒完整重规划五次”；具体调度仍需实现支持。</p>
+<p>运行效率测试使用 NVIDIA A100 80GB。论文报告 CGP 与两种 DP baseline 的推理延迟接近，这个结论对应其硬件与配置，不能直接推断在机器人端任意显卡上都达到相同速度。<a href="https://arxiv.org/pdf/2603.05687v3">论文 v3，第 V-D 节、表 V</a></p>
+<h2 id="7">7. 数据与实验：闭环、映射与压缩三层证据</h2>
+<h3 id="71">7.1 闭环操作：生成目标的收益</h3>
+<table>
+<thead>
+<tr>
+<th>任务</th>
+<th>示范数</th>
+<th>CGP</th>
+<th>Visuotactile DP</th>
+<th>Visuomotor DP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>仿真掌内翻盒</td>
+<td>60</td>
+<td>66.0%</td>
+<td>58.0%</td>
+<td>53.2%</td>
+</tr>
+<tr>
+<td>仿真易碎蛋抓取</td>
+<td>100</td>
+<td>74.8%</td>
+<td>70.0%</td>
+<td>53.2%</td>
+</tr>
+<tr>
+<td>仿真擦盘子</td>
+<td>100</td>
+<td>58.4%</td>
+<td>43.6%</td>
+<td>42.4%</td>
+</tr>
+<tr>
+<td>真实开罐</td>
+<td>45</td>
+<td>93.3%</td>
+<td>66.7%</td>
+<td>73.3%</td>
+</tr>
+<tr>
+<td>真实掌内翻盒</td>
+<td>90</td>
+<td>80.0%</td>
+<td>60.0%</td>
+<td>60.0%</td>
+</tr>
+</tbody>
+</table>
+<p>以上为论文表 II。仿真结果是最后 5 个 checkpoints 的平均成功率，共 250 次 rollout；真实任务每种方法每个任务评估 15 次连续 rollout。因此真实结果支持这些任务上的优势，但不足以单凭百分比推断广泛任务分布下的统计显著性。</p>
+<p>开罐任务里，Visuotactile DP 的结果还低于 Visuomotor DP。这提醒我们：多加一种传感器，并不保证在有限数据和某次评测中一定更好；表示、训练目标和执行方式都可能影响收益。</p>
+<h3 id="72">7.2 单独检查映射：触觉与本体的互补信息</h3>
+<p>作者另行采集了 150 段仿真抓握、4,114 帧、11 种物体，用于手配置预测实验。它用于分析接触映射，并不是一个规模巨大的外部策略预训练集。</p>
+<p>主要结果包括：</p>
+<ul>
+<li>同时输入实际状态和触觉，优于只输入其中一种。</li>
+<li>残差预测优于直接绝对预测。</li>
+<li>在所比较配置下，ResNet1D 触觉编码优于 MLP 与 Transformer 版本。</li>
+<li>注入一定程度的触觉高斯噪声时，映射误差没有立即失控。</li>
+</ul>
+<p>这些结论对应所测数据与配置，不能推出“Transformer 普遍不适合触觉”，也不能推出映射面对任意生成错误都稳定。</p>
+<h3 id="73">7.3 检查压缩：局部指标与闭环指标需要一起看</h3>
+<p>触觉重建实验按 episode 而非随机相邻帧划分训练与验证，比例为 1:1。这样可以降低高度相似的相邻帧同时出现在训练集和验证集中的风险。</p>
+<p>作者分别报告全触觉点的误差和有接触点的误差。这个区分很重要：全手大部分区域没有接触时，输出接近零也可能得到好看的平均误差，却遗漏真正影响控制的接触位置。</p>
+<p>因此，VAE 重建误差、接触映射误差、真实闭环成功率分别衡量不同环节。任何一个指标都不能单独代替另外两个。<a href="https://arxiv.org/pdf/2603.05687v3">论文 v3，第 V 节及附录 B—E</a></p>
+<h2 id="8">8. 预训练、冻结与开源状态</h2>
+<p>把这几件事分开记录，能避免从一个“encoder”名称推导出整套并不存在的训练流程。</p>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>能从论文与官方资料确认的内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>大规模外部触觉预训练</td>
+<td>没有报告使用 TVL、Touch100k 等外部触觉语料作为本方法的预训练数据；论文说明对不同传感器从头训练／适配</td>
+</tr>
+<tr>
+<td>VAE 数据来源</td>
+<td>触觉压缩实验使用策略示范数据；属于任务数据上的表征学习</td>
+</tr>
+<tr>
+<td>条件 encoder 与 VAE encoder</td>
+<td>不共享权重；不能据此声称条件 encoder 从 VAE 权重初始化</td>
+</tr>
+<tr>
+<td>冻结策略</td>
+<td>未给出足够完整的逐阶段冻结、解冻和联合优化说明；“先训练压缩器”不能自动推出后续所有分支都冻结</td>
+</tr>
+<tr>
+<td>视觉 backbone 初始化</td>
+<td>跟随 DP 架构不等于已经披露具体预训练 checkpoint；不能直接套用某个 DP 配置替代证据</td>
+</tr>
+<tr>
+<td>跨任务预训练</td>
+<td>文中采用单任务训练与评测，未验证统一多任务预训练策略</td>
+</tr>
+<tr>
+<td>训练代码、权重、数据下载</td>
+<td>截至 2026-10-17，本次核对的官方入口未发现可确认的下载发布</td>
+</tr>
+</tbody>
+</table>
+<p>核查时，<a href="https://contact-grounded-policy.github.io/">官方项目页</a>提供论文和视频；<a href="https://github.com/contact-grounded-policy">官方 GitHub 组织</a>仅显示项目网站仓库。这个记录说明本次核实到的公开范围，不排除作者之后更新，或存在尚未链接的发布位置。公开网页源码也不等于公开了训练实现。</p>
+<p>从头训练和预训练并不是由模型大小决定的。CGP 的情况更具体：它在特定传感器、特定控制器、特定任务的数据上学习触觉压缩和控制关系。预训练术语的完整区分见 <a href="diffusion-policy-and-act.html">Diffusion Policy 与 ACT</a>。</p>
+<h2 id="9">9. 方法边界与可迁移的思考方式</h2>
+<p><strong>控制映射依赖具体系统。</strong> 更换手、传感器、PD 增益或阻抗配置，都会改变同一目标与实际接触之间的关系。论文明确把跨传感器、跨控制器迁移列为局限，并提出未来可考虑把控制器参数作为条件。</p>
+<p><strong>全手触觉的实证范围需要分清。</strong> 748 个三维力触觉点用于仿真；真实机器人使用四个指尖触觉图像传感器。这些实验不能直接表述为已经验证“真实全掌压阻阵列”。将方法用于掌面压阻与指尖三维力的组合时，需要重新处理模态编码、量纲和数据采集。</p>
+<p><strong>状态与触觉并不一定唯一决定目标命令。</strong> 速度、摩擦、迟滞和不可见接触都可能造成歧义。CGP 学到的是示范分布和特定控制栈下有用的映射，没有给出任意接触条件下的唯一性或稳定性保证。</p>
+<p><strong>联合预测不等于完整物理世界模型。</strong> CGP 直接按观测生成一段示范分布中的状态与触觉序列，没有显式建模任意候选动作导致的环境转移，也没有借此搜索动作空间。</p>
+<p><strong>短历史条件不等于对象级长期记忆。</strong> 文中观测窗口为 2，没有提出持续维护每个物体身份、位置和接触归属的记忆槽位。如果研究目标是遮挡中的多物体操作，需要另行设计历史状态更新。相关连接见 <a href="policy-memory-and-object-centric-tactile-state.html">从时序模块到对象级触觉记忆</a>。</p>
+<p><strong>分别在仿真和真实系统上有效，不等于完成 sim-to-real。</strong> 论文明确没有直接研究同一个策略从仿真迁移到真实机器人的问题，也没有验证跨任务通用策略。</p>
+<p>这些边界仍然保留了 CGP 最有价值的启发：设计动作模型时，需要同时检查传感器观测、训练标签和底层控制接口。一个看起来合理的未来姿态，只有转换成合适的控制参考值，才能产生希望得到的接触。</p>
+<h2 id="10">10. 知识点之间的联系</h2>
+<pre><code class="language-text">控制原理
+实际位置与目标位置存在偏差，偏差会影响作用力
+        ↓
+数据定义
+同时记录实际状态、触觉和控制目标
+        ↓
+表示学习
+用 VAE 将高维触觉压缩为适合生成的连续 latent
+        ↓
+生成建模
+用扩散模型联合预测未来实际状态与触觉
+        ↓
+控制映射
+把预测的接触结果转换成控制器目标
+        ↓
+闭环证据
+检查重建、映射与操作成功率，而非只看一个离线 loss
+</code></pre>
+<p>一个适合动手验证的最小练习，是先在固定增益、单关节接触场景中记录实际角度、目标角度和触觉，比较“只用实际角度”和“实际角度＋触觉”恢复目标角度的误差。先确认数据里存在可学的控制关系，再扩展到高自由度手和完整扩散策略。这个练习是根据论文思想提出的教学方案，不是论文报告的新实验结果。</p>
+<p>后续阅读可以沿两条线展开：沿生成链路阅读 <a href="generative-consistency-and-sampling-distillation.html">采样蒸馏与生成一致性</a>，理解怎样减少采样开销；沿机器人链路阅读 <a href="tactile-memory-experiment-design.html">触觉记忆实验设计</a>，理解怎样证明新增模态或记忆改善了闭环控制。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="tactile-input-representation.html">← TOUCH10 · 从原始触觉到策略条件</a>
+            <a href="policy-memory-and-object-centric-tactile-state.html">TOUCH12 · 策略记忆：从历史观测到对象级触觉状态 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

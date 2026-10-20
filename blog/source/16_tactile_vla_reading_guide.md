@@ -3,7 +3,6 @@
 > 目标读者：刚进入触觉机器人学习、希望最终研究触觉VLA、接触丰富操作或灵巧手的新人。<br>
 > 文中“论文”链接均指向公开的PMLR或arXiv页面。<br>
 > 状态说明：ICML 2024和ICLR 2025按正式版本标注；其余若公开版本首页只显示arXiv，则统一写作“arXiv”，不猜测后续录用状态。<br>
-> 目录中TAP-VLA有重复副本，阅读一个即可。
 
 ## 0. 先建立整个领域的地图
 
@@ -23,14 +22,31 @@
 
 推荐按这个依赖关系阅读，而不是单纯按论文年份阅读。
 
-每篇论文都用下面六个问题做笔记：
+每篇论文按六个维度整理：传感器与原始输入、encoder 的初始化与更新范围、模态融合位置、动作表示与生成目标、示范和标签来源，以及闭环实验与接触质量。它们串起了“数据进入模型，再由动作影响环境”的完整链条。
 
-1. 触觉传感器是什么？原始输入形式是什么？
-2. 触觉encoder是预训练、冻结还是端到端微调？
-3. 视觉、语言、触觉在哪里融合？
-4. action如何表示和生成？
-5. 训练数据来自人工示范、遥操作、仿真还是伪标签？
-6. 是否做真实机器人闭环实验，评价指标是否包含接触质量？
+### 从小模型到触觉记忆的学习分支
+
+先理解可独立训练的小型策略，有助于把触觉的作用从大模型规模、语言能力和预训练数据中分开。下面这条分支连接动作生成、触觉输入、历史状态和研究验证。
+
+| 顺序 | 知识笔记 | 与下一步的联系 |
+| --- | --- | --- |
+| 1 | [动作生成方法](25_action_generation_families.md) | 区分数据、网络、训练目标和采样方式 |
+| 2 | [Diffusion Policy 与 ACT](36_diffusion_policy_and_act.md) | 把抽象 loss 放进完整观测—动作网络 |
+| 3 | [Flow Matching](10_flow_matching_training_and_inference.md) | 理解噪声、干净动作、速度参数化与生成时间 |
+| 4 | [生成一致性与采样蒸馏](37_generative_consistency_and_sampling_distillation.md) | 理解少步生成怎样改变延迟与训练成本 |
+| 5 | [从原始触觉到策略条件](39_tactile_input_representation.md) | 将真实传感器读数构造成有空间和时间含义的输入 |
+| 6 | [CGP 精读](38_cgp_paper_reading_notes.md) | 区分未来物理状态、触觉表示与实际控制命令 |
+| 7 | [策略记忆与对象级触觉状态](40_policy_memory_and_object_centric_tactile_state.md) | 从一帧接触信息走向遮挡下的历史状态估计 |
+| 8 | [触觉记忆的实验设计](41_tactile_memory_experiment_design.md) | 把模型设计变成能够被验证或推翻的研究假设 |
+
+这条分支也与已有基础文章相连：[表示与编码](31_multimodal_encoder_alignment_and_infonce.md) 解释输入怎样变成特征，[监督配方](32_three_consistency_supervision_paradigms.md) 解释特征学什么，[Policy 融合](19_attention_from_embeddings_to_action_expert.md) 解释这些特征怎样影响动作。
+
+### 知识之间的四条连接
+
+- **表示到动作：** 触觉重建和对齐塑造输入特征；动作监督决定特征是否服务于控制。
+- **单帧到历史：** 当前接触可能不足以确定状态；历史、已执行动作和新观测共同帮助更新估计。
+- **生成到反馈：** 采样步数影响推理耗时，传感器刷新和动作前缀决定新触觉何时改变行为。
+- **模型到证据：** 离线误差、对象归属准确率和闭环成功率分别描述不同能力，需要各自的测试。
 
 ---
 
@@ -273,13 +289,30 @@ LLM或robot policy
 
 RDP 是任务特定的视觉—触觉模仿学习策略，可在阅读触觉 VLA 的执行时反馈机制时作为基础对照。重点理解 Fig. 5 中动作块、temporal ensembling 与慢快策略的反馈时序差异，以及 Fig. 6 中非对称 tokenizer 和潜在扩散策略的两阶段训练。论文同时展示 TactAR 如何改善示范质量，但快策略仍从记录下来的专家动作学习，不能凭触觉自动纠正系统性的差示范。
 
+### 16. T-Rex：把一条Flow拆成低频规划与高频触觉修正
+
+**Niu et al., T-Rex: Tactile-Reactive Dexterous Manipulation — arXiv 2026**<br>
+[精读笔记](34_trex_paper_reading_notes.md) · [arXiv](https://arxiv.org/abs/2606.17055) · [官方代码](https://github.com/ZhuoyangLiu2005/T-Rex)
+
+建议在理解Flow Matching、Action Chunk和TacForcing以后阅读。重点：
+
+- Latent、Action、Tactile三套Transformer Expert怎样共享causal joint attention；
+- future-latent query tokens怎样用未来head-camera feature监督；
+- 16帧F6历史怎样通过VQ-VAE形成离散动态token；
+- 为什么在\(\tau_{\mathrm{split}}=0.4\)处分割同一条action flow；
+- slow stream怎样缓存\(x_{0.4}\)和latent/action KV；
+- fast stream怎样用新触觉多次从同一个boundary重新生成action chunk；
+- 论文约5/20 Hz表述与公开代码可配置调度之间的区别。
+
+T-Rex与TacForcing都关注execution-time touch，但T-Rex的核心接口是“缓存上下文 + 级联flow后半段”，不是逐token强制或简单action residual。
+
 ---
 
 ## 第四阶段：灵巧手与高自由度操作
 
 这一阶段需要同时理解遥操作数据、手臂—手指动作分解、触觉闭环和高维action建模。
 
-### 16. 【灵巧手重点】End-to-End Dexterous Arm-Hand VLA Policies via Shared Autonomy
+### 17. 【灵巧手重点】End-to-End Dexterous Arm-Hand VLA Policies via Shared Autonomy
 
 **Cui et al. — arXiv 2025**<br>
 [论文](<Cui et al. - 2025 - End-to-End Dexterous Arm-Hand VLA Policies via Shared Autonomy.pdf>)
@@ -293,7 +326,7 @@ RDP 是任务特定的视觉—触觉模仿学习策略，可在阅读触觉 VLA
 - corrective teleoperation如何追加失败恢复数据；
 - 约90%成功率和50多个物体的实验是否有严格未见物体划分。
 
-### 17. 【灵巧手重点】MoDE-VLA
+### 18. 【灵巧手重点】MoDE-VLA
 
 **Tang et al., Towards Human-Like Manipulation with MoDE-VLA — arXiv 2026**<br>
 [论文](<Tang et al. - 2026 - Towards Human-Like Manipulation with MoDE-VLA.pdf>)
@@ -318,7 +351,7 @@ RDP 是任务特定的视觉—触觉模仿学习策略，可在阅读触觉 VLA
 | 原子技能/端到端策略 |  |  |
 | 失败恢复方式 |  |  |
 
-### 18. Tabero：温柔操作和物理交互质量
+### 19. Tabero：温柔操作和物理交互质量
 
 **Wu et al., Tabero: Learning Gentle Manipulation with Vision, Touch and Language — arXiv 2026**<br>
 [论文](<Wu et al. - 2026 - Tabero Learning Gentle Manipulation with Vision Touch and Language（复件）.pdf>)
@@ -382,7 +415,7 @@ RDP 是任务特定的视觉—触觉模仿学习策略，可在阅读触觉 VLA
 
 ## 推荐的最短主线
 
-如果暂时不想读完全部论文，可以先按这13篇走：
+如果暂时不想读完全部论文，可以先按这14篇走：
 
 1. TVL：三模态语义对齐；
 2. Touch100k：触觉语言数据规模化；
@@ -396,7 +429,8 @@ RDP 是任务特定的视觉—触觉模仿学习策略，可在阅读触觉 VLA
 10. DreamTacVLA：未来触觉预测；
 11. TacForcing：执行期闭环触觉；
 12. RDP：潜在动作块与高频触觉解码；
-13. **Dexterous Arm-Hand VLA → MoDE-VLA：灵巧手与双臂高自由度操作。**
+13. T-Rex：低频视觉规划与高频触觉flow refinement；
+14. **Dexterous Arm-Hand VLA → MoDE-VLA：灵巧手与双臂高自由度操作。**
 
 这条主线对应：
 
@@ -429,12 +463,16 @@ RDP 是任务特定的视觉—触觉模仿学习策略，可在阅读触觉 VLA
 
 画出灵巧手系统的数据闭环：遥操作 → shared autonomy → 示范数据 → 策略训练 → 失败恢复 → 数据追加。
 
-### 最终应能回答的研究问题
+### 从知识点到研究判断
 
-1. 触觉应该先做语言语义对齐，还是直接端到端服务动作预测？
-2. 全局触觉embedding、多触觉token和时序触觉序列分别适合什么任务？
-3. 触觉应注入VLA backbone、action head，还是只产生residual correction？
-4. VLA低频推理和接触控制高频反馈之间怎样协调？
-5. 视觉式触觉与力/力矩传感器是否互补？
-6. 灵巧手的宏观手臂动作、微观手指动作和原子技能应该怎样分层？
-7. 成功率之外，怎样评价峰值力、滑移、物体损伤和交互质量？
+| 设计选择 | 需要理解的联系 |
+| --- | --- |
+| 语义预训练或端到端动作学习 | 预训练标签保留的信息，应与下游操作需要的信息相匹配 |
+| 全局向量、区域 tokens 或历史序列 | 空间分辨率决定接触能否区分，时间范围决定过去事件能否被利用 |
+| 注入 backbone、动作头或残差控制器 | 注入位置影响哪些计算能够读取触觉，也影响反馈延迟 |
+| 低频规划与高频修正 | 长时任务意图与短时接触变化需要在执行时间轴上配合 |
+| 视触觉与力传感器组合 | 局部形变、法向压力和方向性受力提供不同测量信息 |
+| 臂、腕与手指控制 | 宏观接近、掌部支撑和局部接触调整具有不同的动作作用 |
+| 感知指标与操作指标 | 更好的表示还需要转化为目标完成、保持稳定和可接受的交互质量 |
+
+沿着这些联系整理知识，可以从“记住某篇论文用了什么模块”，逐步走向“根据任务信息和可用数据选择模块，并用实验检验选择”。

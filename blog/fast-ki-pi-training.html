@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="连接动作 token、双损失、两阶段与联合训练，区分 KI、冻结、LoRA 和官方 openpi 微调。" />
+    <title>FAST 与 KI：动作监督、梯度与微调 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1-token">1. 先分清三个同名的 token 入口</a></li>
+<li><a href="#2-fast-token">2. FAST 怎样把动作块变成 token</a></li>
+<li><a href="#3-loss">3. 同一条示范，怎样产生两种 loss</a><ul>
+<li><a href="#31-fast">3.1 FAST 分支：预测离散动作编码的条件分布</a></li>
+<li><a href="#32-flow">3.2 Flow 分支：预测连续生成路径上的速度</a></li>
+<li><a href="#33">3.3 两种目标的分工</a></li>
+</ul>
+</li>
+<li><a href="#4-next-token">4. 为什么额外增加 next-token 目标</a></li>
+<li><a href="#5">5. 两条训练分支与两阶段训练是两个维度</a></li>
+<li><a href="#6-ki">6. KI 到底切断什么</a></li>
+<li><a href="#7-lora-ki">7. 冻结、LoRA 与 KI：先看参数，再看梯度来源</a></li>
+<li><a href="#8-openpi">8. 在官方 openpi 中怎么判断实际训练了什么</a></li>
+<li><a href="#9-0-07fast">9. 从 π₀ 到 π₀.₇，FAST 出现在哪些工作中</a></li>
+<li><a href="#10">10. 回到框图与代码的自测</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 3: VLA Architectures</span><span data-lang="zh">第三卷：VLA 核心架构</span> · VLA03</p>
+          <h1>FAST 与 KI：动作监督、梯度与微调</h1>
+          <p class="article-meta"><span data-lang="en">核心 · October 2026 · 11 min read</span><span data-lang="zh">核心 · 2026.10 · 约 11 分钟阅读</span></p>
+          <p class="article-deck">连接动作 token、双损失、两阶段与联合训练，区分 KI、冻结、LoRA 和官方 openpi 微调。</p>
+      <figure class="architecture-figure">
+        <div class="mxgraph" data-mxgraph="{&quot;highlight&quot;: &quot;#2f7f9f&quot;, &quot;nav&quot;: true, &quot;resize&quot;: true, &quot;toolbar&quot;: &quot;zoom layers lightbox&quot;, &quot;xml&quot;: &quot;&lt;mxfile host=\&quot;app.diagrams.net\&quot; type=\&quot;device\&quot; version=\&quot;24.7.17\&quot;&gt;\n    &lt;diagram id=\&quot;pi05-fast-ki-training\&quot; name=\&quot;FAST + KI Training\&quot;&gt;\n        &lt;mxGraphModel dx=\&quot;1920\&quot; dy=\&quot;1510\&quot; grid=\&quot;1\&quot; gridSize=\&quot;10\&quot; guides=\&quot;1\&quot; tooltips=\&quot;1\&quot; connect=\&quot;1\&quot; arrows=\&quot;1\&quot; fold=\&quot;1\&quot; page=\&quot;1\&quot; pageScale=\&quot;1\&quot; pageWidth=\&quot;1920\&quot; pageHeight=\&quot;1510\&quot; math=\&quot;0\&quot; shadow=\&quot;0\&quot;&gt;\n            &lt;root&gt;\n                &lt;mxCell id=\&quot;0\&quot; /&gt;\n                &lt;mxCell id=\&quot;1\&quot; parent=\&quot;0\&quot; /&gt;\n                &lt;mxCell id=\&quot;training_zone\&quot; value=\&quot;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#F4F5F7;strokeColor=#B3BAC5;fontColor=#344563;strokeWidth=2;fillColor=#FBFCFE;strokeWidth=1;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;40\&quot; y=\&quot;130\&quot; width=\&quot;1840\&quot; height=\&quot;1110\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;discrete_lane\&quot; value=\&quot;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#DEEBFF;strokeColor=#4C9AFF;fontColor=#0747A6;strokeWidth=2;fillColor=#F4F9FF;dashed=1;strokeWidth=1;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;400\&quot; y=\&quot;375\&quot; width=\&quot;1460\&quot; height=\&quot;245\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;flow_lane\&quot; value=\&quot;\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#FFE8CC;strokeColor=#FF991F;fontColor=#7A3E00;strokeWidth=2;fillColor=#FFF9F2;dashed=1;strokeWidth=1;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;400\&quot; y=\&quot;890\&quot; width=\&quot;1460\&quot; height=\&quot;335\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;title\&quot; value=\&quot;&amp;lt;b&amp;gt;FAST + Knowledge Insulation · 双动作监督与梯度边界&amp;lt;/b&amp;gt;\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=28;fontColor=#172B4D;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;120\&quot; y=\&quot;20\&quot; width=\&quot;1680\&quot; height=\&quot;50\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;subtitle\&quot; value=\&quot;KI 联合训练示意；公开 openpi π₀.₅ 微调只保留 flow 路径\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=19;fontColor=#5E6C84;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;250\&quot; y=\&quot;75\&quot; width=\&quot;1420\&quot; height=\&quot;34\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;dataflow_legend\&quot; value=\&quot;同一条示范构造两种动作目标 · 实线箭头表示前向数据流\&quot; style=\&quot;text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=15;fontColor=#5E6C84;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;70\&quot; y=\&quot;140\&quot; width=\&quot;800\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;discrete_lane_title\&quot; value=\&quot;&amp;lt;b&amp;gt;1 · 离散动作监督 / VLM representation learning&amp;lt;/b&amp;gt;\&quot; style=\&quot;text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=18;fontColor=#0747A6;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;430\&quot; y=\&quot;385\&quot; width=\&quot;800\&quot; height=\&quot;32\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;flow_lane_title\&quot; value=\&quot;&amp;lt;b&amp;gt;2 · 连续动作监督 / Flow matching&amp;lt;/b&amp;gt;\&quot; style=\&quot;text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=18;fontColor=#7A3E00;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;430\&quot; y=\&quot;895\&quot; width=\&quot;760\&quot; height=\&quot;28\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;ground_truth\&quot; value=\&quot;&amp;lt;b&amp;gt;真实未来动作 A&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;Expert action chunk&amp;lt;br&amp;gt;[H, D]\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#FFFFFF;strokeColor=#7A869A;fontColor=#172B4D;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;80\&quot; y=\&quot;200\&quot; width=\&quot;280\&quot; height=\&quot;105\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;fast\&quot; value=\&quot;&amp;lt;b&amp;gt;FAST tokenizer&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;DCT → 量化 → BPE&amp;lt;br&amp;gt;构造标签，不由 CE 反向训练\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#DEEBFF;strokeColor=#4C9AFF;fontColor=#0747A6;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;470\&quot; y=\&quot;200\&quot; width=\&quot;300\&quot; height=\&quot;105\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;tokens\&quot; value=\&quot;&amp;lt;b&amp;gt;离散动作标签 z₁:K&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;token IDs&amp;lt;br&amp;gt;z = FAST(A)\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#DEEBFF;strokeColor=#4C9AFF;fontColor=#0747A6;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;990\&quot; y=\&quot;200\&quot; width=\&quot;260\&quot; height=\&quot;105\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;observations\&quot; value=\&quot;&amp;lt;b&amp;gt;可观测条件 c&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;图像 + 语言 + 当前 state&amp;lt;br&amp;gt;不包含真实未来动作\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#FFFFFF;strokeColor=#7A869A;fontColor=#172B4D;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;80\&quot; y=\&quot;450\&quot; width=\&quot;280\&quot; height=\&quot;120\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;vlm\&quot; value=\&quot;&amp;lt;b&amp;gt;VLM backbone · θ&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;图像编码器 + 语言主干&amp;lt;br&amp;gt;条件位置 + 离散动作位置\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#B3D4FF;strokeColor=#0052CC;fontColor=#0747A6;strokeWidth=2;fontSize=19;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;470\&quot; y=\&quot;440\&quot; width=\&quot;360\&quot; height=\&quot;145\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;logits\&quot; value=\&quot;&amp;lt;b&amp;gt;预测动作 logits&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;pθ(zᵢ | c, z&amp;amp;lt;ᵢ)&amp;lt;br&amp;gt;词表上的条件分布\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#DEEBFF;strokeColor=#4C9AFF;fontColor=#0747A6;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;1010\&quot; y=\&quot;455\&quot; width=\&quot;250\&quot; height=\&quot;110\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;ce\&quot; value=\&quot;&amp;lt;b&amp;gt;Next-token CE&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;LFAST = −Σᵢ log pθ(zᵢ | c, z&amp;amp;lt;ᵢ)&amp;lt;br&amp;gt;预测分布 vs. 真实 token ID\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#E3FCEF;strokeColor=#36B37E;fontColor=#006644;strokeWidth=2;fontSize=17;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;1540\&quot; y=\&quot;445\&quot; width=\&quot;300\&quot; height=\&quot;130\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;teacher_forcing\&quot; value=\&quot;&amp;lt;b&amp;gt;Teacher forcing&amp;lt;/b&amp;gt;：正确历史 z&amp;amp;lt;ᵢ 仅输入 VLM 的动作 token 位置；因果 mask 防止看见未来标签，观测 prefix 不读取动作标签。\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=16;fontColor=#0747A6;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;850\&quot; y=\&quot;310\&quot; width=\&quot;620\&quot; height=\&quot;60\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;ce_gradient\&quot; value=\&quot;&amp;lt;b&amp;gt;反向：CE 更新 VLM 参数 θ&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;还可混入文字 / 视觉语言目标；主干没有被冻结。\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=17;fontColor=#0747A6;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;1430\&quot; y=\&quot;620\&quot; width=\&quot;430\&quot; height=\&quot;80\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;condition_kv\&quot; value=\&quot;&amp;lt;b&amp;gt;各层条件位置的 K / V&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;来自图像、语言、state&amp;lt;br&amp;gt;不含 FAST 动作位置\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#EAE6FF;strokeColor=#6554C0;fontColor=#403294;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;510\&quot; y=\&quot;635\&quot; width=\&quot;280\&quot; height=\&quot;100\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;stop_gradient\&quot; value=\&quot;&amp;lt;b&amp;gt;stop_gradient(K / V)&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;前向数值保留，可继续读取&amp;lt;br&amp;gt;反向：∂Lflow / ∂θ = 0\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#EAE6FF;strokeColor=#6554C0;fontColor=#403294;strokeWidth=2;strokeWidth=3;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;510\&quot; y=\&quot;770\&quot; width=\&quot;280\&quot; height=\&quot;110\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;attention_mask\&quot; value=\&quot;&amp;lt;b&amp;gt;Attention mask：先规定能读什么&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;FAST 动作位置 ↔ 连续动作位置：互不可读&amp;lt;br&amp;gt;两条分支都能读取观测条件位置&amp;lt;br&amp;gt;&amp;lt;br&amp;gt;stop-gradient 再规定梯度能回到哪里\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#FFEBE6;strokeColor=#FF5630;fontColor=#BF2600;strokeWidth=2;fontSize=17;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;930\&quot; y=\&quot;660\&quot; width=\&quot;470\&quot; height=\&quot;145\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;noise_time\&quot; value=\&quot;&amp;lt;b&amp;gt;采样 ε 与 t&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;ε ~ N(0, I), t ∈ [0, 1]&amp;lt;br&amp;gt;t = 1 为噪声，t = 0 为动作\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#FFE8CC;strokeColor=#FF991F;fontColor=#7A3E00;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;80\&quot; y=\&quot;720\&quot; width=\&quot;280\&quot; height=\&quot;115\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;flow_construct\&quot; value=\&quot;&amp;lt;b&amp;gt;由 A、ε、t 构造监督&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;带噪动作：xₜ = (1−t)A + tε&amp;lt;br&amp;gt;目标速度：uₜ = ε − A\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#FFE8CC;strokeColor=#FF991F;fontColor=#7A3E00;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;80\&quot; y=\&quot;920\&quot; width=\&quot;280\&quot; height=\&quot;140\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;noisy_action\&quot; value=\&quot;&amp;lt;b&amp;gt;Noisy action xₜ + timestep t&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;动作投影 + 时间嵌入&amp;lt;br&amp;gt;连续 action hidden positions\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#FFE8CC;strokeColor=#FF991F;fontColor=#7A3E00;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;470\&quot; y=\&quot;935\&quot; width=\&quot;300\&quot; height=\&quot;110\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;expert\&quot; value=\&quot;&amp;lt;b&amp;gt;Action Expert · φ&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;读取带噪动作、t&amp;lt;br&amp;gt;以及 sg(K / V) 条件\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#FFD59A;strokeColor=#FF8B00;fontColor=#7A3E00;strokeWidth=2;fontSize=19;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;900\&quot; y=\&quot;930\&quot; width=\&quot;300\&quot; height=\&quot;120\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;velocity\&quot; value=\&quot;&amp;lt;b&amp;gt;预测 velocity vφ&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;形状 [H, D]&amp;lt;br&amp;gt;生成路径上的速度\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#E3FCEF;strokeColor=#36B37E;fontColor=#006644;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;1280\&quot; y=\&quot;935\&quot; width=\&quot;210\&quot; height=\&quot;110\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;flow_loss\&quot; value=\&quot;&amp;lt;b&amp;gt;Flow matching loss&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;Lflow = MSE(vφ, uₜ)&amp;lt;br&amp;gt;预测速度 vs. 目标速度\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#E3FCEF;strokeColor=#36B37E;fontColor=#006644;strokeWidth=2;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;1570\&quot; y=\&quot;925\&quot; width=\&quot;270\&quot; height=\&quot;130\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;velocity_target\&quot; value=\&quot;&amp;lt;b&amp;gt;真实目标 uₜ = ε − A&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;由本次示范与采样噪声算出\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#FFE8CC;strokeColor=#FF991F;fontColor=#7A3E00;strokeWidth=2;fontSize=16;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;1260\&quot; y=\&quot;1120\&quot; width=\&quot;280\&quot; height=\&quot;80\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;expert_gradient\&quot; value=\&quot;&amp;lt;b&amp;gt;反向：Lflow 更新 expert φ&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;经 K/V 回到 VLM 的梯度被阻断\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=16;fontColor=#7A3E00;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;850\&quot; y=\&quot;1065\&quot; width=\&quot;390\&quot; height=\&quot;60\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;inference_note\&quot; value=\&quot;动作推理：从噪声开始，沿 t: 1 → 0 积分；使用连续 expert，无需先生成 FAST 动作 token。\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=16;fontColor=#5E6C84;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;410\&quot; y=\&quot;1228\&quot; width=\&quot;1430\&quot; height=\&quot;34\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;original_pi05\&quot; value=\&quot;&amp;lt;b&amp;gt;原始 π₀.₅ 论文 · 两阶段&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;br&amp;gt;预训练：FAST 等 token 预测&amp;lt;br&amp;gt;后训练：加入 action expert，联合 token + flow&amp;lt;br&amp;gt;阶段安排 ≠ 同时存在几条 loss 分支\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#DEEBFF;strokeColor=#4C9AFF;fontColor=#0747A6;strokeWidth=2;fontSize=16;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;70\&quot; y=\&quot;1310\&quot; width=\&quot;570\&quot; height=\&quot;150\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;ki_recipe\&quot; value=\&quot;&amp;lt;b&amp;gt;后续 KI · 联合训练&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;br&amp;gt;FAST / 文字目标更新 VLM&amp;lt;br&amp;gt;flow 目标更新 expert，K/V 接口隔离梯度&amp;lt;br&amp;gt;本图描述这一训练配方\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#EAE6FF;strokeColor=#6554C0;fontColor=#403294;strokeWidth=2;fontSize=16;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;675\&quot; y=\&quot;1310\&quot; width=\&quot;570\&quot; height=\&quot;150\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;public_finetune\&quot; value=\&quot;&amp;lt;b&amp;gt;公开 openpi π₀.₅ 微调 · flow-only&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;br&amp;gt;继承 KI 训练过的 checkpoint&amp;lt;br&amp;gt;无 FAST CE，也无这条 KI stop-gradient&amp;lt;br&amp;gt;flow 更新谁，取决于全参 / LoRA / 冻结配置\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;spacing=12;fontFamily=Helvetica;fontSize=17;fillColor=#FFE8CC;strokeColor=#FF991F;fontColor=#7A3E00;strokeWidth=2;fontSize=16;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;1280\&quot; y=\&quot;1310\&quot; width=\&quot;570\&quot; height=\&quot;150\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;footer\&quot; value=\&quot;参照 FAST (arXiv:2501.09747)、KI (arXiv:2505.23705) 与 openpi 215abfb · 代码核对：2026-10-17\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Helvetica;fontSize=13;fontColor=#5E6C84;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry x=\&quot;160\&quot; y=\&quot;1470\&quot; width=\&quot;1600\&quot; height=\&quot;25\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_a_fast\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4C9AFF;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#4C9AFF;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;ground_truth\&quot; target=\&quot;fast\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_fast_tokens\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4C9AFF;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#4C9AFF;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;fast\&quot; target=\&quot;tokens\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_tokens_ce\&quot; value=\&quot;标签\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4C9AFF;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#4C9AFF;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.5;entryY=0;\&quot; parent=\&quot;1\&quot; source=\&quot;tokens\&quot; target=\&quot;ce\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n                        &lt;Array as=\&quot;points\&quot;&gt;\n                            &lt;mxPoint x=\&quot;1690\&quot; y=\&quot;252\&quot; /&gt;\n                        &lt;/Array&gt;\n                    &lt;/mxGeometry&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_obs_vlm\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0052CC;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#0052CC;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;observations\&quot; target=\&quot;vlm\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_vlm_logits\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0052CC;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#0052CC;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;vlm\&quot; target=\&quot;logits\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_logits_ce\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0052CC;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#0052CC;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;logits\&quot; target=\&quot;ce\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_vlm_kv\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6554C0;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#6554C0;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;\&quot; parent=\&quot;1\&quot; source=\&quot;vlm\&quot; target=\&quot;condition_kv\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_kv_sg\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6554C0;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#6554C0;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;\&quot; parent=\&quot;1\&quot; source=\&quot;condition_kv\&quot; target=\&quot;stop_gradient\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_sg_expert\&quot; value=\&quot;前向条件\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6554C0;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#6554C0;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.5;entryY=0;\&quot; parent=\&quot;1\&quot; source=\&quot;stop_gradient\&quot; target=\&quot;expert\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n                        &lt;Array as=\&quot;points\&quot;&gt;\n                            &lt;mxPoint x=\&quot;850\&quot; y=\&quot;825\&quot; /&gt;\n                            &lt;mxPoint x=\&quot;850\&quot; y=\&quot;865\&quot; /&gt;\n                            &lt;mxPoint x=\&quot;1050\&quot; y=\&quot;865\&quot; /&gt;\n                        &lt;/Array&gt;\n                    &lt;/mxGeometry&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_a_flow\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7A869A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#7A869A;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;ground_truth\&quot; target=\&quot;flow_construct\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n                        &lt;Array as=\&quot;points\&quot;&gt;\n                            &lt;mxPoint x=\&quot;55\&quot; y=\&quot;252\&quot; /&gt;\n                            &lt;mxPoint x=\&quot;55\&quot; y=\&quot;990\&quot; /&gt;\n                        &lt;/Array&gt;\n                    &lt;/mxGeometry&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_noise_flow\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FF991F;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#FF991F;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;\&quot; parent=\&quot;1\&quot; source=\&quot;noise_time\&quot; target=\&quot;flow_construct\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_construct_noisy\&quot; value=\&quot;xₜ, t\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FF991F;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#FF991F;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;flow_construct\&quot; target=\&quot;noisy_action\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_noisy_expert\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FF991F;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#FF991F;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;noisy_action\&quot; target=\&quot;expert\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_expert_velocity\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FF8B00;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#FF8B00;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;expert\&quot; target=\&quot;velocity\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_velocity_loss\&quot; value=\&quot;\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#36B37E;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#36B37E;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;velocity\&quot; target=\&quot;flow_loss\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_construct_target\&quot; value=\&quot;uₜ\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FF991F;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#FF991F;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0;entryY=0.5;\&quot; parent=\&quot;1\&quot; source=\&quot;flow_construct\&quot; target=\&quot;velocity_target\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n                        &lt;Array as=\&quot;points\&quot;&gt;\n                            &lt;mxPoint x=\&quot;220\&quot; y=\&quot;1160\&quot; /&gt;\n                        &lt;/Array&gt;\n                    &lt;/mxGeometry&gt;\n                &lt;/mxCell&gt;\n                &lt;mxCell id=\&quot;e_target_loss\&quot; value=\&quot;目标\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FF991F;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=14;fontColor=#FF991F;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.5;entryY=1;\&quot; parent=\&quot;1\&quot; source=\&quot;velocity_target\&quot; target=\&quot;flow_loss\&quot; edge=\&quot;1\&quot;&gt;\n                    &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n                        &lt;Array as=\&quot;points\&quot;&gt;\n                            &lt;mxPoint x=\&quot;1705\&quot; y=\&quot;1160\&quot; /&gt;\n                        &lt;/Array&gt;\n                    &lt;/mxGeometry&gt;\n                &lt;/mxCell&gt;\n            &lt;/root&gt;\n        &lt;/mxGraphModel&gt;\n    &lt;/diagram&gt;\n&lt;/mxfile&gt;\n&quot;}"></div>
+        <figcaption>
+          <span data-lang="en">Architecture diagram · <a href="assets/diagrams/pi05_fast_ki_training.drawio" download>Download the Draw.io source</a></span>
+          <span data-lang="zh">配套结构图 · <a href="assets/diagrams/pi05_fast_ki_training.drawio" download>下载 Draw.io 原文件</a></span>
+        </figcaption>
+      </figure>
+    
+          <div class="article-content">
+            <p>读懂 <a href="04-pi05-architecture.html">π₀.₅ 的 Prefix 与 Action Expert</a> 以后，还需要追踪训练目标和梯度：同一段动作为什么会出现两个预测分支？FAST 在训练的哪个阶段运行？冻结 VLM、LoRA 与 Knowledge Insulation 又分别控制什么？</p>
+<p>本文连接 <a href="action-generation-mse-token-diffusion-flow.html">动作生成方法</a>、<a href="multimodal-consistency-supervision.html">表示监督配方</a> 与 <a href="05-train-state-jit-checkpoint.html">TrainState 和参数更新</a>。这里的理解关口可以归为四类：动作表示、训练组织、梯度更新、论文与代码边界。</p>
+<blockquote>
+<p>代码核对：2026-10-17，官方 <code>Physical-Intelligence/openpi</code>，commit <a href="https://github.com/Physical-Intelligence/openpi/tree/215abfb217dbac7d5f1273282331b9b1866c0479"><code>215abfb</code></a>。站内 BrainCo-IL 工程篇描述的是另一份项目实现，不能把它的 YAML 与 <code>freeze_strategy</code> 当成官方 openpi 的同名接口。</p>
+</blockquote>
+<h2 id="1-token">1. 先分清三个同名的 token 入口</h2>
+<table>
+<thead>
+<tr>
+<th>入口</th>
+<th>输入</th>
+<th>输出</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>文本 tokenizer + embedding</td>
+<td>指令、写入 prompt 的离散 state</td>
+<td>token ID，再查表成为隐藏向量</td>
+<td>给 VLM 提供条件</td>
+</tr>
+<tr>
+<td>FAST action tokenizer</td>
+<td>真实未来动作块 \(A\in\mathbb R^{H\times D}\)</td>
+<td>可变长度的离散动作 token 序列</td>
+<td>构造自回归动作预测目标</td>
+</tr>
+<tr>
+<td><code>action_in_proj</code></td>
+<td>带噪动作块 \(x_t\)</td>
+<td>\([H,d_{\mathrm{expert}}]\) 连续隐藏向量</td>
+<td>给 flow Action Expert 提供当前生成状态</td>
+</tr>
+</tbody>
+</table>
+<p>图中的“Action tokens”必须注明是哪一种。FAST token 是词表里的整数编号；flow action token 是连续向量，一个位置通常对应一个控制步的完整动作向量。当前 state 与未来 action 也有不同身份：前者是条件，后者是训练目标。</p>
+<p>FAST tokenizer 本身主要做动作编码；VLA 的 next-token loss 训练的是预测这些编码的模型。这里没有通过该交叉熵对 DCT、取整或 BPE 做端到端反向传播。<a href="https://huggingface.co/physical-intelligence/fast/blob/main/processing_action_tokenizer.py">FAST 官方实现</a></p>
+<h2 id="2-fast-token">2. FAST 怎样把动作块变成 token</h2>
+<p>FAST 是 <strong>Frequency-space Action Sequence Tokenization</strong>。它沿每个动作维度的时间轴处理整个 action chunk：</p>
+<pre><code class="language-text">真实动作 A [H, D]
+    → 按数据集动作统计量归一化
+    → 沿时间轴做离散余弦变换 DCT
+    → 缩放、取整，得到整数频域系数
+    → 按低频优先的顺序展开各动作维度
+    → BPE 合并常见系数组合
+    → 动作 token IDs [K]
+</code></pre>
+<p>平滑动作的主要变化往往集中在较少的频率成分中。量化后，很多很小的系数变成零，BPE 可以把重复序列和常见组合编码成更短的 token 序列。\(K\) 随动作复杂度变化，并不固定等于 \(H\) 或 \(H D\)。</p>
+<p>解码时做 BPE 解码、恢复系数矩阵、反量化和逆 DCT，再按数据约定还原动作单位。DCT 在不量化时可逆，BPE 对量化后的系数序列进行无损编码；整个 FAST 编码的精度损失主要来自量化。它并不要求把所有高频分量一律删掉。<a href="https://arxiv.org/html/2501.09747">FAST 论文 §V</a></p>
+<p>因此，一个 FAST token 不必对应“机器人下一个时间步”，也没有预先规定的“抓取”“放下”等语义。它编码的是动作信号中的系数或系数组合。<strong>FAST+</strong> 是在多种机器人动作数据上训练好的通用 tokenizer；<strong>π₀-FAST</strong> 则是用这类 token 训练出的策略模型，二者层级不同。<a href="https://huggingface.co/physical-intelligence/fast">FAST 模型卡</a></p>
+<h2 id="3-loss">3. 同一条示范，怎样产生两种 loss</h2>
+<p>设条件为 \(c=(\text{图像、指令、state})\)，未来动作块为 \(A\)。两条分支都学习底层动作，都需要正确利用条件。</p>
+<h3 id="31-fast">3.1 FAST 分支：预测离散动作编码的条件分布</h3>
+<p>先构造标签：</p>
+<p>\[
+z_{1:K}=\operatorname{FAST}(A).
+\]</p>
+<p>模型预测词表上的概率，目标为：</p>
+<p>\[
+\mathcal L_{\mathrm{FAST}}
+=-\sum_{i=1}^{K}\log p_\theta(z_i\mid c,z_{&lt;i}).
+\]</p>
+<p>训练使用 teacher forcing，输入正确的历史动作 token，预测下一个 token。因果 mask 使这些位置可以在一次前向中并行计算。若用该分支生成动作，推理时才需要依次采样 token，再交给 FAST 解码。</p>
+<p>token ID 只是类别编号。预测 101 与标签 100 的“编号差为 1”没有动作距离意义，不能对 ID 直接算 MSE。</p>
+<h3 id="32-flow">3.2 Flow 分支：预测连续生成路径上的速度</h3>
+<p>本文统一使用官方 openpi 的时间约定，\(t=1\) 为噪声，\(t=0\) 为数据：</p>
+<p>\[
+\epsilon\sim\mathcal N(0,I),\qquad
+x_t=(1-t)A+t\epsilon,\qquad
+u_t=\epsilon-A.
+\]</p>
+<p>训练目标为：</p>
+<p>\[
+\mathcal L_{\mathrm{flow}}
+=\mathbb E_{A,c,t,\epsilon}
+\left[\|v_\phi(x_t,t,c)-u_t\|_2^2\right].
+\]</p>
+<p>网络一次处理整段带噪动作，输出同形状速度。推理从噪声开始，沿时间减小的方向积分，所以 Euler 更新中的 \(\Delta t&lt;0\)。损失中的速度是生成路径上的速度，不一定是机器人实际关节速度。虽然使用 MSE，这仍是带噪条件下的生成训练，区别于只根据观测一次回归动作均值。<a href="https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py">openpi <code>compute_loss</code> 与 <code>sample_actions</code></a></p>
+<h3 id="33">3.3 两种目标的分工</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>FAST next-token loss</th>
+<th>Flow matching loss</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>监督对象</td>
+<td>离散动作编码的条件概率</td>
+<td>当前带噪动作上的连续速度场</td>
+</tr>
+<tr>
+<td>输出空间</td>
+<td>动作词表上的 logits</td>
+<td>与 action chunk 同形状的连续张量</td>
+</tr>
+<tr>
+<td>训练输入</td>
+<td>条件 + 正确的历史 token</td>
+<td>条件 + 带噪动作 + flow timestep</td>
+</tr>
+<tr>
+<td>独立用于动作生成时</td>
+<td>自回归采样、FAST 解码</td>
+<td>从噪声积分得到动作</td>
+</tr>
+<tr>
+<td>KI 配方中的作用</td>
+<td>塑造 VLM 的机器人动作表示</td>
+<td>训练连续动作 expert</td>
+</tr>
+</tbody>
+</table>
+<p>两头共享观测条件，但不把一头的预测当作另一头的监督，也没有要求两个输出直接相等的蒸馏损失。在论文的联合训练里，FAST 动作 token 与连续动作位置互相不可见，避免一条训练分支读取另一条分支包含的目标信息。<a href="https://arxiv.org/html/2504.16054">π₀.₅ §IV-B</a></p>
+<h2 id="4-next-token">4. 为什么额外增加 next-token 目标</h2>
+<p>第一，它给 VLM 一条直接的动作监督路径。主干必须产生足以预测动作编码的特征；Action Expert 可以从这些特征中读取控制所需信息。尤其在 KI 阻断 flow 梯度后，这条路径让主干仍能适应机器人任务。</p>
+<p>第二，token 预测便于与文本、图像问答、目标位置及子任务预测共同训练。动作数据推动模型适应控制，视觉语言数据帮助维持语义能力。语言跟随的改善来自目标、数据混合与梯度隔离的组合，不能归因于“交叉熵天然保留语言知识”。<a href="https://arxiv.org/html/2505.23705">KI 论文 §5–6</a></p>
+<p>第三，FAST 改善了动作 token 的信息密度。高频平滑轨迹逐步量化以后，相邻 token 很相似，模型可能仅靠重复上一时刻就降低损失。DCT 与压缩减少这种冗余。FAST 论文用不同采样频率的实验展示了这个问题；KI 的消融也发现，朴素量化的辅助监督能有帮助，但不如 FAST。<a href="https://arxiv.org/html/2501.09747">FAST §IV–V</a>、<a href="https://arxiv.org/html/2505.23705">KI §6</a></p>
+<p>这些是该训练配方的动机与实验结果，不构成“给任意模型加 CE 都会更好”的保证。新增分支有计算开销；FAST 论文报告的训练加速也不能直接解释为每个训练 step 都更便宜，或机器人推理同步变快。最终仍要比较收敛到目标性能所需的总计算量、语言跟随和闭环任务表现。</p>
+<h2 id="5">5. 两条训练分支与两阶段训练是两个维度</h2>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>训练组织</th>
+<th>动作生成时运行什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>原始 π₀</td>
+<td>使用连续动作 expert 的 flow 目标</td>
+<td>flow expert</td>
+</tr>
+<tr>
+<td>π₀-FAST</td>
+<td>预测 FAST 动作 token</td>
+<td>自回归动作 token + FAST 解码</td>
+</tr>
+<tr>
+<td>原始 π₀.₅论文</td>
+<td>先用 FAST 等离散目标预训练；后训练加入 action expert，保留联合 token/flow 目标</td>
+<td>高层文字预测 + 连续动作 expert</td>
+</tr>
+<tr>
+<td>后续 KI 方案</td>
+<td>在 VLA 适配阶段同时训练离散与连续动作，并隔离 flow 到主干的梯度</td>
+<td>连续动作 expert；按任务使用文字输出</td>
+</tr>
+<tr>
+<td>公开 openpi 的 π₀.₅微调</td>
+<td>加载已用 KI 训练的权重；公开实现只运行 flow 目标</td>
+<td>连续动作 expert</td>
+</tr>
+</tbody>
+</table>
+<p>“分支”描述一次训练图里有哪些输出和 loss；“阶段”描述训练进程先后如何安排。KI 的单阶段是相对于原始 π₀.₅分阶段引入 action expert 的配方而言，仍然可以使用预训练 VLM，也可以在之后继续任务微调。<a href="https://arxiv.org/abs/2504.16054">π₀.₅论文</a>、<a href="https://arxiv.org/abs/2505.23705">KI 论文</a>、<a href="https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/README.md">openpi README</a></p>
+<h2 id="6-ki">6. KI 到底切断什么</h2>
+<p><strong>Knowledge Insulation（知识隔离）</strong>的动机是：新初始化的连续动作 expert 带来的梯度可能干扰预训练 VLM；而完全冻结 VLM 又会限制它学习机器人表示。</p>
+<p>KI 联合训练离散动作和连续动作，让 VLM 经离散目标继续学习，同时在 expert 读取主干 K/V 的连接上使用 stop-gradient：</p>
+<pre><code class="language-text">前向：观测 → VLM 的各层 K/V → stop_gradient → Action Expert → flow 输出
+反向：flow loss → expert 参数
+                    × 不穿过 stop_gradient 回到 VLM
+
+另一路：FAST / 文字 loss → VLM 参数
+</code></pre>
+<p><code>stop_gradient(x)</code> 的前向数值仍等于 <code>x</code>，只改变自动求导。以主干参数 \(\theta\) 和 expert 参数 \(\phi\) 表示，在这样的训练图中：</p>
+<p>\[
+\nabla_\theta\mathcal L_{\mathrm{flow}}=0,
+\qquad
+\nabla_\theta(\mathcal L_{\mathrm{FAST}}+\mathcal L_{\mathrm{text}})
+\text{ 可以非零},
+\qquad
+\nabla_\phi\mathcal L_{\mathrm{flow}}
+\text{ 可以非零}.
+\]</p>
+<p>注意力 mask 与 stop-gradient 控制的事情不同：mask 决定前向能读哪些位置；stop-gradient 决定某条计算路径上的损失能否更新上游参数。只有“Prefix 不读取 noisy action”的 mask，flow 仍能通过 expert 读取的 prefix K/V 反向更新 VLM。<a href="https://arxiv.org/html/2505.23705">KI §5.2 的 K/V 梯度定义</a></p>
+<h2 id="7-lora-ki">7. 冻结、LoRA 与 KI：先看参数，再看梯度来源</h2>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>控制什么</th>
+<th>VLM 是否继续适应任务</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>全参数微调</td>
+<td>所有选定参数可更新</td>
+<td>可以；公开 flow-only 路径也能由 flow loss 更新主干</td>
+</tr>
+<tr>
+<td>冻结整个 VLM</td>
+<td>把 VLM 参数排除出更新集合</td>
+<td>该部分权重不再学习；expert 读取固定的表示函数</td>
+</tr>
+<tr>
+<td>LoRA</td>
+<td>固定部分基础权重，训练低秩增量</td>
+<td>插入适配器后，VLM 的有效映射仍可变化</td>
+</tr>
+<tr>
+<td>KI</td>
+<td>按损失路径隔离梯度</td>
+<td>继续从 FAST / 文字等目标学习，但不接受 flow 梯度</td>
+</tr>
+</tbody>
+</table>
+<p>这些选项不在同一个轴上：LoRA 决定用什么参数承载变化，KI 决定某个 loss 的梯度可以流到哪里。从原理上可以组合，但需要明确实现；只开启 LoRA 不会自动获得 KI。</p>
+<p>官方 <code>get_freeze_filter()</code> 的 LoRA 默认规则匹配 <code>.*llm.*</code>，并排除 <code>.*lora.*</code> 参数；Action Expert 的匹配还取决于它自己的 variant。<strong>这套默认过滤不会顺带冻结 <code>PaliGemma/img</code> 视觉编码器。</strong> <code>train=False</code> 也不能单独证明参数被冻结，应查看实际的 <code>trainable_filter</code> 和优化器更新集合。<a href="https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0_config.py"><code>Pi0Config.get_freeze_filter</code></a></p>
+<p>KI 论文中冻结预训练主干的消融表现较差，不等于“冻结一个已经学过机器人动作的 π₀.₅ checkpoint 做小数据微调必然失败”。初始化权重、任务跨度与可训练模块已经不同，需要独立验证。<a href="https://arxiv.org/html/2505.23705">KI 的冻结消融</a></p>
+<h2 id="8-openpi">8. 在官方 openpi 中怎么判断实际训练了什么</h2>
+<p>不要仅凭 checkpoint 名字判断训练配方。沿下面四个入口核对：</p>
+<table>
+<thead>
+<tr>
+<th>代码入口</th>
+<th>要核对的事实</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/training/config.py"><code>ModelTransformFactory</code></a></td>
+<td><code>PI05</code> 走 prompt/state tokenizer；<code>PI0_FAST</code> 才构造 FAST 输入</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/pi0.py"><code>Pi0.compute_loss</code></a></td>
+<td>返回速度场 MSE，没有联合 FAST CE</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/src/openpi/models/gemma.py"><code>gemma.py</code></a></td>
+<td>检查 expert 读取主干 K/V 的路径是否有 KI 所需 stop-gradient；该公开路径没有</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Physical-Intelligence/openpi/blob/215abfb217dbac7d5f1273282331b9b1866c0479/scripts/train.py"><code>trainable_filter</code> 与训练步</a></td>
+<td>哪些参数参与求导与优化器更新</td>
+</tr>
+</tbody>
+</table>
+<p>因此，使用该版本官方 π₀.₅流程做全参、LoRA 或参数冻结微调时，优化目标仍是 flow loss。加载 KI 训练过的 checkpoint 会继承它已获得的表示，但不会自动重建 FAST 辅助分支或恢复 KI 梯度边界。若希望复现完整方案，需要同时处理动作 token 标签、因果与分支 mask、CE 输出、数据混合和 K/V 梯度隔离。</p>
+<p>对 BrainCo-IL 的具体实验，还要继续核对本项目的 <code>freeze_strategy</code> 如何展开，不能仅凭配置文件名里的 <code>lora_vlm_only</code> 推断所有可训练参数。接着阅读 <a href="02-config-system.html">配置系统</a> 和 <a href="05-train-state-jit-checkpoint.html">TrainState</a>。</p>
+<h2 id="9-0-07fast">9. 从 π₀ 到 π₀.₇，FAST 出现在哪些工作中</h2>
+<table>
+<thead>
+<tr>
+<th>工作</th>
+<th>FAST 的实际角色</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://arxiv.org/abs/2410.24164">原始 π₀</a></td>
+<td>使用 flow 动作生成，未采用 FAST 训练路线</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/abs/2501.09747">FAST / π₀-FAST</a></td>
+<td>提出动作编码，并用自回归 token 生成动作</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/abs/2504.16054">原始 π₀.₅</a></td>
+<td>离散动作预训练，后训练加入连续 expert</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/abs/2505.23705">Knowledge Insulation</a></td>
+<td>用 FAST 监督主干，同时训练被梯度隔离的连续 expert</td>
+</tr>
+<tr>
+<td><a href="https://website.pi-asset.com/pi06star/PI06_model_card.pdf">π₀.₆ Model Card</a></td>
+<td>明确沿用 FAST + KI + 连续动作 expert</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/abs/2511.14759">π*₀.₆ / RECAP</a></td>
+<td>在 π₀.₆基础上学习机器人经验，模型训练描述仍包含 FAST 与 KI</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/abs/2604.15483">π₀.₇</a></td>
+<td>FAST 继续作为主干训练监督；附录图明确标记其动作 token 只用于训练</td>
+</tr>
+</tbody>
+</table>
+<p>这条谱系记录的是动作表示与训练方式；版本新增的任务能力、数据和强化学习方法需要分别阅读，不能由“用了 FAST”推出。</p>
+<h2 id="10">10. 回到框图与代码的自测</h2>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>能讲清楚的判断依据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>图上的 token 指什么？</td>
+<td>区分文本 ID、FAST 动作 ID、连续 action hidden，并说出各自输入</td>
+</tr>
+<tr>
+<td>两条分支是否等于两个阶段？</td>
+<td>一个是训练图的结构，一个是训练进程的安排</td>
+</tr>
+<tr>
+<td>FAST token 是高层动作语义吗？</td>
+<td>它来自底层动作的频域编码；高层子任务文字是另一类输出</td>
+</tr>
+<tr>
+<td>只画 attention mask 就包含 KI 吗？</td>
+<td>继续追踪 expert 读取 K/V 后的反向路径</td>
+</tr>
+<tr>
+<td>使用 MSE 是否一定是动作均值回归？</td>
+<td>检查网络是否读取噪声与 timestep，以及标签是动作还是速度</td>
+</tr>
+<tr>
+<td>LoRA 是否让 VLM 完全不变？</td>
+<td>基础权重可固定，但适配器改变有效映射；视觉塔还需单独检查</td>
+</tr>
+<tr>
+<td>checkpoint 用过 KI，本次也在跑 KI 吗？</td>
+<td>以本次 transforms、loss、梯度边界和 trainable 参数为准</td>
+</tr>
+<tr>
+<td>加辅助 loss 是否一定改善控制？</td>
+<td>需要固定数据与容量的消融、语言跟随和闭环 rollout 证据</td>
+</tr>
+</tbody>
+</table>
+<p>阅读顺序可以沿 <a href="04-pi05-architecture.html">π₀.₅前向结构</a> → 本文 → <a href="05-train-state-jit-checkpoint.html">参数更新</a> 回到一次真实训练。若研究新增触觉模态，再把“辅助监督更新谁、部署保留什么”应用到 <a href="multimodal-consistency-supervision.html">监督配方</a> 和 <a href="tactile-memory-experiment-design.html">触觉记忆实验设计</a>。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="04-pi05-architecture.html">← VLA02 · PI0.5：前向结构与 Action Expert</a>
+            <a href="11-groot-dit-architecture.html">VLA04 · GR00T：VLM Memory 与 DiT Action Head →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+    <script src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+  </body>
+</html>

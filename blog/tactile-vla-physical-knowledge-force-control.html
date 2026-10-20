@@ -246,7 +246,7 @@ a_t=[P_{\text{target}},F_{\text{target}}]
 <h3 id="31">3.1 视觉路径</h3>
 <p>论文使用与 π0 类似的预训练 ViT，对最近 \(H\) 帧图像分别编码：</p>
 <p>\[
-E'<em>{\mathrm{vis}}(I</em>{t-H+1}),\ldots,E'_{\mathrm{vis}}(I_t)
+E'_{\mathrm{vis}}(I_{t-H+1}),\ldots,E'_{\mathrm{vis}}(I_t)
 \]</p>
 <p>每一帧会形成一组视觉 token。历史帧保留了动作和场景随时间的变化。</p>
 <h3 id="32">3.2 语言路径</h3>
@@ -266,7 +266,7 @@ E_{\mathrm{lang}}(L_t)
 </ul>
 <p>最近 \(H\) 个时刻的触觉测量先在时间维拼接，再由简单 MLP 压缩成一个 token：</p>
 <p>\[
-E'<em>{\psi}([T</em>{t-H+1},\ldots,T_t])
+E'_{\psi}([T_{t-H+1},\ldots,T_t])
 \]</p>
 <p>这个 token 表示一小段接触历史，而不是单个瞬时力。</p>
 <p>这里没有：</p>
@@ -279,8 +279,8 @@ E'<em>{\psi}([T</em>{t-H+1},\ldots,T_t])
 <h3 id="34-token-level-fusion">3.4 Token-level fusion</h3>
 <p>三种模态在 token 序列维拼接成统一前缀：</p>
 <p>\[
-S_t=[E'<em>{\mathrm{vis}}(I</em>{t-H+1}),\ldots,E'<em>{\mathrm{vis}}(I_t),
-E</em>{\mathrm{lang}}(L_t),E'<em>{\psi}([T</em>{t-H+1},\ldots,T_t])]
+S_t=[E'_{\mathrm{vis}}(I_{t-H+1}),\ldots,E'_{\mathrm{vis}}(I_t),
+E_{\mathrm{lang}}(L_t),E'_{\psi}([T_{t-H+1},\ldots,T_t])]
 \]</p>
 <p>该前缀使用 non-causal attention。也就是说，前缀中的视觉、语言和触觉 token 可以双向读取彼此，而不是像文本自回归生成那样只能看左侧 token。</p>
 <p>因此，它不是只在 loss 层面对齐三个独立 embedding，而是在策略前向传播中真正做 task-conditioned fusion：</p>
@@ -403,7 +403,7 @@ A^\tau=(1-\tau)A^0+\tau A^1
 \mathcal L_{\mathrm{CFM}}
 =
 \mathbb E\left[
-\left|v_\theta(A^\tau,\tau,S_t)-u(A^0,A^1)\right|^2
+\left\|v_\theta(A^\tau,\tau,S_t)-u(A^0,A^1)\right\|^2
 \right]
 \]</p>
 <p>这一个 flow matching 目标同时覆盖：</p>
@@ -488,8 +488,8 @@ VLM 判断任务是否完成
 P_{\mathrm{hybrid}}=
 P_{\mathrm{target}}+
 \begin{cases}
-K\Delta F,&amp;|\Delta F|&gt;\tau\
-0,&amp;|\Delta F|\le\tau
+K\Delta F,&amp;\|\Delta F\|&gt;\tau\\
+0,&amp;\|\Delta F\|\le\tau
 \end{cases}
 \]</p>
 <p>然后 PID 控制器让机器人跟踪更新后的 \(P_{\mathrm{hybrid}}\)。</p>

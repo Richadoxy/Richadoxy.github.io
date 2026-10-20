@@ -4,6 +4,8 @@
 
 > 后续阅读顺序：[从原始模态到公共语义空间](31_multimodal_encoder_alignment_and_infonce.md) → [多模态表示的监督配方](32_three_consistency_supervision_paradigms.md) → [从对齐表示到 Policy 融合](19_attention_from_embeddings_to_action_expert.md) → [模仿学习与 Behavior Cloning](23_imitation_learning_basics.md)。
 
+若已经能读懂 VLA 前向框图，可以沿 [动作生成](25_action_generation_families.md) → [π₀.₅结构](04_pi05_architecture.md) → [FAST 与 KI](42_fast_ki_and_pi_training.md) → [参数更新](05_train_state_jit_checkpoint.md) 继续。这条路线补齐“表示什么、由什么监督、梯度更新谁、部署运行什么”四个理解关口。
+
 ## 0. 先记住整条主线
 
 多模态 VLA 或模仿学习研究通常可以拆成六层：
@@ -339,6 +341,8 @@ Readout token 负责从 Transformer 中汇总动作所需的信息；Action Head
 
 动作生成方法的细节放在第二卷和第三卷展开。
 
+同一策略也可以同时训练多种动作表示。π₀.₅相关训练方案把真实动作编码成 FAST tokens 来监督 VLM，又用 flow loss 训练连续动作 expert；部署可以只使用连续动作路径。训练中存在离散动作目标，不意味着每次控制都要自回归生成动作 token，详见 [FAST 与 KI](42_fast_ki_and_pi_training.md)。
+
 ---
 
 ## 8. 训练图和推理图必须分开画
@@ -377,6 +381,8 @@ deployable encoders
 - 哪些参数被冻结？
 - 哪些模块部署时真正运行？
 - 训练时使用的信息在推理时是否可获得？
+
+还应单独补一张梯度图：**每项 loss 能更新哪些参数？** 前向 attention mask、参数冻结和 `stop-gradient` 分别控制读取范围、更新集合与反向路径，不能仅凭一张前向框图判断。
 
 ---
 
@@ -424,6 +430,8 @@ Encoder + Fusion + Policy
 - future/reconstruction loss；
 - bottleneck 或 routing；
 - matched no-sensor ablation。
+
+上面的三种方式描述训练阶段如何组织；全参数微调、LoRA 与 KI 则需要另行记录。LoRA 用低秩参数承载适应，冻结决定哪些参数保持不变，KI 限制特定损失的梯度来源。这些机制可以与阶段安排组合。特别是“论文完整训练配方”“发布权重怎样获得”和“当前仓库实际执行的微调”可能不同，π₀.₅是一个具体例子。
 
 ---
 
@@ -528,6 +536,8 @@ Top-1、重建 PSNR 或训练 action loss 只证明某一层能力，不能直�
 - 每个 stage 的数据和 loss 是什么？
 - 哪些参数更新、冻结或使用 LoRA？
 - 哪些训练辅助模块推理时丢弃？
+- 每个 loss 的梯度流向哪里，是否设置 stop-gradient？
+- 论文训练、checkpoint 来源和当前公开微调实现是否一致？
 
 ### 第七步：检查实验闭环
 

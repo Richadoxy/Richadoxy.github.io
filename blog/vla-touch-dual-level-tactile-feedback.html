@@ -393,12 +393,12 @@ episode对应的语言instruction
 <p>\[
 D_{\mathrm{VLA}}
 =
-\left{
+\left\{
 s_{t-n:t},
 o^p_{t-n:t},
-a^{\mathrm{RDT}}<em>{t:t+T_a},
-a^{\mathrm{Exp}}</em>{t:t+T_a}
-\right}
+a^{\mathrm{RDT}}_{t:t+T_a},
+a^{\mathrm{Exp}}_{t:t+T_a}
+\right\}
 \]</p>
 <p>其中：</p>
 <ul>
@@ -475,11 +475,11 @@ a^{\mathrm{Exp}}</em>{t:t+T_a}
 \min_\theta
 \mathbb E_{D_{\mathrm{VLA}}}
 \left[
-\left|
+\left\|
 a^{\mathrm{Exp}}
 -
 \pi_I(a^{\mathrm{RDT}},z;\theta)
-\right|^2
+\right\|^2
 \right]
 \]</p>
 <p>即让修正动作接近专家动作。</p>
@@ -578,9 +578,9 @@ o_t,s_t,m_t,h_{t-1}
 <p>\[
 \mathcal L_{\mathrm{LSTM}}
 =
-\left|
+\left\|
 a_t^{\mathrm{Exp}}-hat a_t
-\right|^2
+\right\|^2
 \]</p>
 <p>官方代码会训练observation encoder、force encoder、两层单向LSTM和output head，DINOv2保持冻结。</p>
 <h3 id="82-interpolant-controller">8.2 Interpolant Controller</h3>

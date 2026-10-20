@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="../assets/css/main.css" />
     <link rel="stylesheet" href="../assets/css/blog.css" />
     <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
   </head>
   <body>
     <header class="site-header">
@@ -34,8 +35,12 @@
           <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
           <div class="toc">
 <ul>
-<li><a href="#0">0. 先建立整个领域的地图</a></li>
-<li><a href="#_1">第一阶段：触觉—视觉—语言表征基础</a><ul>
+<li><a href="#0">0. 先建立整个领域的地图</a><ul>
+<li><a href="#_1">从小模型到触觉记忆的学习分支</a></li>
+<li><a href="#_2">知识之间的四条连接</a></li>
+</ul>
+</li>
+<li><a href="#_3">第一阶段：触觉—视觉—语言表征基础</a><ul>
 <li><a href="#1-tvl">1. TVL：从这里开始</a></li>
 <li><a href="#2-touch100k">2. Touch100k：看数据规模如何扩大</a></li>
 <li><a href="#3-octopi">3. Octopi：从对齐进入触觉属性推理</a></li>
@@ -51,35 +56,36 @@
 <li><a href="#10-tactile-vla">10. Tactile-VLA：物理知识与触觉泛化</a></li>
 </ul>
 </li>
-<li><a href="#_2">第三阶段：力觉、闭环反馈和未来预测</a><ul>
+<li><a href="#_4">第三阶段：力觉、闭环反馈和未来预测</a><ul>
 <li><a href="#11-forcevlavla">11. ForceVLA：先理解力觉如何进入VLA</a></li>
 <li><a href="#12-dreamtacvla">12. DreamTacVLA：从当前触觉转向未来触觉预测</a></li>
 <li><a href="#13-taf-vlafd-vlaforcevla2">13. TaF-VLA、FD-VLA与ForceVLA2：成组阅读</a></li>
 <li><a href="#14-tacvlaat-vlarestacvlavitar">14. TacVLA、AT-VLA、ResTacVLA与ViTaR：比较融合机制</a></li>
 <li><a href="#15-tacforcing">15. TacForcing：执行时流式触觉反馈</a></li>
 <li><a href="#rdp">补充阅读：RDP 的慢速扩散与快速触觉闭环</a></li>
+<li><a href="#16-t-rexflow">16. T-Rex：把一条Flow拆成低频规划与高频触觉修正</a></li>
 </ul>
 </li>
-<li><a href="#_3">第四阶段：灵巧手与高自由度操作</a><ul>
-<li><a href="#16-end-to-end-dexterous-arm-hand-vla-policies-via-shared-autonomy">16. 【灵巧手重点】End-to-End Dexterous Arm-Hand VLA Policies via Shared Autonomy</a></li>
-<li><a href="#17-mode-vla">17. 【灵巧手重点】MoDE-VLA</a></li>
-<li><a href="#18-tabero">18. Tabero：温柔操作和物理交互质量</a></li>
+<li><a href="#_5">第四阶段：灵巧手与高自由度操作</a><ul>
+<li><a href="#17-end-to-end-dexterous-arm-hand-vla-policies-via-shared-autonomy">17. 【灵巧手重点】End-to-End Dexterous Arm-Hand VLA Policies via Shared Autonomy</a></li>
+<li><a href="#18-mode-vla">18. 【灵巧手重点】MoDE-VLA</a></li>
+<li><a href="#19-tabero">19. Tabero：温柔操作和物理交互质量</a></li>
 </ul>
 </li>
-<li><a href="#_4">第五阶段：前沿扩展，按研究兴趣选择</a><ul>
+<li><a href="#_6">第五阶段：前沿扩展，按研究兴趣选择</a><ul>
 <li><a href="#a">A. 多传感器与物理世界建模</a></li>
 <li><a href="#b-token">B. 触觉token规模化</a></li>
 <li><a href="#c">C. 标注、提示与触觉监督</a></li>
 <li><a href="#d">D. 训练时有触觉、推理时没有触觉</a></li>
 </ul>
 </li>
-<li><a href="#_5">推荐的最短主线</a></li>
-<li><a href="#_6">每个阶段的产出建议</a><ul>
-<li><a href="#_7">第一阶段完成后</a></li>
-<li><a href="#_8">第二阶段完成后</a></li>
-<li><a href="#_9">第三阶段完成后</a></li>
-<li><a href="#_10">第四阶段完成后</a></li>
-<li><a href="#_11">最终应能回答的研究问题</a></li>
+<li><a href="#_7">推荐的最短主线</a></li>
+<li><a href="#_8">每个阶段的产出建议</a><ul>
+<li><a href="#_9">第一阶段完成后</a></li>
+<li><a href="#_10">第二阶段完成后</a></li>
+<li><a href="#_11">第三阶段完成后</a></li>
+<li><a href="#_12">第四阶段完成后</a></li>
+<li><a href="#_13">从知识点到研究判断</a></li>
 </ul>
 </li>
 </ul>
@@ -91,14 +97,13 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 6: Tactile Representation and VLA</span><span data-lang="zh">第六卷：触觉表征与触觉 VLA</span> · TOUCH00</p>
           <h1>触觉 VLA 与模仿学习阅读地图</h1>
-          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 12 min read</span><span data-lang="zh">入门 · 2026.09 · 约 12 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 14 min read</span><span data-lang="zh">入门 · 2026.09 · 约 14 分钟阅读</span></p>
           <p class="article-deck">按表征与数据、Language-Action、力控闭环、灵巧手和前沿专题，组织触觉 VLA 的渐进阅读顺序。</p>
           <div class="article-content">
             <blockquote>
 <p>目标读者：刚进入触觉机器人学习、希望最终研究触觉VLA、接触丰富操作或灵巧手的新人。<br>
 文中“论文”链接均指向公开的PMLR或arXiv页面。<br>
-状态说明：ICML 2024和ICLR 2025按正式版本标注；其余若公开版本首页只显示arXiv，则统一写作“arXiv”，不猜测后续录用状态。<br>
-目录中TAP-VLA有重复副本，阅读一个即可。</p>
+状态说明：ICML 2024和ICLR 2025按正式版本标注；其余若公开版本首页只显示arXiv，则统一写作“arXiv”，不猜测后续录用状态。<br></p>
 </blockquote>
 <h2 id="0">0. 先建立整个领域的地图</h2>
 <p>触觉VLA并不是一个单一问题，可以拆成五层：</p>
@@ -113,17 +118,70 @@
 ⑤ 灵巧手、多指和双臂高自由度操作
 </code></pre>
 <p>推荐按这个依赖关系阅读，而不是单纯按论文年份阅读。</p>
-<p>每篇论文都用下面六个问题做笔记：</p>
-<ol>
-<li>触觉传感器是什么？原始输入形式是什么？</li>
-<li>触觉encoder是预训练、冻结还是端到端微调？</li>
-<li>视觉、语言、触觉在哪里融合？</li>
-<li>action如何表示和生成？</li>
-<li>训练数据来自人工示范、遥操作、仿真还是伪标签？</li>
-<li>是否做真实机器人闭环实验，评价指标是否包含接触质量？</li>
-</ol>
+<p>每篇论文按六个维度整理：传感器与原始输入、encoder 的初始化与更新范围、模态融合位置、动作表示与生成目标、示范和标签来源，以及闭环实验与接触质量。它们串起了“数据进入模型，再由动作影响环境”的完整链条。</p>
+<h3 id="_1">从小模型到触觉记忆的学习分支</h3>
+<p>先理解可独立训练的小型策略，有助于把触觉的作用从大模型规模、语言能力和预训练数据中分开。下面这条分支连接动作生成、触觉输入、历史状态和研究验证。</p>
+<table>
+<thead>
+<tr>
+<th>顺序</th>
+<th>知识笔记</th>
+<th>与下一步的联系</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><a href="action-generation-mse-token-diffusion-flow.html">动作生成方法</a></td>
+<td>区分数据、网络、训练目标和采样方式</td>
+</tr>
+<tr>
+<td>2</td>
+<td><a href="diffusion-policy-and-act.html">Diffusion Policy 与 ACT</a></td>
+<td>把抽象 loss 放进完整观测—动作网络</td>
+</tr>
+<tr>
+<td>3</td>
+<td><a href="10-flow-matching-training-inference.html">Flow Matching</a></td>
+<td>理解噪声、干净动作、速度参数化与生成时间</td>
+</tr>
+<tr>
+<td>4</td>
+<td><a href="generative-consistency-and-sampling-distillation.html">生成一致性与采样蒸馏</a></td>
+<td>理解少步生成怎样改变延迟与训练成本</td>
+</tr>
+<tr>
+<td>5</td>
+<td><a href="tactile-input-representation.html">从原始触觉到策略条件</a></td>
+<td>将真实传感器读数构造成有空间和时间含义的输入</td>
+</tr>
+<tr>
+<td>6</td>
+<td><a href="cgp-contact-grounded-policy.html">CGP 精读</a></td>
+<td>区分未来物理状态、触觉表示与实际控制命令</td>
+</tr>
+<tr>
+<td>7</td>
+<td><a href="policy-memory-and-object-centric-tactile-state.html">策略记忆与对象级触觉状态</a></td>
+<td>从一帧接触信息走向遮挡下的历史状态估计</td>
+</tr>
+<tr>
+<td>8</td>
+<td><a href="tactile-memory-experiment-design.html">触觉记忆的实验设计</a></td>
+<td>把模型设计变成能够被验证或推翻的研究假设</td>
+</tr>
+</tbody>
+</table>
+<p>这条分支也与已有基础文章相连：<a href="multimodal-encoder-alignment-infonce.html">表示与编码</a> 解释输入怎样变成特征，<a href="multimodal-consistency-supervision.html">监督配方</a> 解释特征学什么，<a href="19-attention-openclip-tactile-groot.html">Policy 融合</a> 解释这些特征怎样影响动作。</p>
+<h3 id="_2">知识之间的四条连接</h3>
+<ul>
+<li><strong>表示到动作：</strong> 触觉重建和对齐塑造输入特征；动作监督决定特征是否服务于控制。</li>
+<li><strong>单帧到历史：</strong> 当前接触可能不足以确定状态；历史、已执行动作和新观测共同帮助更新估计。</li>
+<li><strong>生成到反馈：</strong> 采样步数影响推理耗时，传感器刷新和动作前缀决定新触觉何时改变行为。</li>
+<li><strong>模型到证据：</strong> 离线误差、对象归属准确率和闭环成功率分别描述不同能力，需要各自的测试。</li>
+</ul>
 <hr />
-<h2 id="_1">第一阶段：触觉—视觉—语言表征基础</h2>
+<h2 id="_3">第一阶段：触觉—视觉—语言表征基础</h2>
 <p>这一阶段先回答“触觉怎样变成模型可以使用的语义表示”，暂时不急着看动作策略。</p>
 <h3 id="1-tvl">1. TVL：从这里开始</h3>
 <p><strong>Fu et al., A Touch, Vision, and Language Dataset for Multimodal Alignment — ICML 2024</strong><br>
@@ -241,7 +299,7 @@ LLM或robot policy
 </ul>
 <p>不要只看平均成功率，要确认论文所说的“generalization”究竟是哪一种。</p>
 <hr />
-<h2 id="_2">第三阶段：力觉、闭环反馈和未来预测</h2>
+<h2 id="_4">第三阶段：力觉、闭环反馈和未来预测</h2>
 <p>前两阶段关注“触觉能不能进入模型”，这一阶段关注“执行时能不能及时改变动作”。</p>
 <h3 id="11-forcevlavla">11. ForceVLA：先理解力觉如何进入VLA</h3>
 <p><strong>Yu et al., ForceVLA: Enhancing VLA Models with a Force-aware MoE for Contact-rich Manipulation — arXiv 2025</strong><br>
@@ -356,10 +414,24 @@ LLM或robot policy
 <p><strong>Xue et al., Reactive Diffusion Policy: Slow-Fast Visual-Tactile Policy Learning for Contact-Rich Manipulation — RSS 2025</strong><br>
 <a href="rdp-reactive-diffusion-policy.html">精读笔记</a> · <a href="https://arxiv.org/abs/2503.02881v3">arXiv</a> · <a href="https://github.com/xiaoxiaoxh/reactive_diffusion_policy">官方代码</a></p>
 <p>RDP 是任务特定的视觉—触觉模仿学习策略，可在阅读触觉 VLA 的执行时反馈机制时作为基础对照。重点理解 Fig. 5 中动作块、temporal ensembling 与慢快策略的反馈时序差异，以及 Fig. 6 中非对称 tokenizer 和潜在扩散策略的两阶段训练。论文同时展示 TactAR 如何改善示范质量，但快策略仍从记录下来的专家动作学习，不能凭触觉自动纠正系统性的差示范。</p>
+<h3 id="16-t-rexflow">16. T-Rex：把一条Flow拆成低频规划与高频触觉修正</h3>
+<p><strong>Niu et al., T-Rex: Tactile-Reactive Dexterous Manipulation — arXiv 2026</strong><br>
+<a href="trex-tactile-reactive-dexterous-manipulation.html">精读笔记</a> · <a href="https://arxiv.org/abs/2606.17055">arXiv</a> · <a href="https://github.com/ZhuoyangLiu2005/T-Rex">官方代码</a></p>
+<p>建议在理解Flow Matching、Action Chunk和TacForcing以后阅读。重点：</p>
+<ul>
+<li>Latent、Action、Tactile三套Transformer Expert怎样共享causal joint attention；</li>
+<li>future-latent query tokens怎样用未来head-camera feature监督；</li>
+<li>16帧F6历史怎样通过VQ-VAE形成离散动态token；</li>
+<li>为什么在\(\tau_{\mathrm{split}}=0.4\)处分割同一条action flow；</li>
+<li>slow stream怎样缓存\(x_{0.4}\)和latent/action KV；</li>
+<li>fast stream怎样用新触觉多次从同一个boundary重新生成action chunk；</li>
+<li>论文约5/20 Hz表述与公开代码可配置调度之间的区别。</li>
+</ul>
+<p>T-Rex与TacForcing都关注execution-time touch，但T-Rex的核心接口是“缓存上下文 + 级联flow后半段”，不是逐token强制或简单action residual。</p>
 <hr />
-<h2 id="_3">第四阶段：灵巧手与高自由度操作</h2>
+<h2 id="_5">第四阶段：灵巧手与高自由度操作</h2>
 <p>这一阶段需要同时理解遥操作数据、手臂—手指动作分解、触觉闭环和高维action建模。</p>
-<h3 id="16-end-to-end-dexterous-arm-hand-vla-policies-via-shared-autonomy">16. 【灵巧手重点】End-to-End Dexterous Arm-Hand VLA Policies via Shared Autonomy</h3>
+<h3 id="17-end-to-end-dexterous-arm-hand-vla-policies-via-shared-autonomy">17. 【灵巧手重点】End-to-End Dexterous Arm-Hand VLA Policies via Shared Autonomy</h3>
 <p><strong>Cui et al. — arXiv 2025</strong><br>
 <a href="https://arxiv.org/abs/2511.00139">论文</a></p>
 <p>推荐作为灵巧手第一篇，重点：</p>
@@ -371,7 +443,7 @@ LLM或robot policy
 <li>corrective teleoperation如何追加失败恢复数据；</li>
 <li>约90%成功率和50多个物体的实验是否有严格未见物体划分。</li>
 </ul>
-<h3 id="17-mode-vla">17. 【灵巧手重点】MoDE-VLA</h3>
+<h3 id="18-mode-vla">18. 【灵巧手重点】MoDE-VLA</h3>
 <p><strong>Tang et al., Towards Human-Like Manipulation with MoDE-VLA — arXiv 2026</strong><br>
 <a href="https://arxiv.org/abs/2603.08122">论文</a></p>
 <p>这篇进一步进入双臂、多指、接触丰富的in-hand manipulation：</p>
@@ -429,7 +501,7 @@ LLM或robot policy
 </tr>
 </tbody>
 </table>
-<h3 id="18-tabero">18. Tabero：温柔操作和物理交互质量</h3>
+<h3 id="19-tabero">19. Tabero：温柔操作和物理交互质量</h3>
 <p><strong>Wu et al., Tabero: Learning Gentle Manipulation with Vision, Touch and Language — arXiv 2026</strong><br>
 <a href="https://arxiv.org/abs/2605.27886">论文</a></p>
 <p>虽然不应仅按“灵巧手论文”理解，但它对多指抓取和易损物体操作很重要。重点：</p>
@@ -441,7 +513,7 @@ LLM或robot policy
 <li>“gentle”语言指令如何真正改变物理交互。</li>
 </ul>
 <hr />
-<h2 id="_4">第五阶段：前沿扩展，按研究兴趣选择</h2>
+<h2 id="_6">第五阶段：前沿扩展，按研究兴趣选择</h2>
 <p>这些论文建议在完成前四阶段后阅读，因为它们通常默认读者已经理解基础VLA和触觉融合。</p>
 <h3 id="a">A. 多传感器与物理世界建模</h3>
 <p><strong>MLA: A Multisensory Language-Action Model — arXiv，本地版本更新至2026</strong><br>
@@ -481,8 +553,8 @@ LLM或robot policy
 <li>这种路线与真正的闭环触觉策略适用场景有何不同。</li>
 </ul>
 <hr />
-<h2 id="_5">推荐的最短主线</h2>
-<p>如果暂时不想读完全部论文，可以先按这13篇走：</p>
+<h2 id="_7">推荐的最短主线</h2>
+<p>如果暂时不想读完全部论文，可以先按这14篇走：</p>
 <ol>
 <li>TVL：三模态语义对齐；</li>
 <li>Touch100k：触觉语言数据规模化；</li>
@@ -496,6 +568,7 @@ LLM或robot policy
 <li>DreamTacVLA：未来触觉预测；</li>
 <li>TacForcing：执行期闭环触觉；</li>
 <li>RDP：潜在动作块与高频触觉解码；</li>
+<li>T-Rex：低频视觉规划与高频触觉flow refinement；</li>
 <li><strong>Dexterous Arm-Hand VLA → MoDE-VLA：灵巧手与双臂高自由度操作。</strong></li>
 </ol>
 <p>这条主线对应：</p>
@@ -507,25 +580,55 @@ LLM或robot policy
   → 灵巧手高维控制
 </code></pre>
 <hr />
-<h2 id="_6">每个阶段的产出建议</h2>
-<h3 id="_7">第一阶段完成后</h3>
+<h2 id="_8">每个阶段的产出建议</h2>
+<h3 id="_9">第一阶段完成后</h3>
 <p>画一张encoder结构图，说明每种输入、embedding维度、对齐损失和评估任务。</p>
-<h3 id="_8">第二阶段完成后</h3>
+<h3 id="_10">第二阶段完成后</h3>
 <p>建立VLA对比表：backbone、触觉注入层、action表示、训练数据和真实机器人任务。</p>
-<h3 id="_9">第三阶段完成后</h3>
+<h3 id="_11">第三阶段完成后</h3>
 <p>建立控制对比表：传感器频率、VLA推理频率、低层控制器、动作chunk长度、反馈延迟和力指标。</p>
-<h3 id="_10">第四阶段完成后</h3>
+<h3 id="_12">第四阶段完成后</h3>
 <p>画出灵巧手系统的数据闭环：遥操作 → shared autonomy → 示范数据 → 策略训练 → 失败恢复 → 数据追加。</p>
-<h3 id="_11">最终应能回答的研究问题</h3>
-<ol>
-<li>触觉应该先做语言语义对齐，还是直接端到端服务动作预测？</li>
-<li>全局触觉embedding、多触觉token和时序触觉序列分别适合什么任务？</li>
-<li>触觉应注入VLA backbone、action head，还是只产生residual correction？</li>
-<li>VLA低频推理和接触控制高频反馈之间怎样协调？</li>
-<li>视觉式触觉与力/力矩传感器是否互补？</li>
-<li>灵巧手的宏观手臂动作、微观手指动作和原子技能应该怎样分层？</li>
-<li>成功率之外，怎样评价峰值力、滑移、物体损伤和交互质量？</li>
-</ol>
+<h3 id="_13">从知识点到研究判断</h3>
+<table>
+<thead>
+<tr>
+<th>设计选择</th>
+<th>需要理解的联系</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>语义预训练或端到端动作学习</td>
+<td>预训练标签保留的信息，应与下游操作需要的信息相匹配</td>
+</tr>
+<tr>
+<td>全局向量、区域 tokens 或历史序列</td>
+<td>空间分辨率决定接触能否区分，时间范围决定过去事件能否被利用</td>
+</tr>
+<tr>
+<td>注入 backbone、动作头或残差控制器</td>
+<td>注入位置影响哪些计算能够读取触觉，也影响反馈延迟</td>
+</tr>
+<tr>
+<td>低频规划与高频修正</td>
+<td>长时任务意图与短时接触变化需要在执行时间轴上配合</td>
+</tr>
+<tr>
+<td>视触觉与力传感器组合</td>
+<td>局部形变、法向压力和方向性受力提供不同测量信息</td>
+</tr>
+<tr>
+<td>臂、腕与手指控制</td>
+<td>宏观接近、掌部支撑和局部接触调整具有不同的动作作用</td>
+</tr>
+<tr>
+<td>感知指标与操作指标</td>
+<td>更好的表示还需要转化为目标完成、保持稳定和可接受的交互质量</td>
+</tr>
+</tbody>
+</table>
+<p>沿着这些联系整理知识，可以从“记住某篇论文用了什么模块”，逐步走向“根据任务信息和可用数据选择模块，并用实验检验选择”。</p>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
             <a href="07-vlash-integration.html">← RUN03 · VLASH 在 BrainCo-IL 中的集成</a>
