@@ -375,7 +375,11 @@ deployable encoders
 + low-level controller
 ```
 
-重建 decoder、matching head、privileged posterior 经常只是训练脚手架。阅读论文时需要逐项问：
+重建 decoder、matching head、privileged posterior 经常只是训练脚手架。
+
+这里的 `privileged posterior` 指利用部署时拿不到的信息来推断潜变量的训练分支。例如 ACT 的后验编码器读取专家未来动作和当前状态，输出潜变量分布，并与动作策略一起更新参数。部署时原版 ACT 跳过这个编码器，将 \(z=0\) 输入保留下来的策略。视觉 encoder 仍需运行。先验、后验、KL 和梯度分工的直观例子见 [DP 与 ACT](36_diffusion_policy_and_act.md)。
+
+阅读论文时需要逐项问：
 
 - 哪些网络只制造 loss？
 - 哪些参数被冻结？
@@ -434,6 +438,27 @@ Encoder + Fusion + Policy
 上面的三种方式描述训练阶段如何组织；全参数微调、LoRA 与 KI 则需要另行记录。LoRA 用低秩参数承载适应，冻结决定哪些参数保持不变，KI 限制特定损失的梯度来源。这些机制可以与阶段安排组合。特别是“论文完整训练配方”“发布权重怎样获得”和“当前仓库实际执行的微调”可能不同，π₀.₅是一个具体例子。
 
 ---
+
+### 9.4 Dropout：训练时临时屏蔽哪些信息
+
+Dropout 是一种正则化方法：训练时随机屏蔽部分信息，减少模型对少数特征的过度依赖。普通 `Dropout(p=0.1)` 表示每个特征元素有 10% 的概率被临时置零，每次前向重新抽取。PyTorch 会将保留值按 \(1/(1-p)\) 缩放以维持期望，常规推理时关闭这种随机屏蔽。网络权重没有被删除。[PyTorch Dropout 文档](https://docs.pytorch.org/docs/stable/generated/torch.nn.Dropout.html)
+
+| 操作 | 随机改变什么 | 主要用途 |
+| --- | --- | --- |
+| 普通 dropout | 网络内部的部分特征元素 | 减少过拟合和特征间的过度依赖 |
+| 模态 dropout | 整路输入，如深度或某种传感器表示 | 训练对信息缺失的适应能力 |
+| CVAE 潜变量采样 | 从潜变量分布取出一个 \(z\) | 表达生成样本的差异 |
+| 扩散加噪 | 向真实动作加入已知随机噪声 | 构造去噪学习问题 |
+
+阅读代码时，要继续确认 dropout 概率和实际调用状态。有 `Dropout` 类或配置字段，不等于训练已启用。前面几类策略提供了不同的例子：
+
+| 核对对象 | 公开实现或配置中的普通 dropout |
+| --- | --- |
+| π0.5 的官方 OpenPI 默认实现 | Gemma 与 SigLIP 默认值为 0，模型初始化未覆盖；因此默认关闭 |
+| GR00T N1 / N1.5 发布模型 | 动作头 DiT 配置为 0.2；N1.5 的额外视觉语言 self-attention 模块也是 0.2 |
+| 原版 ACT | 论文超参数表报告 Transformer dropout 为 0.1 |
+
+这些数值分别来自 [OpenPI Gemma](https://github.com/Physical-Intelligence/openpi/blob/main/src/openpi/models/gemma.py)、[SigLIP](https://github.com/Physical-Intelligence/openpi/blob/main/src/openpi/models/siglip.py)与[初始化路径](https://github.com/Physical-Intelligence/openpi/blob/main/src/openpi/models/pi0.py)，[GR00T N1](https://huggingface.co/nvidia/GR00T-N1-2B/blob/main/config.json)与 [N1.5 配置](https://huggingface.co/nvidia/GR00T-N1.5-3B/blob/main/config.json)，以及 [ACT 论文附录的超参数表](https://arxiv.org/html/2304.13705v1#A1.SS4)。这里的 GR00T 数值专指 N1/N1.5，不能直接替代其他版本配置；公开默认值也不能证明未公开的所有预训练阶段都采用同一设置。
 
 ## 10. 多模态 VLA 研究通常在研究什么
 

@@ -54,7 +54,7 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span> · IL03</p>
           <h1>动作生成方法：从连续回归到概率生成</h1>
-          <p class="article-meta"><span data-lang="en">进阶 · September 2026 · 11 min read</span><span data-lang="zh">进阶 · 2026.09 · 约 11 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">进阶 · September 2026 · 13 min read</span><span data-lang="zh">进阶 · 2026.09 · 约 13 分钟阅读</span></p>
           <p class="article-deck">串联回归、自回归、CVAE、GAN、扩散、Flow Matching 与生成一致性，区分训练目标、采样和执行。</p>
           <div class="article-content">
             <p>动作生成可以看成一件很具体的事：把当前看到、摸到和记住的信息，转换成接下来要执行的命令。不同方法的区别，在于它们怎样表示多个可能的动作，以及怎样从这些可能性中生成一条动作序列。</p>
@@ -107,14 +107,43 @@ p_\theta(y_{1:N}\mid c)
 <p>RT-2 是将动作编码为 token 并接入视觉语言模型的一个具体例子。<a href="https://arxiv.org/abs/2307.15818">RT-2 原论文</a></p>
 <p>FAST 则先对动作块的每个维度沿时间轴做 DCT，再量化频域系数、按低频优先排列，最后用 BPE 合并常见的系数组合。它压缩的是整段动作的表示：token 顺序对应压缩后的编码顺序，不能把“预测下一个 token”理解为“预测下一个机器人控制时刻”。量化引入近似误差，BPE 对量化后的符号序列做无损合并。<a href="https://arxiv.org/abs/2501.09747">FAST 原论文</a></p>
 <h2 id="4-vae-cvae">4. VAE / CVAE：用潜变量组织动作模式</h2>
-<p>VAE 是带潜变量的概率生成框架，包含 encoder、decoder 和对应的训练目标。ViT 则是一种 Transformer 网络架构。VAE 的输入可以是图像，也可以是动作或触觉，不能简单归类为“一种视觉 encoder”。<a href="https://arxiv.org/abs/1312.6114">VAE 原论文</a></p>
-<p>用于条件动作生成时，可以写成：</p>
+<p>先从拿杯子的例子理解：相同起始场景下，示范者可能缓慢接近，也可能较快接近。普通确定性预测只接收观测 \(c\)，而 CVAE 给动作生成器增加一个潜变量输入 \(z\)，用它容纳观测未完全解释的动作差异：</p>
 <p>\[
-q_\phi(z\mid A,c),\qquad
-p_\theta(A\mid z,c),\qquad
-p(z\mid c).
+\hat A=f_\theta(c)
+\quad\longrightarrow\quad
+\hat A=f_\theta(c,z).
 \]</p>
-<p>训练 encoder 看见专家动作，生成潜变量分布；decoder 根据潜变量和条件重建动作。一个常见的条件 VAE 目标是：</p>
+<p>数据集没有给每条示范标注 \(z\)，所以训练时需要一个编码器，根据专家动作推断它可能对应哪些潜变量。这个编码器与动作生成器联合训练。潜变量是一次前向中的向量，网络权重则是训练中积累下来的参数，两者不能混淆。</p>
+<p>CVAE 是条件变分自编码器：<strong>条件</strong>指观测信息，<strong>变分</strong>指用可训练分布近似真实后验，<strong>自编码器</strong>指训练时先编码示范、再尝试重建它。VAE/CVAE 的输入可以是图像、动作或触觉；ViT 则是一种网络结构。<a href="https://arxiv.org/abs/1312.6114">VAE 原论文</a></p>
+<p>先把三个分布读成三个问题，再看损失：</p>
+<table>
+<thead>
+<tr>
+<th>分布</th>
+<th>在问什么</th>
+<th>实际作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>先验 \(p(z\mid c)\)</td>
+<td>还没看到这条具体动作，\(z\) 可能是什么</td>
+<td>提供生成时的潜变量来源；也可以简化成不依赖条件的标准高斯</td>
+</tr>
+<tr>
+<td>近似后验 \(q_\phi(z\mid A,c)\)</td>
+<td>已经看到示范动作，哪些 \(z\) 能解释它</td>
+<td>编码器输出分布参数，再采样得到 \(z\)</td>
+</tr>
+<tr>
+<td>生成分布 \(p_\theta(A\mid z,c)\)</td>
+<td>给定场景与 \(z\)，能生成什么动作</td>
+<td>解码器，即动作生成网络</td>
+</tr>
+</tbody>
+</table>
+<p>“先验／后验”的先后相对于是否已知这条示范，不是训练之前与之后。下面是一般 CVAE 的完整条件写法；原始 ACT 的近似后验为了效率，只读取动作和关节状态，省略图像。</p>
+<p>训练时，decoder 根据潜变量和条件重建动作。常见目标是：</p>
 <p>\[
 \mathcal L_{\mathrm{CVAE}}
 =\mathbb E_{z\sim q_\phi(z\mid A,c)}
@@ -122,12 +151,19 @@ p(z\mid c).
 +\beta D_{\mathrm{KL}}
 \big(q_\phi(z\mid A,c)\|p(z\mid c)\big).
 \]</p>
-<p>第一项要求动作能重建回来。第二项让训练得到的潜变量分布靠近推理时使用的先验，常见选择是标准高斯。\(\beta=1\) 对应标准负 ELBO 的形式，其他权重改变重建与正则化的平衡。</p>
+<p>第一项比较生成动作与专家动作。第二项中的 <strong>KL 散度比较两个潜变量分布</strong>，对后验偏离先验的程度施加代价，防止编码器任意使用部署时难以获得的示范专属代码。它不直接比较动作，也不要求每个 \(z\) 等于零。</p>
+<p>\(\beta\) 控制两项的取舍：既要保留帮助重建的示范信息，也要限制后验的偏离程度。\(\beta=1\) 对应标准负 ELBO（证据下界取负）的形式。具体高斯分布的 KL 数值例子见 <a href="diffusion-policy-and-act.html">ACT 的先验、后验与 KL</a>。</p>
 <p>重建损失取决于输出分布假设：固定方差高斯对应缩放后的 MSE，固定尺度 Laplace 对应缩放后的 L1。不同 VAE 不必使用同一种重建损失。</p>
-<pre><code class="language-text">训练：条件 c + 专家动作 A → 后验 encoder → z → decoder → 重建 A
-推理：条件 c + 先验中的 z                         → decoder → 生成 A
+<pre><code class="language-text">训练：专家动作 A + 条件 → 后验 encoder → 采样 z ─┐
+                                               ├→ decoder → 重建 A
+                              观测条件 c ──────┘
+
+生成：                     从先验选择 z ────────┐
+                                               ├→ decoder → 生成 A
+                              观测条件 c ──────┘
 </code></pre>
-<p>推理时没有未来专家动作，因此不能继续使用依赖它的训练后验。ACT 是一个动作领域的 CVAE 实例；它的实际推理 latent 约定见 <a href="diffusion-policy-and-act.html">DP 与 ACT</a>。</p>
+<p>推理时没有未来专家动作，因此跳过依赖它的训练后验。一般 CVAE 可以从先验采样来生成不同结果；<strong>原版 ACT 固定使用 \(z=0\)，即标准高斯先验的均值</strong>，一次前向输出动作块。这只是固定了一个输入，训练好的动作策略权重、图像和状态输入都仍然保留。KL 有助于训练与部署的衔接，但不保证零向量总是最优选择。<a href="https://arxiv.org/html/2304.13705v1#S4.SS2">ACT 原论文</a></p>
+<p>训练时潜变量让模型有机会区分示范方式；固定 \(z\) 部署后，同一观测下的策略输出仍然是确定性的。后验编码器如何更新、重参数化如何传梯度，以及与 DP 的区别，在 <a href="diffusion-policy-and-act.html">DP 与 ACT</a> 中展开。</p>
 <h2 id="5-gan">5. GAN：让判别器提供生成反馈</h2>
 <p>GAN 使用两个网络：生成器 \(G\) 根据条件和随机变量产生样本，判别器 \(D\) 学习区分真实样本与生成样本。生成器通过判别器的反馈改善输出。这种对抗训练是 <a href="https://arxiv.org/abs/1406.2661">GAN 原论文</a> 的基本思路；下面把它写成条件动作生成的形式。</p>
 <p>\[

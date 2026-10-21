@@ -394,6 +394,27 @@
   color: var(--heading);
 }
 
+.concept-figure {
+  margin: 1.5rem 0;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.concept-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.concept-figure figcaption {
+  margin-top: 0.65rem;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
 .architecture-figure {
   margin: 2rem 0;
   padding: 0.8rem;
