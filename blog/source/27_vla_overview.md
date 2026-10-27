@@ -4,6 +4,8 @@
 
 > 后续阅读顺序：[从原始模态到公共语义空间](31_multimodal_encoder_alignment_and_infonce.md) → [多模态表示的监督配方](32_three_consistency_supervision_paradigms.md) → [从对齐表示到 Policy 融合](19_attention_from_embeddings_to_action_expert.md) → [模仿学习与 Behavior Cloning](23_imitation_learning_basics.md)。
 
+> 强化学习分支：[灵巧手 RL 研究地图](43_dexterous_rl_overview.md) → [交互训练基础](44_rl_basics_and_training_loop.md) → [Teacher–Student 与部署](45_teacher_student_and_sim_to_real.md)。该分支补充奖励、探索和仿真交互，并区分学习算法与知识迁移框架。
+
 若已经能读懂 VLA 前向框图，可以沿 [动作生成](25_action_generation_families.md) → [π₀.₅结构](04_pi05_architecture.md) → [FAST 与 KI](42_fast_ki_and_pi_training.md) → [参数更新](05_train_state_jit_checkpoint.md) 继续。这条路线补齐“表示什么、由什么监督、梯度更新谁、部署运行什么”四个理解关口。
 
 ## 0. 先记住整条主线

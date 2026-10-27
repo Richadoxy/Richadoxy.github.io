@@ -167,6 +167,9 @@ POSTS = [
     Post("TOUCH11", "38_cgp_paper_reading_notes.md", "cgp-contact-grounded-policy", "CGP 精读：状态、触觉与接触一致的控制", "区分未来机器人状态、触觉 latent 和控制命令，拆解联合扩散、接触映射及 Visuotactile DP 对照。", "tactile", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("TOUCH12", "40_policy_memory_and_object_centric_tactile_state.md", "policy-memory-and-object-centric-tactile-state", "策略记忆：从历史观测到对象级触觉状态", "串联滑窗、GRU、缓存和 memory tokens，再理解遮挡中的身份 anchor、动态 slot 与接触归属。", "tactile", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("TOUCH13", "41_tactile_memory_experiment_design.md", "tactile-memory-experiment-design", "触觉记忆的实验设计：从假设到控制证据", "把数据、辅助监督、公平 baseline、遮挡扰动和联合成功指标连接成可验证的研究过程。", "tactile", published_en="October 2026", published_zh="2026.10", level="实践"),
+    Post("RL01", "43_dexterous_rl_overview.md", "dexterous-rl-overview", "灵巧手强化学习：研究范式与学习地图", "区分目标奖励、示范辅助、轨迹跟踪与训练框架，串联代表论文、路线时间线和常见研究贡献。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="入门"),
+    Post("RL02", "44_rl_basics_and_training_loop.md", "rl-basics-and-training-loop", "RL 基础：从交互回报到 PPO、SAC 与训练闭环", "理解状态、观测、回报、价值与策略更新，再把奖励、探索、课程、reset 和独立评测放进灵巧手实验。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="核心"),
+    Post("RL03", "45_teacher_student_and_sim_to_real.md", "teacher-student-and-sim-to-real", "Teacher–Student：策略蒸馏、特权信息与部署", "分开 teacher 的求解算法、student 的学习目标和部署观测，比较动作蒸馏、DAgger、非对称 actor–critic 与在线适应。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="进阶"),
 ]
 
 
@@ -220,6 +223,13 @@ CHAINS = {
         "label_zh": "触觉 VLA",
         "label_en": "Tactile VLA",
         "description": "连接触觉输入、跨模态表示、动作与闭环反馈，再进入 CGP、对象级记忆和实验设计；阅读地图提供基础与论文两条路线。",
+    },
+    "reinforcement": {
+        "title": "第七卷：强化学习与灵巧操作",
+        "title_en": "Part 7: Reinforcement Learning and Dexterity",
+        "label_zh": "强化学习",
+        "label_en": "RL",
+        "description": "从灵巧手研究地图进入 RL 交互训练，区分奖励与 tracking、PPO / SAC 和 teacher–student，再连接视觉触觉策略与真机部署。",
     },
 }
 
@@ -522,7 +532,7 @@ def index_page(reading_times: dict[str, int]) -> str:
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="从机器学习基础、模仿学习到 VLA、OpenPI 工程、异步部署与触觉机器人的渐进学习路径。" />
+    <meta name="description" content="从机器学习基础、模仿学习到 VLA、OpenPI 工程、异步部署、触觉机器人与灵巧手强化学习的渐进学习路径。" />
     <title>学习之路 | Xiyue Dong</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -556,8 +566,8 @@ def index_page(reading_times: dict[str, int]) -> str:
       </aside>
       <main class="archive-main" id="main-content">
         <header class="archive-intro">
-          <h2><span data-lang="en">Learning paths</span><span data-lang="zh">从模仿学习到 VLA</span></h2>
-          <p><span data-lang="en">Six connected paths through representations, action generation, VLA architectures, training, runtime, and tactile robotics. Follow PI0.5 into FAST/KI supervision and fine-tuning, or connect DP/ACT to tactile memory and experiments.</span><span data-lang="zh">按知识依赖分成六卷。从 F01 建立总地图，沿 IL04 理解 DP / ACT，再从 VLA02 的 PI0.5 结构进入 VLA03 的 FAST/KI 训练与微调；触觉阅读地图继续连接输入表示、历史记忆和实验验证。</span></p>
+          <h2><span data-lang="en">Learning paths</span><span data-lang="zh">模仿学习、VLA 与强化学习</span></h2>
+          <p><span data-lang="en">Seven connected paths through representations, imitation learning, VLA architectures, engineering, runtime, tactile robotics, and reinforcement learning. Follow PI0.5 into FAST/KI training, or start with RL01 to connect dexterous manipulation, rewards, tracking, and teacher–student deployment.</span><span data-lang="zh">按知识依赖分成七卷。从 F01 建立多模态地图，沿 IL04 理解 DP / ACT，再从 VLA02 进入 FAST/KI 训练；触觉路线连接输入、记忆和实验。新增 RL01 从灵巧手范式进入奖励、tracking、交互训练与 teacher–student 部署。</span></p>
         </header>
         <div class="series-grid">{series_cards}</div>
         <div class="archive-filters" role="group" aria-label="按知识链筛选文章">

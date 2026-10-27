@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="理解状态、观测、回报、价值与策略更新，再把奖励、探索、课程、reset 和独立评测放进灵巧手实验。" />
+    <title>RL 基础：从交互回报到 PPO、SAC 与训练闭环 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 从“预测专家动作”到“根据后果改进动作”</a></li>
+<li><a href="#2-mdppomdp">2. MDP、POMDP 与机器人观测</a></li>
+<li><a href="#3-rewardreturnvalue-advantage">3. Reward、return、value 和 advantage</a></li>
+<li><a href="#4-actor-critic">4. Actor 与 critic 的分工</a></li>
+<li><a href="#5-pposac-model-based">5. PPO、SAC 与 model-based 方法</a><ul>
+<li><a href="#51-ppo">5.1 PPO：用当前策略附近的数据更新策略</a></li>
+<li><a href="#52-sac">5.2 SAC：复用经验并加入熵目标</a></li>
+<li><a href="#53-model-based">5.3 Model-based：显式利用动力学预测</a></li>
+<li><a href="#54">5.4 几组互相独立的分类</a></li>
+</ul>
+</li>
+<li><a href="#6-reward">6. Reward 从哪里来</a><ul>
+<li><a href="#61">6.1 目标奖励</a></li>
+<li><a href="#62-tracking">6.2 Tracking 奖励</a></li>
+<li><a href="#63">6.3 模仿损失不是即时奖励</a></li>
+</ul>
+</li>
+<li><a href="#7-curriculum-reset">7. 探索、curriculum 与 reset 都会改变学到的技能</a></li>
+<li><a href="#8">8. 一次训练实验应怎样组织</a></li>
+<li><a href="#9">9. 读训练结果时常见的混淆</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL02</p>
+          <h1>RL 基础：从交互回报到 PPO、SAC 与训练闭环</h1>
+          <p class="article-meta"><span data-lang="en">核心 · October 2026 · 8 min read</span><span data-lang="zh">核心 · 2026.10 · 约 8 分钟阅读</span></p>
+          <p class="article-deck">理解状态、观测、回报、价值与策略更新，再把奖励、探索、课程、reset 和独立评测放进灵巧手实验。</p>
+          <div class="article-content">
+            <blockquote>
+<p>阅读位置：<a href="dexterous-rl-overview.html">灵巧手 RL 研究地图</a> → 本文 → <a href="teacher-student-and-sim-to-real.html">Teacher–Student 与部署</a>。本章建立读论文和设计实验需要的基础，不展开完整算法推导。</p>
+</blockquote>
+<h2 id="1">1. 从“预测专家动作”到“根据后果改进动作”</h2>
+<p>Behavior Cloning 使用专家提供的观测—动作配对。RL 则让策略与环境交互，根据动作造成的后果获得奖励，再更新策略。</p>
+<pre><code class="language-text">观测 o_t → actor → 动作 a_t → 环境
+   ↑                          ↓
+   └──── 下一观测 o_(t+1)、奖励 r_t、终止信息
+
+收集的交互经验 → 估计回报 / 价值 → 更新 actor
+</code></pre>
+<p>使用示范初始化、参考轨迹或已有控制器，不会自动改变后续 RL 更新的性质。反过来，student 仅通过专家动作监督训练，即使 teacher 来自 RL，这个 student 阶段仍属于模仿学习。</p>
+<h2 id="2-mdppomdp">2. MDP、POMDP 与机器人观测</h2>
+<p>完全可观测的 Markov 决策过程通常写为：</p>
+<p>\[
+\mathcal M=(\mathcal S,\mathcal A,P,r,\rho_0,\gamma).
+\]</p>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>含义</th>
+<th>灵巧手例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>\(s_t\)</td>
+<td>环境状态</td>
+<td>手部位置速度、物体状态、影响转移的物理量</td>
+</tr>
+<tr>
+<td>\(a_t\)</td>
+<td>动作</td>
+<td>关节位置目标、速度、力矩或控制器参数</td>
+</tr>
+<tr>
+<td>\(P(s_{t+1}\mid s_t,a_t)\)</td>
+<td>状态转移</td>
+<td>执行器与接触动力学</td>
+</tr>
+<tr>
+<td>\(r(s_t,a_t,s_{t+1})\)</td>
+<td>奖励</td>
+<td>目标进展、稳定保持、掉落代价</td>
+</tr>
+<tr>
+<td>\(\rho_0\)</td>
+<td>初始状态分布</td>
+<td>物体位置、初始抓持和任务阶段</td>
+</tr>
+<tr>
+<td>\(\gamma\)</td>
+<td>折扣因子</td>
+<td>对未来奖励的相对权重</td>
+</tr>
+</tbody>
+</table>
+<p>真实机器人只能获得观测 \(o_t\)。例如相机看不到掌内物体，关节编码器不能直接测出摩擦系数。这时更适合用部分可观测决策过程理解策略：</p>
+<p>\[
+a_t\sim\pi_\theta(a_t\mid h_t,g),\qquad
+h_t=f(o_{0:t},a_{0:t-1}),
+\]</p>
+<p>其中 \(h_t\) 是历史或记忆，\(g\) 是任务目标。历史可以帮助推断隐藏状态，但不保证所有隐藏物理量都可辨识。记忆结构见 <a href="policy-memory-and-object-centric-tactile-state.html">策略记忆与对象级触觉状态</a>。</p>
+<h2 id="3-rewardreturnvalue-advantage">3. Reward、return、value 和 advantage</h2>
+<p>这些量的职责不同：</p>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>在回答什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reward \(r_t\)</td>
+<td>这一步产生了什么即时信号？</td>
+</tr>
+<tr>
+<td>Return \(G_t\)</td>
+<td>从现在起累计获得多少折扣奖励？</td>
+</tr>
+<tr>
+<td>State value \(V^\pi(s)\)</td>
+<td>在状态 \(s\) 按策略继续执行，预期回报是多少？</td>
+</tr>
+<tr>
+<td>Action value \(Q^\pi(s,a)\)</td>
+<td>先执行动作 \(a\)，之后按策略执行，预期回报是多少？</td>
+</tr>
+<tr>
+<td>Advantage \(A^\pi(s,a)\)</td>
+<td>这个动作相对策略在该状态下的平均水平好多少？</td>
+</tr>
+</tbody>
+</table>
+<p>在完全可观测记号下：</p>
+<p>\[
+G_t=\sum_{k=0}^{T-t-1}\gamma^k r_{t+k},\qquad
+J(\theta)=\mathbb E_{\tau\sim\pi_\theta}[G_0],
+\]</p>
+<p>\[
+V^\pi(s)=\mathbb E[G_t\mid s_t=s],\qquad
+A^\pi(s,a)=Q^\pi(s,a)-V^\pi(s).
+\]</p>
+<p>例如，某一步松开一根手指可能暂时降低接触数，却能腾出手指完成换指。只最大化当步接触数，可能永远学不到这个行为；return 用于评价动作的后续后果。奖励定义若偏离任务，长期优化仍可能得到错误行为。</p>
+<h2 id="4-actor-critic">4. Actor 与 critic 的分工</h2>
+<p>Actor 输出动作或动作分布；critic 估计价值，用于训练。一个常见的 value 学习目标包含：</p>
+<p>\[
+y_t=r_t+\gamma(1-d_t)V_{\bar\psi}(s_{t+1}),
+\qquad
+\mathcal L_V=(V_\psi(s_t)-y_t)^2.
+\]</p>
+<p>这里仅示意 bootstrap 的含义，具体算法的目标不同；\(d_t\) 指真正的终止。若只是采样长度到上限，且任务在定义上仍会继续，就不应无条件把未来价值设为零。</p>
+<p>Critic 的误差和 advantage 帮助优化 actor，但 critic 通常不直接给出“正确动作标签”。因此 actor–critic 不等于动作模仿意义下的 teacher–student。非对称观测的进一步区分见 <a href="teacher-student-and-sim-to-real.html">RL03</a>。</p>
+<h2 id="5-pposac-model-based">5. PPO、SAC 与 model-based 方法</h2>
+<h3 id="51-ppo">5.1 PPO：用当前策略附近的数据更新策略</h3>
+<p>PPO 收集当前策略的 rollout，再对这批数据做多轮小批量更新。常见的 clipped objective 用新旧策略概率比和 advantage 构造更新目标，限制某些过大的有利方向更新；它不等于对所有状态提供严格的策略距离保证。</p>
+<p>对灵巧手而言，PPO 可以优化目标奖励，也可以优化 tracking 奖励，还可以用于训练 teacher 或直接训练部署 actor。它并不规定这些外层接口。<a href="https://arxiv.org/abs/1707.06347">PPO 原论文</a></p>
+<h3 id="52-sac">5.2 SAC：复用经验并加入熵目标</h3>
+<p>SAC 是 off-policy actor–critic 方法，可从 replay buffer 采样历史经验进行更新。它在任务回报之外加入策略熵目标，用来平衡收益与探索。</p>
+<p>经验复用对昂贵交互有吸引力，但是否适合某个灵巧手任务，仍取决于数据覆盖、价值估计、奖励和实现。SAC 也可以训练 teacher；不能仅凭“off-policy”推断它一定优于 PPO。<a href="https://arxiv.org/abs/1801.01290">SAC 原论文</a></p>
+<h3 id="53-model-based">5.3 Model-based：显式利用动力学预测</h3>
+<p>这类方法学习或使用环境转移模型，生成预测、规划动作或辅助策略优化。MPC 每次规划未来一段动作，只执行前缀，再根据新状态重新规划。</p>
+<p><a href="https://arxiv.org/abs/1909.11652">PDDM</a> 展示了学习动力学结合在线 MPC 的灵巧操作路线。接触切换会增加建模难度；采用模型需要评价预测误差如何影响实际控制。</p>
+<h3 id="54">5.4 几组互相独立的分类</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>取值与含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>On-policy / off-policy</td>
+<td>更新是否依赖当前策略附近的数据；是否能有效利用其他行为策略的数据</td>
+</tr>
+<tr>
+<td>Online / offline RL</td>
+<td>训练阶段是否继续与环境交互获取新数据</td>
+</tr>
+<tr>
+<td>Model-free / model-based</td>
+<td>算法是否显式使用环境转移模型进行学习或决策</td>
+</tr>
+<tr>
+<td>Simulation / real world</td>
+<td>交互发生在哪里</td>
+</tr>
+<tr>
+<td>Teacher / student</td>
+<td>模型在知识迁移流程中承担什么角色</td>
+</tr>
+</tbody>
+</table>
+<p>On-policy 不表示只在一批数据上更新一次；off-policy 也不表示只使用固定离线数据。直接把普通 SAC 放到固定数据集上训练，不能自动获得可靠的 offline RL，因为未覆盖动作的价值估计仍可能出错。</p>
+<h2 id="6-reward">6. Reward 从哪里来</h2>
+<h3 id="61">6.1 目标奖励</h3>
+<p>可以根据物体目标姿态误差、抬升高度、开合角度或任务完成情况构造奖励。Dense reward 提供中间进展，sparse reward 更多依赖最终结果。</p>
+<p>手工设计的 dense reward 可能被策略利用。例如只奖励高度，可能鼓励抛起物体；只奖励接触数，可能鼓励夹死物体。成功判定需要独立检查目标、保持时间和失败条件。</p>
+<h3 id="62-tracking">6.2 Tracking 奖励</h3>
+<p>给定参考 \(\hat{s}_{\phi_t}\)，一个示意项可以写为：</p>
+<p>\[
+r_{\mathrm{track},t}=\exp(-\alpha\,d(s_t,\hat{s}_{\phi_t})).
+\]</p>
+<p>\(d\) 可比较物体位姿、指尖位置等；旋转应使用适合旋转空间的距离，不能直接把所有量混成未归一化的欧氏距离。参考进度 \(\phi_t\) 如何推进，也是方法的一部分。</p>
+<p>Tracking 提供稠密任务信号，但若参考在机器人上不可实现，增加训练量不一定解决问题。<a href="https://proceedings.mlr.press/v305/lum25a.html">Human2Sim2Robot</a> 的物体中心目标与 <a href="https://meowuu7.github.io/DexTrack/">DexTrack</a> 的通用跟踪训练提供了不同处理思路。</p>
+<h3 id="63">6.3 模仿损失不是即时奖励</h3>
+<p>一个组合训练目标可以示意为：</p>
+<p>\[
+\mathcal L(\theta)=-J_{\mathrm{RL}}(\theta)
+                +\lambda\mathcal L_{\mathrm{imitation}}(\theta).
+\]</p>
+<p>RL 项来自交互回报，模仿项来自专家标签。也可以把示范相似度设计为 reward，但这与直接增加动作监督不是同一种梯度路径。阅读时需要确认实际实现。</p>
+<h2 id="7-curriculum-reset">7. 探索、curriculum 与 reset 都会改变学到的技能</h2>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>改变什么</th>
+<th>灵巧手例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>动作探索</td>
+<td>采样哪些动作</td>
+<td>在策略分布或受约束技能空间中探索</td>
+</tr>
+<tr>
+<td>初始状态分布</td>
+<td>从哪里开始尝试</td>
+<td>从已握住物体、桌面物体或示范中间阶段开始</td>
+</tr>
+<tr>
+<td>课程学习</td>
+<td>何时提高难度</td>
+<td>增加目标角度、物体差异、扰动或任务长度</td>
+</tr>
+<tr>
+<td>辅助控制</td>
+<td>训练早期谁承担部分物理任务</td>
+<td>逐渐撤掉物体支撑或虚拟驱动力</td>
+</tr>
+<tr>
+<td>失败／困难样本采样</td>
+<td>训练资源投向哪里</td>
+<td>更多采样尚未掌握的换指阶段</td>
+</tr>
+</tbody>
+</table>
+<p>从“已握住物体”开始学旋转，不等于学会从桌面抓起再旋转。使用示范中间状态训练，也需要在完整 episode 中检验阶段衔接。</p>
+<p><a href="https://arxiv.org/abs/2505.24853">DexMachina</a> 用逐渐减弱的虚拟物体控制构建课程；<a href="https://arxiv.org/abs/2610.19089">DexMimic</a> 的 2026 年预印本研究 value 引导的 reset 分配。这些创新改变探索条件，不要求发明新的 PPO 更新公式。</p>
+<h2 id="8">8. 一次训练实验应怎样组织</h2>
+<p>下面以“将已抓住物体转到目标姿态并保持”为示例，不包含从桌面获取物体的能力。</p>
+<ol>
+<li><strong>定义独立成功条件。</strong> 物体姿态进入容差并保持指定时间，且没有掉落；训练 reward 与这个指标分开记录。</li>
+<li><strong>固定观测和动作合同。</strong> Actor 是否读取真值？动作是绝对位置还是增量？目标更新频率与低层控制频率分别是多少？</li>
+<li><strong>检查物理与 reset。</strong> 初始抓持是否稳定、接触几何是否合理、关节限制是否正确？</li>
+<li><strong>建立小规模 baseline。</strong> 先验证奖励、终止和基本可学性，再扩大随机化和物体集合。</li>
+<li><strong>记录资源和失败。</strong> 同时报告环境交互量、并行环境数、硬件与墙钟时间，不只报告训练小时数。</li>
+<li><strong>在冻结策略下评测。</strong> 区分训练物体、未见物体、不同物理参数和外部扰动，报告重复试验与波动。</li>
+<li><strong>验证部署观测。</strong> 若训练成功依赖特权信息，再进入 student 或感知适配阶段。</li>
+</ol>
+<p>动作语义和时序的基础见 <a href="robot-data-action-semantics.html">机器人数据与 Action</a>。位置目标也会通过底层控制器产生力，不能把“输出位置”理解成“与力和接触无关”。</p>
+<h2 id="9">9. 读训练结果时常见的混淆</h2>
+<table>
+<thead>
+<tr>
+<th>看到的结果</th>
+<th>能证明什么，还不能证明什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reward 上升</td>
+<td>指定奖励被优化；需要独立任务成功指标</td>
+</tr>
+<tr>
+<td>大量并行仿真很快收敛</td>
+<td>墙钟时间较短；环境交互总量可能仍很大</td>
+</tr>
+<tr>
+<td>Teacher 成功率高</td>
+<td>特权观测下有能力；不保证 student 可恢复同样信息</td>
+</tr>
+<tr>
+<td>Tracking error 较小</td>
+<td>接近参考；还需检查功能完成、物体保持和接触可行性</td>
+</tr>
+<tr>
+<td>随机化后零样本部署</td>
+<td>在所测试真机条件下可迁移；不自动覆盖所有手型和对象</td>
+</tr>
+<tr>
+<td>Student 动作 MSE 很低</td>
+<td>在该数据分布上接近 teacher；还需检查自主 rollout 分布</td>
+</tr>
+</tbody>
+</table>
+<p>继续阅读 <a href="teacher-student-and-sim-to-real.html">Teacher–Student：策略蒸馏、特权信息与部署</a>，把“策略已经学会”连接到“部署时能观察并执行”。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="dexterous-rl-overview.html">← RL01 · 灵巧手强化学习：研究范式与学习地图</a>
+            <a href="teacher-student-and-sim-to-real.html">RL03 · Teacher–Student：策略蒸馏、特权信息与部署 →</a>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

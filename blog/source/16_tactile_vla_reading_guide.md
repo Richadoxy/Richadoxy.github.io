@@ -41,6 +41,8 @@
 
 这条分支也与已有基础文章相连：[表示与编码](31_multimodal_encoder_alignment_and_infonce.md) 解释输入怎样变成特征，[监督配方](32_three_consistency_supervision_paradigms.md) 解释特征学什么，[Policy 融合](19_attention_from_embeddings_to_action_expert.md) 解释这些特征怎样影响动作。
 
+若研究灵巧手交互训练或用仿真专家生成数据，可接着进入 [RL 研究地图](43_dexterous_rl_overview.md) 与 [Teacher–Student 专题](45_teacher_student_and_sim_to_real.md)。后者区分特权 teacher、真实触觉 student 和真机部署条件。
+
 ### 知识之间的四条连接
 
 - **表示到动作：** 触觉重建和对齐塑造输入特征；动作监督决定特征是否服务于控制。

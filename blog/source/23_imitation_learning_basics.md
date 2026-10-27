@@ -2,6 +2,8 @@
 
 模仿学习的目标是让策略从示范中学习行为。它是理解 VLA 动作训练的直接起点。
 
+与交互学习的联系见 [RL 基础与训练闭环](44_rl_basics_and_training_loop.md)；若示范来自 RL 专家，再读 [Teacher–Student 与部署](45_teacher_student_and_sim_to_real.md)，区分 teacher 的求解算法和 student 的模仿目标。
+
 ## 1. 从示范到策略
 
 一条机器人示范通常包含时间序列：

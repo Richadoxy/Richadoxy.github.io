@@ -48,6 +48,8 @@ To explicitly refresh matching engineering notes and Draw.io diagrams from the e
 .blog-build-env/bin/python scripts/build_blog.py --sync-upstream
 ```
 
-The archive is organized into six dependency-first series: foundations, imitation learning, VLA architectures, engineering, runtime/deployment, and tactile VLA. Article codes such as `F01`, `IL01`, and `VLA01` express the reading path while legacy foundation URLs redirect to their consolidated replacements.
+The archive is organized into seven dependency-first series: foundations, imitation learning, VLA architectures, engineering, runtime/deployment, tactile VLA, and reinforcement learning for dexterous manipulation. Article codes such as `F01`, `IL01`, `VLA01`, and `RL01` express the reading path while legacy foundation URLs redirect to their consolidated replacements.
 
 The PI0.5 path separates forward architecture (`VLA02`) from FAST/KI training and fine-tuning (`VLA03`), then connects to the engineering notes. Official openpi code references in the training article are pinned to a commit; BrainCo-IL-specific configuration examples remain identified as project extensions.
+
+The RL path starts with a research map and paper timeline (`RL01`), introduces interaction, rewards, PPO/SAC, and training evaluation (`RL02`), then explains teacher–student distillation and sim-to-real deployment (`RL03`). It distinguishes the learning algorithm from the reward source, policy architecture, and knowledge-transfer framework. Markdown sources are `43_dexterous_rl_overview.md` through `45_teacher_student_and_sim_to_real.md`.
