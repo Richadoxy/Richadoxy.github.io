@@ -334,6 +334,16 @@
   margin: 0.7rem 0;
 }
 
+.article-content > p > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 1.4rem 0 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
 .article-content code {
   padding: 0.08rem 0.28rem;
   border-radius: 3px;

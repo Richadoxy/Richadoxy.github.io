@@ -167,9 +167,10 @@ POSTS = [
     Post("TOUCH11", "38_cgp_paper_reading_notes.md", "cgp-contact-grounded-policy", "CGP 精读：状态、触觉与接触一致的控制", "区分未来机器人状态、触觉 latent 和控制命令，拆解联合扩散、接触映射及 Visuotactile DP 对照。", "tactile", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("TOUCH12", "40_policy_memory_and_object_centric_tactile_state.md", "policy-memory-and-object-centric-tactile-state", "策略记忆：从历史观测到对象级触觉状态", "串联滑窗、GRU、缓存和 memory tokens，再理解遮挡中的身份 anchor、动态 slot 与接触归属。", "tactile", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("TOUCH13", "41_tactile_memory_experiment_design.md", "tactile-memory-experiment-design", "触觉记忆的实验设计：从假设到控制证据", "把数据、辅助监督、公平 baseline、遮挡扰动和联合成功指标连接成可验证的研究过程。", "tactile", published_en="October 2026", published_zh="2026.10", level="实践"),
-    Post("RL01", "43_dexterous_rl_overview.md", "dexterous-rl-overview", "灵巧手强化学习：研究范式与学习地图", "区分目标奖励、示范辅助、轨迹跟踪与训练框架，串联代表论文、路线时间线和常见研究贡献。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="入门"),
-    Post("RL02", "44_rl_basics_and_training_loop.md", "rl-basics-and-training-loop", "RL 基础：从交互回报到 PPO、SAC 与训练闭环", "理解状态、观测、回报、价值与策略更新，再把奖励、探索、课程、reset 和独立评测放进灵巧手实验。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="核心"),
-    Post("RL03", "45_teacher_student_and_sim_to_real.md", "teacher-student-and-sim-to-real", "Teacher–Student：策略蒸馏、特权信息与部署", "分开 teacher 的求解算法、student 的学习目标和部署观测，比较动作蒸馏、DAgger、非对称 actor–critic 与在线适应。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="进阶"),
+    Post("RL01", "43_dexterous_rl_overview.md", "dexterous-rl-overview", "灵巧手强化学习：研究范式与学习地图", "从知识树区分学习信号、网络、PPO 与训练框架，再连接灵巧手路线、实验设计和 HORA 精讲。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="入门"),
+    Post("RL02", "44_rl_basics_and_training_loop.md", "rl-basics-and-training-loop", "RL 基础：从 Actor–Critic 到 PPO 的数据、目标与梯度", "用网络图、数值例子和逐段伪代码连接 reward、return、价值预测、GAE 与 PPO，明确训练目标和梯度边界。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="核心"),
+    Post("RL03", "45_teacher_student_and_sim_to_real.md", "teacher-student-and-sim-to-real", "Teacher–Student：策略蒸馏、特权信息与部署", "从特权输入与监督目标组织知识迁移，区分动作、分布与 latent 蒸馏，再连接在线适应和真机部署。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="进阶"),
+    Post("RL04", "46_hora_paper_walkthrough.md", "hora-paper-walkthrough", "HORA 精讲：从特权 PPO 策略到本体感知在线适应", "将 RL 通识落实到 HORA 的三阶段网络、历史适应、控制接口与对照实验，区分论文设计和公开代码实现。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="精读"),
 ]
 
 
@@ -229,7 +230,7 @@ CHAINS = {
         "title_en": "Part 7: Reinforcement Learning and Dexterity",
         "label_zh": "强化学习",
         "label_en": "RL",
-        "description": "从灵巧手研究地图进入 RL 交互训练，区分奖励与 tracking、PPO / SAC 和 teacher–student，再连接视觉触觉策略与真机部署。",
+        "description": "沿研究地图、Actor–Critic 与 PPO 通识、Teacher–Student 框架进入 HORA 精讲，用符号、网络图和实验建立从交互学习到真机适应的知识链。",
     },
 }
 
@@ -298,6 +299,9 @@ def rewrite_links(text: str, posts_by_source: dict[str, Post]) -> str:
             target = PAPER_LINKS[normalized_target]
         elif target in posts_by_source:
             target = f"{posts_by_source[target].slug}.html"
+        elif target.startswith("../assets/"):
+            # Markdown lives in blog/source; generated pages live in blog.
+            target = target.removeprefix("../")
         elif target.endswith(".drawio"):
             target = f"assets/diagrams/{Path(target).name}"
         elif target.startswith("../../"):
@@ -567,7 +571,7 @@ def index_page(reading_times: dict[str, int]) -> str:
       <main class="archive-main" id="main-content">
         <header class="archive-intro">
           <h2><span data-lang="en">Learning paths</span><span data-lang="zh">模仿学习、VLA 与强化学习</span></h2>
-          <p><span data-lang="en">Seven connected paths through representations, imitation learning, VLA architectures, engineering, runtime, tactile robotics, and reinforcement learning. Follow PI0.5 into FAST/KI training, or start with RL01 to connect dexterous manipulation, rewards, tracking, and teacher–student deployment.</span><span data-lang="zh">按知识依赖分成七卷。从 F01 建立多模态地图，沿 IL04 理解 DP / ACT，再从 VLA02 进入 FAST/KI 训练；触觉路线连接输入、记忆和实验。新增 RL01 从灵巧手范式进入奖励、tracking、交互训练与 teacher–student 部署。</span></p>
+          <p><span data-lang="en">Seven connected paths through representations, imitation learning, VLA architectures, engineering, runtime, tactile robotics, and reinforcement learning. The RL path connects actor–critic networks, PPO training, teacher–student transfer, and a detailed HORA walkthrough.</span><span data-lang="zh">按知识依赖分成七卷。从多模态表示进入模仿学习、VLA、工程与触觉机器人；RL 路线依次展开 Actor–Critic、PPO 训练闭环、Teacher–Student 与 HORA 精讲。</span></p>
         </header>
         <div class="series-grid">{series_cards}</div>
         <div class="archive-filters" role="group" aria-label="按知识链筛选文章">

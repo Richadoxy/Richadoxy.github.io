@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="将 RL 通识落实到 HORA 的三阶段网络、历史适应、控制接口与对照实验，区分论文设计和公开代码实现。" />
+    <title>HORA 精讲：从特权 PPO 策略到本体感知在线适应 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1">1. 从任务确定研究路线</a></li>
+<li><a href="#2">2. 符号、信息来源与维度</a></li>
+<li><a href="#3">3. 三个阶段对应三条不同的信息流</a></li>
+<li><a href="#4-ppo">4. 第一阶段：PPO 同时塑造环境表示与控制策略</a><ul>
+<li><a href="#41">4.1 物体信息编码器并不处理图像</a></li>
+<li><a href="#42-actor-critic-mlp">4.2 Actor 和 Critic 共享 MLP 骨干</a></li>
+<li><a href="#43-ppo">4.3 PPO 在网络之外组织采样和更新</a></li>
+<li><a href="#44-reward">4.4 Reward 与初始抓握共同决定可学性</a></li>
+</ul>
+</li>
+<li><a href="#5-latent">5. 第二阶段：用历史估计控制所需的 latent</a><ul>
+<li><a href="#51">5.1 历史为何能提供信息</a></li>
+<li><a href="#52">5.2 历史编码器的张量变化</a></li>
+<li><a href="#53">5.3 固定控制器，改变标签来源与梯度路径</a></li>
+</ul>
+</li>
+<li><a href="#6">6. 部署：固定参数下的闭环适应</a></li>
+<li><a href="#7">7. 对照实验：删除、替换、停止更新与性能参照</a><ul>
+<li><a href="#71-dr-noadapt">7.1 DR 是方法路线，NoAdapt 是机制消融</a></li>
+<li><a href="#72-sysid">7.2 SysID 的已知边界</a></li>
+<li><a href="#73-noadapt-latent">7.3 NoAdapt 固定的是 latent</a></li>
+</ul>
+</li>
+<li><a href="#8">8. 实验协议：分布变化与仿真迁移是两条轴</a><ul>
+<li><a href="#81-table-1">8.1 Table 1 的两栏都在仿真中</a></li>
+<li><a href="#82-figure-34">8.2 Figure 3、4 是真机对照</a></li>
+<li><a href="#83">8.3 指标与单位</a></li>
+<li><a href="#84">8.4 主要结果支持哪条设计</a></li>
+<li><a href="#85">8.5 附录实验检验训练与历史设计</a></li>
+</ul>
+</li>
+<li><a href="#9">9. 从结果定位贡献与局限</a></li>
+<li><a href="#10">10. 从论文图走到源码</a></li>
+<li><a href="#11">11. 后续阅读的两个方向</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL04</p>
+          <h1>HORA 精讲：从特权 PPO 策略到本体感知在线适应</h1>
+          <p class="article-meta"><span data-lang="en">精读 · October 2026 · 20 min read</span><span data-lang="zh">精读 · 2026.10 · 约 20 分钟阅读</span></p>
+          <p class="article-deck">将 RL 通识落实到 HORA 的三阶段网络、历史适应、控制接口与对照实验，区分论文设计和公开代码实现。</p>
+          <div class="article-content">
+            <blockquote>
+<p>阅读位置：<a href="dexterous-rl-overview.html">灵巧手 RL 研究地图</a> → <a href="rl-basics-and-training-loop.html">RL 基础：网络、回报与 PPO</a> → <a href="teacher-student-and-sim-to-real.html">Teacher–Student 与部署</a> → 本文。通识章节解释 Actor、Critic、GAE 和 PPO 如何工作；这里将这些概念落实到一篇论文的输入、网络、训练阶段与证据上。</p>
+<p>论文：Haozhi Qi 等，<em>In-Hand Object Rotation via Rapid Motor Adaptation</em>，CoRL 2022。本文结合<a href="https://arxiv.org/abs/2210.04887">论文</a>、<a href="https://haozhi.io/hora/">项目页</a>与<a href="https://github.com/HaozhiQi/hora/tree/v0.0.1">官方代码 v0.0.1</a>，于 2026-10-28 核对。下面明确区分论文的概念描述和公开实现细节；固定版本有助于定位代码，不代表所有实验数值都能逐项复现。</p>
+</blockquote>
+<h2 id="1">1. 从任务确定研究路线</h2>
+<p>HORA 研究的是：物体已经被四指 Allegro Hand 稳定抓住后，利用指尖持续绕指定轴向旋转，并在物体尺寸、质量、形状等变化时保持操作。主体任务是手内持续旋转，不包含从桌面发现、接近并抓起物体的完整流程，也不能直接等同于任意目标姿态的通用重定向。</p>
+<p>它属于以下组合路线：</p>
+<table>
+<thead>
+<tr>
+<th>层次</th>
+<th>HORA 的具体选择</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>任务</td>
+<td>从初始稳定抓握开始的手内旋转</td>
+</tr>
+<tr>
+<td>行为学习信号</td>
+<td>旋转进展与稳定性相关的任务奖励</td>
+</tr>
+<tr>
+<td>第一阶段算法</td>
+<td>PPO，通过仿真交互学习特权策略</td>
+</tr>
+<tr>
+<td>策略结构</td>
+<td>物体信息 MLP、共享控制 MLP、Actor／Critic 输出头</td>
+</tr>
+<tr>
+<td>第二阶段目标</td>
+<td>从运动历史预测控制所需的环境 latent</td>
+</tr>
+<tr>
+<td>部署信息</td>
+<td>关节位置和历史控制指令；不依赖视觉或触觉传感器输入</td>
+</tr>
+<tr>
+<td>泛化机制</td>
+<td>训练时域随机化，加上执行时持续更新 latent</td>
+</tr>
+</tbody>
+</table>
+<p>训练不需要一条人类专家动作轨迹。奖励规定旋转和稳定操作的目标，策略自己寻找换指动作。第二阶段虽然有监督标签，但标签是第一阶段生成的 latent，不是逐帧专家动作。</p>
+<p>HORA 继承了腿足机器人 <a href="https://arxiv.org/abs/2107.04034">RMA</a> 的快速适应思路：先学习由特权信息条件化的控制器，再通过历史估计这些信息的控制表征。论文的价值在于将这条路线落实到接触频繁变化的手内操作，并通过奖励、训练物体、初始抓握及真实部署展示其可行性。<a href="https://haozhi.io/hora/">项目介绍</a></p>
+<h2 id="2">2. 符号、信息来源与维度</h2>
+<p>同一个“动作”在论文叙述和控制代码中可能指不同层级。本文用 \(a_t\) 表示策略的原始动作输出，用 \(u_t\) 表示发送给底层控制器的关节位置目标，避免把增量动作与累积目标混在一起。</p>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>本文含义</th>
+<th>维度或类型</th>
+<th>来源与用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>\(t\)</td>
+<td>当前控制时刻</td>
+<td>整数索引</td>
+<td>区分当前输入、历史与输出</td>
+</tr>
+<tr>
+<td>\(q_t\)</td>
+<td>16 个关节的位置</td>
+<td>16 维</td>
+<td>机器人本体感知；实现对关节读数做归一化</td>
+</tr>
+<tr>
+<td>\(u_{t-1}\)</td>
+<td>上一次发出的关节位置目标</td>
+<td>16 维</td>
+<td>控制命令记录</td>
+</tr>
+<tr>
+<td>\(o_t\)</td>
+<td>最近 3 步关节位置与控制指令组成的短历史</td>
+<td>96 维</td>
+<td>每步 \(16+16\) 维，供控制策略使用</td>
+</tr>
+<tr>
+<td>\(H_t\)</td>
+<td>最近 30 步的同类信息</td>
+<td>\(30\times32\)</td>
+<td>供历史适应模块使用</td>
+</tr>
+<tr>
+<td>\(e_t\)</td>
+<td>仿真提供的物体特权信息</td>
+<td>9 维</td>
+<td>位置 3、尺寸缩放 1、质量 1、摩擦 1、质心偏移 3</td>
+</tr>
+<tr>
+<td>\(\mu\)</td>
+<td>物体信息编码器</td>
+<td>MLP</td>
+<td>将 \(e_t\) 转成环境表征</td>
+</tr>
+<tr>
+<td>\(z_t\)</td>
+<td>特权信息编码后的 latent，论文称 extrinsics</td>
+<td>8 维</td>
+<td>第一阶段控制条件、第二阶段监督目标</td>
+</tr>
+<tr>
+<td>\(\phi\)</td>
+<td>历史适应模块</td>
+<td>MLP + 时间卷积</td>
+<td>从 \(H_t\) 推断环境表征</td>
+</tr>
+<tr>
+<td>\(\hat z_t\)</td>
+<td>由历史估计的 latent</td>
+<td>8 维</td>
+<td>第二阶段执行和真机部署时使用；帽子表示估计值</td>
+</tr>
+<tr>
+<td>\(\pi\)</td>
+<td>控制策略／Actor</td>
+<td>条件动作分布</td>
+<td>根据 \(o_t\) 和 latent 选择动作</td>
+</tr>
+<tr>
+<td>\(m_t\)、\(\sigma\)</td>
+<td>高斯动作分布的均值与标准差</td>
+<td>各 16 维</td>
+<td>前者依赖输入；该版本的后者是独立可学习参数</td>
+</tr>
+<tr>
+<td>\(a_t\)</td>
+<td>原始策略动作</td>
+<td>16 维</td>
+<td>训练时采样，推理时通常取均值</td>
+</tr>
+<tr>
+<td>\(V\)</td>
+<td>Critic 的状态价值预测</td>
+<td>一个标量</td>
+<td>第一阶段估计回报，辅助 PPO 更新</td>
+</tr>
+</tbody>
+</table>
+<p>论文使用 \(o_t=(q_{t-2:t},a_{t-3:t-1})\) 表达短历史。阅读实现时，<code>compute_observations()</code> 和部署代码保存的是关节读数与 <code>cur_targets</code>／历史位置目标。本文的 \(u\) 特意将这类目标与原始高斯采样动作 \(a\) 分开。<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/tasks/allegro_hand_hora.py">观测与控制实现</a>、<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/deploy/deploy.py">部署实现</a></p>
+<p>\(e_t\) 也不全是固定物理常数：物体位置会随时间变化。\(z_t\) 的每一维没有预先指定必须代表质量或摩擦；它由控制任务的训练目标塑造。预测 \(z_t\) 成功，不意味着恢复了每个物理参数的精确值。</p>
+<h2 id="3">3. 三个阶段对应三条不同的信息流</h2>
+<p><img alt="HORA 的特权策略训练、历史适应学习和真机部署：实线为前向数据流，虚线为参数更新；第二阶段只训练历史适应模块" src="assets/figures/hora-training-deployment.svg" /></p>
+<p><a href="assets/figures/hora-training-deployment.svg">打开三阶段矢量图</a>。</p>
+<p>图中的三行应分开阅读。第一阶段先学会控制；第二阶段学习如何从可获得的历史构造控制条件；第三阶段只运行部署所需的前向计算。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>控制策略使用的 latent</th>
+<th>主要更新参数</th>
+<th>监督来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>特权策略学习</td>
+<td>\(z_t=\mu(e_t)\)</td>
+<td>编码器、共享骨干、Actor、Critic 和动作分布参数</td>
+<td>环境奖励，经 GAE／PPO 构造训练目标</td>
+</tr>
+<tr>
+<td>历史适应学习</td>
+<td>\(\hat z_t=\phi(H_t)\)</td>
+<td>仅 \(\phi\)</td>
+<td>固定编码器给出的 \(z_t\)</td>
+</tr>
+<tr>
+<td>真机部署</td>
+<td>\(\hat z_t=\phi(H_t)\)</td>
+<td>不更新网络权重</td>
+<td>无训练 loss；历史与 latent 随执行更新</td>
+</tr>
+</tbody>
+</table>
+<p>这里可以用 teacher–student 视角理解信息迁移，但不能把图机械地画成“一个大 Actor 蒸馏出另一个小 Actor”。HORA 保留底层控制策略，重点替换产生环境条件的分支。</p>
+<h2 id="4-ppo">4. 第一阶段：PPO 同时塑造环境表示与控制策略</h2>
+<h3 id="41">4.1 物体信息编码器并不处理图像</h3>
+<p>\[
+z_t=\mu(e_t),\qquad
+\mu:\mathbb R^9\rightarrow\mathbb R^8.
+\]</p>
+<p>\(\mathbb R^d\) 表示 \(d\) 维实数向量空间。编码器的线性层尺寸为：</p>
+<pre><code class="language-text">e_t：9 → 256 → 128 → 8：z_t
+</code></pre>
+<p>它处理的是仿真已经给出的数值，省去了从图像或接触信号估计物体状态的困难。这里的 encoder 是模块职责，不限定某一种大模型架构。</p>
+<h3 id="42-actor-critic-mlp">4.2 Actor 和 Critic 共享 MLP 骨干</h3>
+<p>\[
+x_t=[o_t;z_t]\in\mathbb R^{104},\qquad
+h_t=f(x_t)\in\mathbb R^{128}.
+\]</p>
+<p>\([\,;\,]\) 表示向量拼接，\(x_t\) 是拼接后的策略输入，\(f\) 是共享 MLP，\(h_t\) 是它输出的中间特征。这里的 \(h_t\) 不是完整运动历史；运动历史使用 \(H_t\) 表示。</p>
+<p>这里的 \(x_t\) 专指共享 MLP 的输入。完整训练网络仍接收原始 \(o_t,e_t\)，在 PPO 更新时重新经过 \(\mu\) 计算 \(z_t\)，才能让梯度传回物体编码器；不要把缓存的、已断开计算图的 latent 当成完整训练接口。</p>
+<pre><code class="language-text">o_t：96 + z_t：8
+        ↓ 拼接
+共享 MLP：104 → 512 → 256 → 128
+        ├─ Actor 均值头：128 → 16
+        └─ Critic 价值头：128 → 1
+</code></pre>
+<p>Actor 的随机动作接口为：</p>
+<p>\[
+a_t\sim\pi(\cdot\mid o_t,z_t)
+=\mathcal N\!\left(m_t,\operatorname{diag}(\sigma^2)\right).
+\]</p>
+<p>\(\mathcal N\) 表示高斯分布，\(\operatorname{diag}(\sigma^2)\) 表示各动作维度条件独立的对角协方差。Actor 头预测均值 \(m_t\)，标准差由可学习的 log-standard-deviation 参数取指数获得。Critic 预测一个状态价值；它没有为每一个候选动作单独输出 \(Q\) 值。</p>
+<p>下文用 \(m_\pi(o_t,z_t)\) 表示策略分布的均值函数，区分“分布 \(\pi\)”与“选定的动作数值”。训练时可以从分布采样，本文的部署和 NoAdapt 确定性表达式使用这个均值。</p>
+<p>公开代码的共享 MLP 使用 ELU；编码器输出和适应模块输出还经过 <code>tanh</code>。论文附录对编码器激活函数的描述与这份实现有差异，复现网络应直接核对所用版本。<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/models/models.py">模型实现</a>、<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/configs/train/AllegroHandHora.yaml">训练配置</a></p>
+<h3 id="43-ppo">4.3 PPO 在网络之外组织采样和更新</h3>
+<p>第一阶段的控制器最初并不会旋转物体，Critic 也不预先知道未来回报。仿真交互产生奖励和状态变化，PPO 将这些经历转成 Actor 与 Critic 的训练目标。反向传播经过共享骨干，因此 \(\mu\) 也能学到哪些物体信息有助于控制。</p>
+<p>此时的 Expert 是第一阶段最终得到的特权策略。“Expert”表示它在后续比较中的角色，不表示训练时必须存在人类专家动作。</p>
+<p>关于 old log-probability、GAE、固定 return target 和两种 loss 的逐项含义，见 <a href="rl-basics-and-training-loop.html">RL02 的 Actor–Critic 与 PPO 训练链路</a>。HORA 在此使用已有算法，其方法重点没有落在修改 PPO 目标函数上。</p>
+<h3 id="44-reward">4.4 Reward 与初始抓握共同决定可学性</h3>
+<p>为避免把论文中的代价符号与实现权重混淆，下面按 <code>v0.0.1</code> 的计算方式组织奖励。设 \(\omega_t\) 为物体角速度，\(k\) 为目标旋转方向的单位向量，\(v_t\) 为物体线速度，\(q_{\mathrm{init}}\) 为本次初始关节姿态，\(\tau_t\) 为命令力矩，\(\dot q_t\) 为关节速度：</p>
+<p>\[
+r_t=\operatorname{clip}(\omega_t^\top k,-0.5,0.5)
+-\alpha_v\|v_t\|_1
+-\alpha_q\|q_t-q_{\mathrm{init}}\|_2^2
+-\alpha_\tau\|\tau_t\|_2^2
+-\alpha_w(\tau_t^\top\dot q_t)^2.
+\]</p>
+<p>其中 <code>clip</code> 将数值限制在给定区间；\(\|\cdot\|_1\) 是绝对值之和，\(\|\cdot\|_2^2\) 是平方和。\(\alpha_v,\alpha_q,\alpha_\tau,\alpha_w\) 是非负权重，此配置分别为 0.3、0.3、0.1、2.0。该版本的 <code>compute_reward()</code> 将旋转方向设为 \(k=(0,0,-1)\)，复现时需同时检查坐标约定。最后一项是该代码实现的功率相关惩罚，不应直接当成实际机械能的累计测量。</p>
+<table>
+<thead>
+<tr>
+<th>奖励部分</th>
+<th>对学习行为的约束</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>指定方向角速度</td>
+<td>鼓励持续旋转；裁剪减少单纯追求更高速度的收益</td>
+</tr>
+<tr>
+<td>物体线速度代价</td>
+<td>减少物体在手中不稳定移动</td>
+</tr>
+<tr>
+<td>偏离初始手姿代价</td>
+<td>为动作提供姿态约束</td>
+</tr>
+<tr>
+<td>力矩及功率相关代价</td>
+<td>抑制过于激烈、耗力的控制</td>
+</tr>
+</tbody>
+</table>
+<p>论文公式与公开代码在范数、功率项等细节上并非完全相同。因此应分别引用概念公式和实际执行的 reward，不能把论文附录的符号不加检查地抄进程序。<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/tasks/allegro_hand_hora.py">奖励实现</a>、<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/configs/task/AllegroHandHora.yaml">权重配置</a></p>
+<p>上述 \(r_t\) 是环境返回的原始奖励。PPO 采样实现还会缩放奖励、处理超时 bootstrap，并对价值做归一化；日志中的分数、训练缓冲区里的目标和论文评估指标需要按各自代码路径核对。</p>
+<p>训练从稳定抓握初始化，并随机化物体与动力学。这样的 reset 让策略把交互预算用于持续旋转，而不必同时解决从桌面抓取。Reward、reset、物体分布和并行仿真一起构成训练方案；单看网络层数无法解释技能如何获得。</p>
+<h2 id="5-latent">5. 第二阶段：用历史估计控制所需的 latent</h2>
+<h3 id="51">5.1 历史为何能提供信息</h3>
+<p>同样的位置目标发给手指，不同质量、接触和几何条件会产生不同的关节运动。历史模块接收“曾经发出什么指令”和“实际测到了什么运动”，由这些时序关系估计当前操作条件。</p>
+<p>输入不是一幅完整物体模型，也不是触觉图像。它只提供与当前控制交互有关的证据；不同物理环境可能产生相近历史，因此不能保证所有物体参数都被唯一辨识。</p>
+<h3 id="52">5.2 历史编码器的张量变化</h3>
+<p>对一个样本忽略 batch 维度，\(\phi\) 的结构是：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>运算</th>
+<th>输出形状</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>输入</td>
+<td>30 步，每步 16 个关节读数和 16 个位置目标</td>
+<td>\(30\times32\)</td>
+</tr>
+<tr>
+<td>逐时间步编码</td>
+<td>同一个 MLP，32 → 32 → 32</td>
+<td>\(30\times32\)</td>
+</tr>
+<tr>
+<td>时间卷积 1</td>
+<td>通道 32 → 32，核 9，步长 2，无 padding</td>
+<td>\(32\times11\)</td>
+</tr>
+<tr>
+<td>时间卷积 2</td>
+<td>通道 32 → 32，核 5，步长 1</td>
+<td>\(32\times7\)</td>
+</tr>
+<tr>
+<td>时间卷积 3</td>
+<td>通道 32 → 32，核 5，步长 1</td>
+<td>\(32\times3\)</td>
+</tr>
+<tr>
+<td>展平与投影</td>
+<td>96 → 8，随后 <code>tanh</code></td>
+<td>\(\hat z_t\in\mathbb R^8\)</td>
+</tr>
+</tbody>
+</table>
+<p>卷积阶段的形状顺序为“通道 × 时间长度”。在 20 Hz 控制频率下，30 步覆盖约 1.5 秒。代码中残留的 50 帧注释不应覆盖实际配置和投影尺寸。<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/models/models.py">历史网络</a>、<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/configs/task/AllegroHandHora.yaml">历史长度配置</a></p>
+<h3 id="53">5.3 固定控制器，改变标签来源与梯度路径</h3>
+<p>\[
+z_t=\operatorname{stopgrad}(\mu(e_t)),\qquad
+\hat z_t=\phi(H_t),\qquad
+\mathcal L_{\mathrm{adapt}}
+=\mathbb E\left[\|\hat z_t-z_t\|_2^2\right].
+\]</p>
+<p><code>stopgrad</code> 表示把目标视作常量，不通过它更新标签网络；\(\mathbb E\) 表示对训练样本取平均。这个阶段冻结 \(\mu\)、共享控制骨干与输出头，只更新 \(\phi\)。</p>
+<p>数据采集也需要区分：执行策略使用的是 \(\pi(o_t,\hat z_t)\)，因此历史来自“估计 latent 的控制器”实际访问的状态。与此同时，仿真仍提供 \(e_t\)，冻结的 \(\mu\) 可以为同一状态产生监督目标。它不是只在完美 Expert 的成功轨迹上离线拟合一次。</p>
+<pre><code class="language-python"># 概念化第二阶段；省略归一化与并行环境接口
+for parameter in encoder_and_control_parameters:
+    parameter.requires_grad = False
+
+z_target = encoder(privileged_info).detach()
+z_pred = adaptation(history)
+loss = ((z_pred - z_target) ** 2).mean()
+
+optimizer_phi.zero_grad()
+loss.backward()
+optimizer_phi.step()
+
+# 与环境交互仍使用估计的 latent，而不是 z_target
+action = policy_mean(short_history, z_pred.detach())
+next_observation = env.step(action)
+</code></pre>
+<p>这段代码强调监督与执行使用什么信息，并非官方训练循环的逐行复制。实际实现还处理动作限幅、观测统计和交互时序。环境奖励可以用于记录表现，但适应模块的梯度来自 latent MSE。<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/padapt/padapt.py">第二阶段训练代码</a></p>
+<h2 id="6">6. 部署：固定参数下的闭环适应</h2>
+<p>部署链路为：</p>
+<p>\[
+H_t\xrightarrow{\phi}\hat z_t,\qquad
+(o_t,\hat z_t)\xrightarrow{\pi}a_t.
+\]</p>
+<p>历史每步更新，\(\hat z_t\) 也随之更新。网络权重保持固定，没有在真机上继续运行 PPO。Critic 与特权编码器不承担部署决策；即便软件对象保留相关层，也不意味着策略必须读取它们的输出。</p>
+<p>代码里的原始动作还要变成底层控制目标：</p>
+<p>\[
+u_t=\operatorname{clip}_{\mathrm{joint}}\!
+\left(u_{t-1}+\frac{1}{24}\operatorname{clip}(a_t,-1,1)\right).
+\]</p>
+<p>\(u_t\) 是新的关节位置目标；\(\operatorname{clip}_{\mathrm{joint}}\) 表示按每个关节的上下限限幅。策略输出的是目标增量的归一化控制量，不能直接当成绝对关节角或力矩。</p>
+<p>PD 控制器再根据目标与实际关节状态形成力矩，概念上为：</p>
+<p>\[
+\tau_t=K_p(u_t-q_t)-K_d\dot q_t.
+\]</p>
+<p>\(K_p\) 是比例增益，\(K_d\) 是阻尼增益。策略读取关节历史的闭环与底层 PD 的关节反馈是两个层级；回放高层动作时，底层 PD 也可以继续存在。<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/deploy/deploy.py">部署代码</a></p>
+<h2 id="7">7. 对照实验：删除、替换、停止更新与性能参照</h2>
+<p><img alt="HORA 与 DR、SysID、NoAdapt、Periodic、Expert 的信息流对照；灰色表示移除，橙色表示替换或停止更新，SysID 后端只作功能示意" src="assets/figures/hora-baseline-comparison.svg" /></p>
+<p><a href="assets/figures/hora-baseline-comparison.svg">打开对照实验矢量图</a>。</p>
+<p>图中六行主要比较测试时的信息流。训练过程必须另外说明：例如 DR 要按自身输入重新训练，不能从训练好的 HORA 中直接拔掉 latent 分支就当作公平对照。</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>测试时的结构</th>
+<th>相对 HORA 的改动</th>
+<th>检验的设计问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HORA／Ours</td>
+<td>\(H_t\to\phi\to\hat z_t\)，再与 \(o_t\) 一起进入 \(\pi\)</td>
+<td>完整方案</td>
+<td>历史条件控制是否有效</td>
+</tr>
+<tr>
+<td>DR</td>
+<td>\(o_t\to\pi_{\mathrm{DR}}\)</td>
+<td>去掉环境表征分支，使用域随机化重新训练</td>
+<td>直接训练鲁棒策略是否足够</td>
+</tr>
+<tr>
+<td>SysID</td>
+<td>历史 → 显式信息估计 \(\hat e_t\) → 参数条件控制</td>
+<td>预测目标由 latent 换为物理信息</td>
+<td>必须精确估计参数，还是学习控制表征更合适</td>
+</tr>
+<tr>
+<td>NoAdapt</td>
+<td>只在开始时计算 \(\hat z_0\)，随后 \(a_t=m_\pi(o_t,\hat z_0)\)</td>
+<td>固定 latent，保留实时观测与策略</td>
+<td>初始估计是否足够</td>
+</tr>
+<tr>
+<td>Periodic</td>
+<td>预先记录 Expert 动作，再按时间回放</td>
+<td>实时策略决策由动作序列替代</td>
+<td>固定动作模式能否应对不同条件</td>
+</tr>
+<tr>
+<td>Expert</td>
+<td>\(e_t\to\mu\to z_t\)，再与 \(o_t\) 一起进入 \(\pi\)</td>
+<td>直接使用特权信息</td>
+<td>不必推断 latent 时的性能参照</td>
+</tr>
+</tbody>
+</table>
+<p>其中 \(\pi_{\mathrm{DR}}\) 是独立训练的 DR 策略，\(\hat e_t\) 是显式参数估计，\(\hat z_0\) 是初始 latent。Expert 来自本方法的第一阶段，不是人类示范者，也不是数学上保证最优的控制器。<a href="https://arxiv.org/html/2210.04887v1#S4">对照定义</a></p>
+<h3 id="71-dr-noadapt">7.1 DR 是方法路线，NoAdapt 是机制消融</h3>
+<p>DR 代表域随机化直接训练策略的思路。OpenAI 的 <a href="https://arxiv.org/abs/1808.00177">Dactyl</a> 和<a href="https://arxiv.org/abs/1910.07113">魔方操作</a> 是相关路线的代表；HORA 的 DR 行不是这些整套系统在相同硬件上的逐层复现。</p>
+<p>HORA 自己也使用域随机化。对比关注的是“仅依靠随机化与直接策略学习”和“再加入显式 latent 适应”。DR 仍根据关节观测更新动作，不能理解为开环或固定动作回放。</p>
+<p>SysID 是另一种环境估计设计；NoAdapt 是对自身机制的直接消融；Periodic 是行为解释的对照；Expert 是特权性能参照。这些名字没有构成所有灵巧手 RL 论文的必做清单。通用实验设计原则见 <a href="rl-basics-and-training-loop.html">RL02</a>。</p>
+<h3 id="72-sysid">7.2 SysID 的已知边界</h3>
+<p>论文明确给出的是预测目标从 \(z_t\) 改成 \(e_t\)。公开资料没有完整展示 \(\hat e_t\) 到控制器之间的逐层连接，不能据此断言它一定删除 \(\mu\)、一定直接拼接成 105 维输入，或者估计器与 \(\phi\) 的每一层完全相同。因此图中参数条件控制器保留为功能模块。</p>
+<h3 id="73-noadapt-latent">7.3 NoAdapt 固定的是 latent</h3>
+<p>NoAdapt 每步仍读取新的 \(o_t\)，并重新计算动作。它去掉的是对环境条件的持续重估，不是冻结动作序列。完整 HORA 的“在线更新”则指输入、历史和 latent 更新，不能与网络权重更新混为一谈。</p>
+<h2 id="8">8. 实验协议：分布变化与仿真迁移是两条轴</h2>
+<h3 id="81-table-1">8.1 Table 1 的两栏都在仿真中</h3>
+<p>Within Training Distribution 使用与训练相同的物体集合和随机化规则重新评估策略；Out-of-Distribution 扩大参数范围并加入新形状。前者是分布内测试，不是训练 loss 或训练 reward 曲线；后者也不等于真机。<a href="https://arxiv.org/html/2210.04887v1#S5.SS1">论文 §5.1</a></p>
+<table>
+<thead>
+<tr>
+<th>设置举例</th>
+<th>训练／分布内测试</th>
+<th>分布外测试</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>形状</td>
+<td>圆柱体集合</td>
+<td>圆柱体，并加入各 10% 的球体和立方体</td>
+</tr>
+<tr>
+<td>质量</td>
+<td>0.01–0.25 kg</td>
+<td>0.01–0.30 kg</td>
+</tr>
+<tr>
+<td>摩擦系数</td>
+<td>0.3–3.0</td>
+<td>0.2–3.5</td>
+</tr>
+<tr>
+<td>缩放系数</td>
+<td>0.70–0.86</td>
+<td>0.66–0.90</td>
+</tr>
+</tbody>
+</table>
+<p>分布外范围与训练范围存在重叠，因此不能说每一个 OOD 样本的每一个参数都在训练范围之外。改变的是整体任务生成分布。相关范围见论文附录 Table 5。</p>
+<h3 id="82-figure-34">8.2 Figure 3、4 是真机对照</h3>
+<p>两组分别测试较重物体与不规则物体，每组 6 个物体，采用 20 种初始抓握位置，每次最多 30 秒。Expert 因无法直接读取所需真值而未加入真机对照；Periodic 在仿真中表现较差，也未继续列入这一组实机比较。<a href="https://arxiv.org/html/2210.04887v1#S5.SS1">真机评估设置</a></p>
+<p>因而应分别记录：实验在什么设备上运行，以及测试物体和参数是否超出训练分布。只有仿真 OOD 成绩，不能自动推出真机迁移效果。</p>
+<h3 id="83">8.3 指标与单位</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>含义</th>
+<th>阅读时的边界</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RotR</td>
+<td>仿真旋转奖励指标</td>
+<td>不直接当成旋转圈数；也不能与实机 Rotations 数值横比</td>
+</tr>
+<tr>
+<td>TTF</td>
+<td>掉落前持续时间，按最大时长归一化</td>
+<td>不是成功率；仿真最大 20 秒，实机最大 30 秒</td>
+</tr>
+<tr>
+<td>Rotations</td>
+<td>实机一次运行中的净旋转角度</td>
+<td>单位是弧度，\(2\pi\) 弧度才是一整圈</td>
+</tr>
+<tr>
+<td>ObjVel</td>
+<td>仿真物体线速度大小，表中做了缩放</td>
+<td>主要反映稳定性</td>
+</tr>
+<tr>
+<td>Torque</td>
+<td>命令力矩绝对值之和的时间平均</td>
+<td>是控制强度的代理量，不等同于测得的总能耗</td>
+</tr>
+</tbody>
+</table>
+<p>例如 \(\mathrm{TTF}=0.8\) 表示平均持续到最大时长的 80%，不能读成“80% 的任务成功”。这些量衡量不同侧面：更快旋转、持续更久和更小力矩不必同时改善。<a href="https://arxiv.org/html/2210.04887v1#S4">指标定义</a></p>
+<h3 id="84">8.4 主要结果支持哪条设计</h3>
+<p>下表只摘取论文 Table 1 与 Figure 3、4 的均值，用来连接方法与结果；完整标准差、稳定性和力矩指标应结合原表阅读。仿真列是 RotR，真机列是净旋转弧度，不同列不能直接比较数值大小。</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>仿真 ID：RotR</th>
+<th>仿真 OOD：RotR</th>
+<th>真机重物：弧度</th>
+<th>真机不规则物体：弧度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DR</td>
+<td>176.12</td>
+<td>140.80</td>
+<td>9.67</td>
+<td>6.59</td>
+</tr>
+<tr>
+<td>SysID</td>
+<td>174.42</td>
+<td>132.56</td>
+<td>10.36</td>
+<td>8.16</td>
+</tr>
+<tr>
+<td>HORA</td>
+<td>222.27</td>
+<td>160.60</td>
+<td>23.96</td>
+<td>19.22</td>
+</tr>
+<tr>
+<td>Expert</td>
+<td>233.71</td>
+<td>165.07</td>
+<td>未评测</td>
+<td>未评测</td>
+</tr>
+</tbody>
+</table>
+<p>在这组协议下，HORA 的仿真旋转指标接近有特权信息的 Expert，真机累计旋转量也高于 DR 与 SysID。重物组中 HORA 的平均 TTF 为 0.98，说明其较大转角同时伴随较长的保持时间。这些是指定任务、物体和评估条件下的证据，不能单独推出任意手型、任意姿态目标的泛化能力。<a href="https://arxiv.org/html/2210.04887v1#S5.SS1">论文主实验</a></p>
+<h3 id="85">8.5 附录实验检验训练与历史设计</h3>
+<p>附录还比较了去掉物理随机化、改变适应模块历史长度，以及让 DR 直接接收更长历史。DR-MLP 将历史展平后输入策略，DR-LSTM 先通过循环网络处理时间信息。<a href="https://arxiv.org/html/2210.04887v1#A2">附录 B</a></p>
+<p>这组实验帮助区分“额外历史信息”与“用 latent 监督组织历史学习”的作用。作者报告在自己的 PPO 设置中，直接优化长历史策略较困难。由此可支持该训练设计的选择，但不能推导成 LSTM 普遍不适合灵巧操作，或历史越长一定越差。计算预算、优化设置与任务分布都是结论的适用条件。</p>
+<h2 id="9">9. 从结果定位贡献与局限</h2>
+<p>HORA 的核心连接是：<strong>先用特权信息训练可控制的表示，再让本体感知历史提供这种表示，从而保留底层控制技能并改变部署信息来源。</strong> 这使一篇看似主要使用 MLP 和 PPO 的论文，仍然可以在任务设计、适应接口与真实泛化上形成贡献。</p>
+<p>阅读其证据时，可以采用以下对应关系：</p>
+<table>
+<thead>
+<tr>
+<th>设计主张</th>
+<th>对应证据</th>
+<th>不应额外推导的结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>历史中的交互信息能支持适应</td>
+<td>与 DR、SysID 的控制效果比较，latent 随物体变化的分析</td>
+<td>latent 每一维都等价于某个真实物理参数</td>
+</tr>
+<tr>
+<td>持续重估环境条件有用</td>
+<td>与 NoAdapt 比较</td>
+<td>所有部署都需要在线更新权重</td>
+</tr>
+<tr>
+<td>手指动作具有反馈适应性</td>
+<td>与 Periodic 比较</td>
+<td>任何预先设计控制器都不能工作</td>
+</tr>
+<tr>
+<td>仿真学到的技能可迁移</td>
+<td>真机物体和扰动展示、重复试验</td>
+<td>已获得从感知、抓取到任意操作的完整通用系统</td>
+</tr>
+</tbody>
+</table>
+<p>技能范围仍受初始抓握、手型、控制接口和训练任务影响。只靠本体感知也存在信息边界：相似历史可能对应不同接触条件，未知物体的尖角、孔洞、柔性和较大偏心可能导致失败。历史推断性能必须通过闭环控制检验，而不是只看 latent MSE。</p>
+<p>如果将来引入视觉或触觉，更有针对性的研究问题是这些信息补足了哪一类隐藏状态、是否改善了失败恢复，以及训练和部署能否获得一致的信息。直接增加模态或换更大的网络，并不能单独证明控制贡献。</p>
+<h2 id="10">10. 从论文图走到源码</h2>
+<p>按数据流读代码，比按文件名逐个浏览更容易保持上下文：</p>
+<table>
+<thead>
+<tr>
+<th>阅读顺序</th>
+<th>文件与入口</th>
+<th>需要对上的概念</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/tasks/allegro_hand_hora.py">任务环境</a>：<code>compute_observations</code>、<code>compute_reward</code></td>
+<td>\(o,H,e\) 如何形成，reward、reset、动作目标如何实现</td>
+</tr>
+<tr>
+<td>2</td>
+<td><a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/models/models.py">网络</a>：<code>ActorCritic</code>、<code>ProprioAdaptTConv</code></td>
+<td>\(\mu,\phi,\pi,V\) 各自的数据和参数</td>
+</tr>
+<tr>
+<td>3</td>
+<td><a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/ppo/ppo.py">PPO</a>：<code>play_steps</code>、<code>train_epoch</code></td>
+<td>先采样，再重新前向并更新；old log-probability 固定</td>
+</tr>
+<tr>
+<td>4</td>
+<td><a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/ppo/experience.py">经验缓冲区</a>：<code>computer_return</code></td>
+<td>GAE、return target、advantage 标准化</td>
+</tr>
+<tr>
+<td>5</td>
+<td><a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/padapt/padapt.py">历史适应训练</a>：<code>train</code></td>
+<td>只更新 \(\phi\)，标签停止梯度，执行用预测 latent</td>
+</tr>
+<tr>
+<td>6</td>
+<td><a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/deploy/deploy.py">真机部署</a></td>
+<td>动作增量、关节顺序、历史缓冲区、20 Hz 控制</td>
+</tr>
+</tbody>
+</table>
+<p>实现中 <code>self.mu</code> 是 Actor 的均值输出层，而论文符号 \(\mu\) 指物体信息编码器；后者在代码中叫 <code>env_mlp</code>。这两处名字相同但角色不同，读代码时应按张量来源判断。</p>
+<p>另外，<code>v0.0.1</code> 的 README 本身也提示 reset 顺序等实现差异会影响奖励数值。复现实验需要同时固定版本、手模型、奖励定义、重置与评估协议，而不只固定一个 checkpoint。<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/README.md">官方实现说明</a></p>
+<h2 id="11">11. 后续阅读的两个方向</h2>
+<p>沿学习算法方向，可以从 <a href="rl-basics-and-training-loop.html">RL02</a> 的 PPO 目标、GAE 和固定训练目标继续研究估计误差与训练稳定性。沿灵巧操作方向，可以以 HORA 的历史适应为起点，对照 <a href="dexterous-rl-overview.html">研究地图</a> 中的触觉旋转、点云策略和目标条件操作，逐项记录新增信息如何改变可观察性、技能范围与真机反馈。</p>
+<p>这两条方向共享网络与训练的基础，但论文贡献可以落在不同位置：改进 PPO 是算法研究，改善隐藏接触信息的使用方式则是表示、控制与部署研究。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="teacher-student-and-sim-to-real.html">← RL03 · Teacher–Student：策略蒸馏、特权信息与部署</a>
+            <span></span>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

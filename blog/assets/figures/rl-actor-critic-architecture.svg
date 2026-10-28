@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1010" viewBox="0 0 1280 1010" role="img" aria-labelledby="title desc">
+<title id="title">Actor–Critic：一次前向计算，两个不同职责</title>
+<desc id="desc">通用共享骨干示意。原始输入经过编码器和共享MLP后，Actor预测动作均值，结合可学习的log标准差形成高斯分布；Critic预测一个状态价值。PPO是外部训练算法，不是前向层。</desc>
+<defs>
+<marker id="data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/></marker>
+<marker id="fixed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/></marker>
+<marker id="grad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ea580c"/></marker>
+</defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033} .title{font-weight:750} .muted{fill:#475569}</style>
+<rect width="1280" height="1010" fill="#ffffff"/>
+<text x="40" y="57" font-size="32" text-anchor="start" class="title">Actor–Critic：一次前向计算，两个不同职责</text>
+<text x="40" y="99" font-size="22" text-anchor="start" class="muted">这张图只画前向计算；网络结构可以替换，Actor／Critic 的职责保持明确。</text>
+<rect x="40" y="126" width="25" height="25" rx="5" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="76" y="147" font-size="22" text-anchor="start" class="">可学习模块</text>
+<rect x="260" y="126" width="25" height="25" rx="5" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="296" y="147" font-size="22" text-anchor="start" class="">数值／数据</text>
+<rect x="585" y="126" width="25" height="25" rx="5" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="621" y="147" font-size="22" text-anchor="start" class="">物理环境</text>
+<rect x="795" y="126" width="25" height="25" rx="5" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="831" y="147" font-size="22" text-anchor="start" class="">损失／改动</text>
+<path d="M 1020 135 L 1070 135" fill="none" stroke="#ea580c" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="8 7" marker-end="url(#grad)"/>
+<text x="1083" y="143" font-size="22" text-anchor="start" class="">梯度更新</text>
+<rect x="60" y="215" width="245" height="115" rx="13" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="182.5" y="264.4" font-size="24" text-anchor="middle" class="title">原始输入 x_t</text>
+<text x="182.5" y="297.4" font-size="24" text-anchor="middle" class="">观测、历史、任务</text>
+<rect x="380" y="215" width="280" height="115" rx="13" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="520.0" y="264.4" font-size="24" text-anchor="middle" class="title">Encoder</text>
+<text x="520.0" y="297.4" font-size="24" text-anchor="middle" class="">生成特征 z_t</text>
+<rect x="735" y="215" width="470" height="115" rx="13" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="970.0" y="264.4" font-size="24" text-anchor="middle" class="title">共享网络</text>
+<text x="970.0" y="297.4" font-size="24" text-anchor="middle" class="">示例：MLP，输出特征 f_t</text>
+<path d="M 305 272 L 380 272" fill="none" stroke="#475569" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#data)"/>
+<path d="M 660 272 L 735 272" fill="none" stroke="#475569" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#data)"/>
+<path d="M 970 330 L 970 370 L 290 370 L 290 425" fill="none" stroke="#475569" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#data)"/>
+<path d="M 970 370 L 695 370 L 695 425" fill="none" stroke="#475569" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#data)"/>
+<rect x="80" y="425" width="420" height="135" rx="13" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="290.0" y="467.9" font-size="24" text-anchor="middle" class="title">Critic 输出头</text>
+<text x="290.0" y="500.9" font-size="24" text-anchor="middle" class="">f_t → V_ψ(x_t)</text>
+<text x="290.0" y="533.9" font-size="24" text-anchor="middle" class="">状态价值：一个标量</text>
+<rect x="540" y="425" width="310" height="135" rx="13" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="695.0" y="467.9" font-size="24" text-anchor="middle" class="title">Actor 输出头</text>
+<text x="695.0" y="500.9" font-size="24" text-anchor="middle" class="">f_t → 均值 m_t</text>
+<text x="695.0" y="533.9" font-size="24" text-anchor="middle" class="">m_t ∈ ℝᵈ</text>
+<rect x="900" y="425" width="305" height="135" rx="13" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="1052.5" y="467.9" font-size="24" text-anchor="middle" class="title">可学习参数 log σ</text>
+<text x="1052.5" y="500.9" font-size="24" text-anchor="middle" class="">σ = exp(log σ)</text>
+<text x="1052.5" y="533.9" font-size="24" text-anchor="middle" class="">标准差 σ ∈ ℝᵈ</text>
+<rect x="80" y="640" width="420" height="120" rx="13" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="290.0" y="675.4" font-size="24" text-anchor="middle" class="title">预测未来累计回报</text>
+<text x="290.0" y="708.4" font-size="24" text-anchor="middle" class="">例如：V_ψ(x_t) = 5</text>
+<text x="290.0" y="741.4" font-size="24" text-anchor="middle" class="">由训练学出，不是奖励公式</text>
+<path d="M 290 560 L 290 640" fill="none" stroke="#475569" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#data)"/>
+<rect x="700" y="640" width="505" height="120" rx="13" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="952.5" y="675.4" font-size="24" text-anchor="middle" class="title">动作分布 π_θ(· | x_t)</text>
+<text x="952.5" y="708.4" font-size="24" text-anchor="middle" class="">Normal(m_t, diag(σ²))</text>
+<text x="952.5" y="741.4" font-size="24" text-anchor="middle" class="">连续动作使用概率密度</text>
+<path d="M 695 560 L 695 605 L 850 605 L 850 640" fill="none" stroke="#475569" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#data)"/>
+<path d="M 1052 560 L 1052 640" fill="none" stroke="#475569" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#data)"/>
+<rect x="700" y="825" width="505" height="95" rx="13" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="952.5" y="864.4" font-size="24" text-anchor="middle" class="title">训练时采样 a_t ∈ ℝᵈ</text>
+<text x="952.5" y="897.4" font-size="24" text-anchor="middle" class="">保存该动作的 log π_old(a_t | x_t)</text>
+<path d="M 952 760 L 952 825" fill="none" stroke="#475569" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#data)"/>
+<rect x="80" y="825" width="420" height="95" rx="13" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="290.0" y="864.4" font-size="24" text-anchor="middle" class="title">Critic 帮助训练</text>
+<text x="290.0" y="897.4" font-size="24" text-anchor="middle" class="">普通策略部署通常只保留 Actor</text>
+<text x="40" y="970" font-size="22" text-anchor="start" class="">d：动作维度；θ、ψ：Actor 与 Critic 参数，可包含共享部分。PPO 不在推理路径中。</text>
+</svg>

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="分开 teacher 的求解算法、student 的学习目标和部署观测，比较动作蒸馏、DAgger、非对称 actor–critic 与在线适应。" />
+    <meta name="description" content="从特权输入与监督目标组织知识迁移，区分动作、分布与 latent 蒸馏，再连接在线适应和真机部署。" />
     <title>Teacher–Student：策略蒸馏、特权信息与部署 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -35,35 +35,35 @@
           <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
           <div class="toc">
 <ul>
-<li><a href="#0-teacherstudent-teacher">0. Teacher–student 是框架，teacher 可以怎样获得</a><ul>
-<li><a href="#_1">算法、目标和角色可以自由组合到什么程度</a></li>
+<li><a href="#0">0. 训练角色与求解算法</a><ul>
+<li><a href="#_1">算法、目标与角色的组合边界</a></li>
 </ul>
 </li>
-<li><a href="#1">1. 为什么灵巧手常需要这个框架</a></li>
-<li><a href="#2-student">2. Student 可以学动作，也可以学其他目标</a><ul>
+<li><a href="#1">1. 从特权观测到部署观测</a></li>
+<li><a href="#2-student">2. 监督目标决定 student 的学习内容</a><ul>
 <li><a href="#21">2.1 动作监督</a></li>
 <li><a href="#22">2.2 动作分布蒸馏</a></li>
 <li><a href="#23">2.3 潜变量或状态估计监督</a></li>
 </ul>
 </li>
-<li><a href="#3-bc-dagger">3. BC 与 DAgger：训练状态分布从哪里来</a></li>
-<li><a href="#4-critic-teacher">4. Critic 不等于动作 teacher</a></li>
+<li><a href="#3-bc-dagger">3. BC 与 DAgger：监督数据覆盖的状态</a></li>
+<li><a href="#4-actorcritic-teacherstudent">4. Actor–Critic 与 Teacher–Student 的分工</a></li>
 <li><a href="#5">5. 训练图、梯度图和推理图</a></li>
-<li><a href="#6-tracking-teacherstudent">6. Tracking 与 teacher–student 怎样组合</a><ul>
+<li><a href="#6">6. 将目标奖励、参考跟踪与蒸馏组合</a><ul>
 <li><a href="#a-teacher-student">示例 A：目标奖励 teacher → 感知 student</a></li>
 <li><a href="#b-teacher-student">示例 B：参考跟踪 teacher → 参考条件 student</a></li>
 <li><a href="#c-actor">示例 C：直接训练可部署 actor</a></li>
 </ul>
 </li>
-<li><a href="#7">7. 三个决定蒸馏能否成功的条件</a><ul>
-<li><a href="#71-student">7.1 Student 能否从输入中确定合理动作</a></li>
-<li><a href="#72">7.2 动作接口是否相同</a></li>
-<li><a href="#73-teacher-student">7.3 Teacher 能否在 student 的失败附近继续指导</a></li>
+<li><a href="#7">7. 可部署蒸馏的三个条件</a><ul>
+<li><a href="#71">7.1 观测足以支持合理决策</a></li>
+<li><a href="#72">7.2 动作接口可以对应</a></li>
+<li><a href="#73-student">7.3 监督覆盖 student 的偏离与恢复状态</a></li>
 </ul>
 </li>
-<li><a href="#8-online-adaptation">8. Online adaptation 不一定在线更新权重</a></li>
+<li><a href="#8">8. 在线更新表征与在线更新权重</a></li>
 <li><a href="#9">9. 与触觉数据生成路线的关系</a></li>
-<li><a href="#10">10. 读论文时记录四个独立答案</a></li>
+<li><a href="#10-hora">10. 从通用框架进入 HORA</a></li>
 </ul>
 </div>
 
@@ -73,21 +73,22 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL03</p>
           <h1>Teacher–Student：策略蒸馏、特权信息与部署</h1>
-          <p class="article-meta"><span data-lang="en">进阶 · October 2026 · 11 min read</span><span data-lang="zh">进阶 · 2026.10 · 约 11 分钟阅读</span></p>
-          <p class="article-deck">分开 teacher 的求解算法、student 的学习目标和部署观测，比较动作蒸馏、DAgger、非对称 actor–critic 与在线适应。</p>
+          <p class="article-meta"><span data-lang="en">进阶 · October 2026 · 14 min read</span><span data-lang="zh">进阶 · 2026.10 · 约 14 分钟阅读</span></p>
+          <p class="article-deck">从特权输入与监督目标组织知识迁移，区分动作、分布与 latent 蒸馏，再连接在线适应和真机部署。</p>
           <div class="article-content">
             <blockquote>
-<p>阅读位置：<a href="dexterous-rl-overview.html">灵巧手 RL 研究地图</a> → <a href="rl-basics-and-training-loop.html">RL 基础与训练闭环</a> → 本文。这里讨论控制策略的 teacher–student；表示学习中的 EMA teacher 和生成模型的采样蒸馏，需要按各自目标另外理解。</p>
+<p>阅读位置：<a href="dexterous-rl-overview.html">灵巧手 RL 研究地图</a> → <a href="rl-basics-and-training-loop.html">RL 通识与 PPO 训练闭环</a> → 本文 → <a href="hora-paper-walkthrough.html">HORA 精讲</a>。RL02 说明单个 actor–critic 怎样从交互中学习；本文说明不同模型、输入与训练阶段之间怎样传递知识，RL04 再代入 HORA 的具体网络和实验。</p>
 </blockquote>
-<h2 id="0-teacherstudent-teacher">0. Teacher–student 是框架，teacher 可以怎样获得</h2>
+<h2 id="0">0. 训练角色与求解算法</h2>
 <p><strong>Teacher–student 描述谁提供学习目标、谁学习这些目标，不限定 teacher 的求解算法。</strong> Teacher 可以是通过 PPO、SAC 或其他合适方法训练的策略；也可以是规划器、轨迹优化器、已有控制器或多个专家组成的集合。</p>
+<p>“Teacher”是它在后续知识迁移中的角色，不意味着它在初始化时已经会完成任务。一个从随机权重开始的 actor，可以先靠环境奖励训练，再成为 student 的 teacher。特权信息给它更完整的输入，但不自动给出正确动作标签；它自己的 actor loss 和 value loss 仍按 <a href="rl-basics-and-training-loop.html">RL02</a> 的交互闭环产生。</p>
 <p>Student 也不一定使用 RL。常见流程是：</p>
 <pre><code class="language-text">阶段 A：任务奖励 / 参考 + 环境交互 → RL teacher
 阶段 B：teacher 输出的监督 + student 观测 → 模仿学习 student
 阶段 C：可选的 RL 微调或在线适应 → 部署
 </code></pre>
 <p>Teacher 不必比 student 参数更多，也不必始终更强；它可能只是掌握更丰富的训练信息，或者只擅长一个任务。<a href="https://arxiv.org/abs/1511.06295">Policy Distillation</a> 展示了策略压缩与多任务专家整合，说明这是一种知识迁移组织方式。</p>
-<h3 id="_1">算法、目标和角色可以自由组合到什么程度</h3>
+<h3 id="_1">算法、目标与角色的组合边界</h3>
 <table>
 <thead>
 <tr>
@@ -136,32 +137,77 @@
 </table>
 <p><a href="https://arxiv.org/abs/1707.06347">PPO</a> 与 <a href="https://arxiv.org/abs/1801.01290">SAC</a> 规定不同的策略优化方法；二者都没有把“必须作为 teacher”写进定义。<a href="https://arxiv.org/abs/1909.11652">PDDM</a> 提供了学习动力学与 MPC 的灵巧控制例子；将其输出作为蒸馏标签在接口上可行，不表示原论文一定采用了 teacher–student。</p>
 <p><strong>算法层面可替换，不表示工程上直接换一个名字就能运行。</strong> 数据收集方式、动作分布、状态输入、奖励尺度和优化器配置都需要重新核对。</p>
-<h2 id="1">1. 为什么灵巧手常需要这个框架</h2>
+<h2 id="1">1. 从特权观测到部署观测</h2>
 <p>仿真容易提供物体位姿、接触、速度和物理参数。先用这些信息获得可靠行为，可以把“动作怎样才有效”和“传感器怎样支持动作”分阶段解决。</p>
-<p>设：</p>
-<ul>
-<li>\(o_t\)：部署可获得的观测；</li>
-<li>\(p_t\)：只在训练中可获得的特权信息；</li>
-<li>\(h_t\)：由观测与过去动作构成的历史；</li>
-<li>\(g\)：目标或任务条件。</li>
-</ul>
+<p>本文采用以下通用记号。不同论文可以使用不同字母；HORA 将特权信息记作 \(e_t\)，精讲中会给出逐项对应。</p>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>\(t\)</td>
+<td>机器人控制时间步</td>
+</tr>
+<tr>
+<td>\(o_t\)</td>
+<td>部署可获得的观测，例如关节读数、图像、触觉</td>
+</tr>
+<tr>
+<td>\(p_t\)</td>
+<td>只在训练时可获得的特权信息，例如仿真物体状态</td>
+</tr>
+<tr>
+<td>\(h_t\)</td>
+<td>由当前及过去观测、过去动作组成的历史或记忆</td>
+</tr>
+<tr>
+<td>\(g\)</td>
+<td>目标或任务条件；无显式条件的任务可以省略</td>
+</tr>
+<tr>
+<td>\(\pi_T,\pi_S\)</td>
+<td>Teacher 与 student 的策略分布，参数分别记作 \(\theta_T,\theta_S\)</td>
+</tr>
+<tr>
+<td>\(a_t^T,a_t^S\)</td>
+<td>Teacher 与 student 输出的动作；上标 \(T,S\) 表示角色</td>
+</tr>
+<tr>
+<td>\(D\)</td>
+<td>用于监督训练的数据集或采样分布</td>
+</tr>
+<tr>
+<td>\(\mathbb E_D[\cdot]\)</td>
+<td>对从 \(D\) 采样的数据取平均</td>
+</tr>
+<tr>
+<td>\(\operatorname{sg}(\cdot)\)</td>
+<td>Stop-gradient：保留数值，但不沿该分支反向传播</td>
+</tr>
+</tbody>
+</table>
 <p>一种特权动作蒸馏接口是：</p>
 <p>\[
-a_t^T\sim\pi_T(a_t\mid o_t,p_t,g),\qquad
-a_t^S\sim\pi_S(a_t\mid h_t,g).
+a_t^T\sim\pi_T(\cdot\mid o_t,p_t,g),\qquad
+a_t^S\sim\pi_S(\cdot\mid h_t,g).
 \]</p>
 <p>Teacher 可以使用 \(p_t\)，student 的输入不包含它。训练时可以用 \(p_t\) 为 student 制造标签，但部署时所需输入必须实际存在。</p>
 <p><a href="https://arxiv.org/abs/2412.01791">DextrAH-RGB</a> 先在仿真训练特权控制策略，再将其蒸馏为 RGB 输入策略，是真实感知接口转换的一个代表案例。</p>
 <p>这与单纯压缩模型不同：同观测蒸馏主要改变模型或计算量，特权蒸馏还改变了可获得信息。Student 可能需要记忆，或者使用不同于 teacher 的动作策略才能在部分可观测条件下完成任务。</p>
-<h2 id="2-student">2. Student 可以学动作，也可以学其他目标</h2>
+<h2 id="2-student">2. 监督目标决定 student 的学习内容</h2>
+<p>Teacher–student 不能只画成两个网络之间的一根箭头。箭头上传递的是动作、概率分布还是 latent，决定了损失比较什么，也决定 student 必须保留哪些模块。</p>
 <h3 id="21">2.1 动作监督</h3>
 <p>对确定性连续动作，一个简单目标为：</p>
 <p>\[
 \mathcal L_{\mathrm{action}}
 =\mathbb E_{(h_t,g,a_t^T)\sim D}
-\left[\|\mu_S(h_t,g)-a_t^T\|^2\right].
+\left[\|m_{\theta_S}(h_t,g)-\operatorname{sg}(a_t^T)\|_2^2\right].
 \]</p>
-<p>这里 \(D\) 可以来自 teacher rollout，也可以来自 student 访问过、再由 teacher 标注的状态。若使用 teacher 的动作均值作为标签，应明确记录，避免混淆随机探索动作与部署动作。</p>
+<p>\(m_{\theta_S}\) 是 student 的确定性动作输出或动作分布均值，\(\|\cdot\|_2^2\) 表示动作向量各维误差平方之和。Teacher 动作作为固定标签，损失更新 student 参数 \(\theta_S\)。这里 \(D\) 可以来自 teacher rollout，也可以来自 student 访问过、再由 teacher 标注的状态。若使用 teacher 的动作均值作为标签，应明确记录，避免混淆随机探索动作与部署动作。</p>
 <p>同一组标签也可以用于训练条件概率模型。使用 Diffusion Policy 或 flow action head，不会自动把 student 的训练变成 RL；训练目标仍可能完全来自动作示范。相关背景见 <a href="action-generation-mse-token-diffusion-flow.html">动作生成方法</a>。</p>
 <h3 id="22">2.2 动作分布蒸馏</h3>
 <p>若 teacher 与 student 都输出可比较的动作分布，可以使用分布差异作为监督：</p>
@@ -175,17 +221,45 @@ D_{\mathrm{KL}}\left(
 \right)
 \right].
 \]</p>
-<p>KL 的方向、分布参数化和尺度要明确；不是所有生成式策略都有方便计算的显式动作密度。不同动作空间之间也不能直接计算这个 KL。</p>
+<p>\(D_{\mathrm{KL}}(P\|Q)\) 是从分布 \(P\) 到 \(Q\) 的 KL 散度，\(\cdot\) 表示遍历动作空间。在此安排中 teacher 分布固定，student 调整 \(\theta_S\) 去接近它。KL 的方向、分布参数化和尺度要明确；不是所有生成式策略都有方便计算的显式动作密度。不同动作空间之间也不能直接计算这个 KL。</p>
 <h3 id="23">2.3 潜变量或状态估计监督</h3>
 <p>可以让 teacher 的特权分支形成环境潜变量 \(z_t\)，再训练历史编码器预测它：</p>
 <p>\[
-z_t=E_T(p_t),\qquad
-\hat z_t=A_\phi(h_t),\qquad
-\mathcal L_z=\|\hat z_t-z_t\|^2.
+z_t=E_\eta(p_t),\qquad
+\hat z_t=F_\omega(h_t),\qquad
+\mathcal L_z=\mathbb E_D\left[\|\hat z_t-\operatorname{sg}(z_t)\|_2^2\right].
 \]</p>
-<p>部署时把 \(\hat z_t\) 输入底层策略，而不一定复制整个 actor。<a href="https://arxiv.org/abs/2107.04034">RMA</a> 是腿足机器人中的代表结构；<a href="https://haozhi.io/hora/">HORA</a> 将快速适应思路用于手内物体旋转。引用前者是解释框架来源，不把它算作灵巧手实验。</p>
-<p>此时学的是可用于控制的隐状态或环境属性表示；它不必对应每个物理参数的精确估计。</p>
-<h2 id="3-bc-dagger">3. BC 与 DAgger：训练状态分布从哪里来</h2>
+<p>这里 \(E_\eta\) 是参数为 \(\eta\) 的特权信息编码器，\(z_t\) 是它产生的环境表征；\(F_\omega\) 是参数为 \(\omega\) 的历史估计器，\(\hat z_t\) 是历史推断得到的表征。字母 \(F\) 表示估计模块，避免与 RL02 中的优势函数 \(A\) 混淆。</p>
+<p>一种常见安排是先训练带特权分支的控制策略，再固定该策略和 \(E_\eta\)，只优化 \(F_\omega\)。部署时将 \(\hat z_t\) 输入已有的底层策略，未必再训练一套完整的动作 student。<a href="https://arxiv.org/abs/2107.04034">RMA</a> 是腿足机器人中的代表结构；<a href="https://arxiv.org/html/2210.04887v1#S3">HORA</a> 将快速适应思路用于手内物体旋转。引用前者是解释框架来源，不把它算作灵巧手实验。</p>
+<p>此时学的是可用于控制的隐状态或环境属性表示，不要求每一维都有明确物理单位。如果训练目标改成真实质量、摩擦等参数，就变成显式参数估计这一设计选择；是否继续经过编码器，应查看该方法的实际接口。</p>
+<table>
+<thead>
+<tr>
+<th>监督目标</th>
+<th>Student 直接学习的输出</th>
+<th>部署可能保留的结构</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>动作</td>
+<td>下一步命令或动作序列</td>
+<td>Student 策略</td>
+</tr>
+<tr>
+<td>动作分布</td>
+<td>各动作的相对倾向及不确定性</td>
+<td>Student 概率策略</td>
+</tr>
+<tr>
+<td>环境 latent</td>
+<td>供控制器使用的表示</td>
+<td>历史估计器 + 已有控制策略</td>
+</tr>
+</tbody>
+</table>
+<p>这些目标可以组合，但“student”这个角色不能单独决定它一定输出动作，也不能决定它一定使用 PPO。</p>
+<h2 id="3-bc-dagger">3. BC 与 DAgger：监督数据覆盖的状态</h2>
 <p>直接 BC 常在 teacher 访问的状态上学习。部署时 student 的小误差会改变下一步观测，逐渐进入训练集没覆盖的区域。</p>
 <p>DAgger 的核心是让训练数据逐步覆盖学习者自身造成的状态：</p>
 <pre><code class="language-text">1. 用 student 或 teacher/student 混合策略执行
@@ -195,8 +269,9 @@ z_t=E_T(p_t),\qquad
 </code></pre>
 <p>动作监督仍来自 teacher，而不是直接最大化环境 reward，所以 DAgger 属于交互式模仿学习。它需要能够在学习者访问的状态上查询有效专家。<a href="https://proceedings.mlr.press/v15/ross11a.html">DAgger 原论文</a></p>
 <p>在仿真中，同一时刻的完整状态和传感器观测可以配对：teacher 读真值，student 读渲染图像或触觉，监督对应同一次物理状态。真机上若无法获得 teacher 需要的隐藏状态，就不能假定这个查询接口仍然可用。</p>
-<h2 id="4-critic-teacher">4. Critic 不等于动作 teacher</h2>
-<p>这是最容易混淆的两个框架：</p>
+<h2 id="4-actorcritic-teacherstudent">4. Actor–Critic 与 Teacher–Student 的分工</h2>
+<p>Actor–critic 描述同一个 RL 训练过程中的决策与估值职责；teacher–student 描述跨模型或跨阶段的监督关系。Teacher 自己可以通过 actor–critic 训练，因此一套系统中可以同时存在 teacher actor、teacher critic 和 student。</p>
+<p>Critic 的价值预测不是专家动作标签。它通过环境回报构造的目标学习估值，再帮助 actor 形成策略梯度；这一闭环在 <a href="rl-basics-and-training-loop.html">RL02</a> 中展开。以下比较的是特权信息可以放置的两种位置：</p>
 <table>
 <thead>
 <tr>
@@ -238,9 +313,9 @@ z_t=E_T(p_t),\qquad
 <h2 id="5">5. 训练图、梯度图和推理图</h2>
 <p>下面是一个通用的“两阶段动作蒸馏”示例，不代表所有论文都冻结同样的模块。</p>
 <pre><code class="language-text">阶段 A：teacher 学习
-特权状态 + 目标 → teacher actor → 环境 → reward
-                                      ↓
-                  teacher critic / RL 更新
+特权输入 + 目标 → teacher actor → 环境 → 奖励与下一观测
+特权输入 + 目标 → teacher critic → 价值预测
+上述交互记录与预测 → RL 更新 → teacher 网络参数
 
 阶段 B：student 学习
 同一环境状态 ──→ 冻结 teacher → 动作标签 ─┐
@@ -280,8 +355,9 @@ z_t=E_T(p_t),\qquad
 </tr>
 </tbody>
 </table>
+<p>这里的“固定 teacher”指其权重不参与这个阶段的更新，不表示每次输出相同的标签。输入状态变化，固定权重的 teacher 仍然可以输出不同动作；同样，固定权重的历史估计器也可以输出随历史变化的 latent。</p>
 <p>推理时是否需要参考轨迹，由策略的条件输入决定；是否需要 critic，由部署算法决定。普通策略网络往往不带 critic，在线规划或价值引导系统则可能保留价值模型。</p>
-<h2 id="6-tracking-teacherstudent">6. Tracking 与 teacher–student 怎样组合</h2>
+<h2 id="6">6. 将目标奖励、参考跟踪与蒸馏组合</h2>
 <p>Tracking 决定 teacher 要完成什么，不决定 teacher 怎样获得，也不决定 student 怎么训练。</p>
 <h3 id="a-teacher-student">示例 A：目标奖励 teacher → 感知 student</h3>
 <pre><code class="language-text">目标姿态奖励 + PPO + 特权状态
@@ -304,17 +380,23 @@ z_t=E_T(p_t),\qquad
 特权状态   → critic → RL 训练信号
 </code></pre>
 <p>这是非对称 actor–critic 的一种安排，可以不经过独立 teacher–student 阶段。是否分阶段，取决于可学性、感知成本和实验目的。</p>
-<h2 id="7">7. 三个决定蒸馏能否成功的条件</h2>
-<h3 id="71-student">7.1 Student 能否从输入中确定合理动作</h3>
+<h2 id="7">7. 可部署蒸馏的三个条件</h2>
+<h3 id="71">7.1 观测足以支持合理决策</h3>
 <p>假设相同观测可能对应“物体向左滑”和“向右滑”，teacher 因能读真值而输出相反的修正动作。没有足够历史或传感器信息的 student 无法区分两种状态；动作 MSE 可能学出不合适的平均值。</p>
 <p>增加数据和网络规模不一定解决信息缺失。需要改善观测、引入历史或主动感知，或允许 student 学习更适合自身信息条件的行为。Teacher 的观测更强，也意味着它可能采用 student 无法复现的决策。</p>
-<h3 id="72">7.2 动作接口是否相同</h3>
+<h3 id="72">7.2 动作接口可以对应</h3>
 <p>需要核对关节顺序、坐标系、绝对／增量目标、归一化、控制周期、动作延迟和底层增益。Teacher 输出力矩、student 输出位置目标时，不能直接做动作 MSE，需要定义合理转换或换用其他监督。</p>
 <p>跨手型还涉及不同运动学和接触能力。简单动作蒸馏不会自动消除 embodiment gap。接口背景见 <a href="robot-data-action-semantics.html">机器人数据与动作语义</a>。</p>
-<h3 id="73-teacher-student">7.3 Teacher 能否在 student 的失败附近继续指导</h3>
+<h3 id="73-student">7.3 监督覆盖 student 的偏离与恢复状态</h3>
 <p>只保存成功轨迹适合训练初始策略，但可能缺少滑移、偏离和恢复动作。需要评价专家在这些状态是否仍可靠，再决定是否采用 DAgger、扰动采集或后续 RL 微调。</p>
 <p>“Teacher 在自己的 rollout 上表现好”与“能纠正任意 student 状态”是两个能力。</p>
-<h2 id="8-online-adaptation">8. Online adaptation 不一定在线更新权重</h2>
+<h2 id="8">8. 在线更新表征与在线更新权重</h2>
+<p>固定参数的网络仍然可以随输入变化而适应环境。以历史估计器为例：</p>
+<p>\[
+\hat z_t=F_\omega(h_t),\qquad
+\hat z_{t+1}=F_\omega(h_{t+1}).
+\]</p>
+<p>新观测改变了 \(h_{t+1}\)，因此输出 \(\hat z_{t+1}\) 可以不同；两次前向计算使用的是同一组参数 \(\omega\)。这种适应无需在部署循环中调用反向传播或优化器更新。</p>
 <table>
 <thead>
 <tr>
@@ -341,7 +423,7 @@ z_t=E_T(p_t),\qquad
 </tr>
 </tbody>
 </table>
-<p>HORA 的历史适应不应简单理解成“真机上继续运行 PPO”。同样，使用新触觉更新记忆，也不等于在部署时训练网络。</p>
+<p>HORA 使用上述历史表征更新，而不是在真机上继续运行 PPO。它的三阶段计算图、固定模块和真实控制接口见 <a href="hora-paper-walkthrough.html">HORA 精讲</a>。同样，使用新触觉更新记忆，也不等于在部署时训练网络。</p>
 <p>Sim-to-real 还需要处理动力学、视觉、触觉和执行器差异。蒸馏解决了知识或接口迁移问题，不自动消除所有仿真差距。</p>
 <h2 id="9">9. 与触觉数据生成路线的关系</h2>
 <p>RL teacher 可以生成机器人技能与监督，随后用于触觉策略。不同的数据阶段应分开记录：</p>
@@ -378,18 +460,44 @@ z_t=E_T(p_t),\qquad
 </table>
 <p>仿真接触力不能直接冒充真实 taxel 或视触觉图像；特权 teacher 也不能在缺少隐藏状态的真机上直接照搬。需要可部署状态估计、student 或其他经过验证的执行方式。</p>
 <p>对于“保持物体 A，同时操作 B”，teacher 可以使用物体真值训练任务技能，而 student 使用视觉身份、全掌触觉和历史。最终要验证对象级接触记忆是否在相同传感器和控制频率下优于全局记忆，不能仅凭 teacher 成功率支持表示贡献。相关实验见 <a href="tactile-memory-experiment-design.html">触觉记忆的实验设计</a>。</p>
-<h2 id="10">10. 读论文时记录四个独立答案</h2>
-<ol>
-<li><strong>Teacher 怎样得到？</strong> 算法、奖励、参考、观测和训练预算。</li>
-<li><strong>Student 学什么？</strong> 动作、分布、latent、价值或组合目标；采用什么数据分布。</li>
-<li><strong>信息怎样迁移？</strong> 哪些模块共享、冻结、重训，监督能更新哪些参数。</li>
-<li><strong>部署运行什么？</strong> 输入能否获得，是否仍需 reference、teacher、planner 或在线更新。</li>
-</ol>
-<p>只写“我们采用 teacher–student”不足以描述一个可复现方法。这四个答案才决定它如何与 PPO、SAC、tracking、视觉触觉感知和真实控制组合。</p>
+<h2 id="10-hora">10. 从通用框架进入 HORA</h2>
+<p>建立完 RL02 的单次训练闭环与本文的阶段关系，再读 HORA，可以将每个设计放回准确的位置：</p>
+<table>
+<thead>
+<tr>
+<th>已有知识</th>
+<th>HORA 中需要具体化的接口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Actor–critic 用交互回报学习</td>
+<td>第一阶段的特权输入、动作分布、价值头和 PPO 更新</td>
+</tr>
+<tr>
+<td>特权信息可以形成控制表征</td>
+<td>物体信息编码器生成的 latent，以及它怎样进入控制策略</td>
+</tr>
+<tr>
+<td>Student 可以只学习 latent</td>
+<td>历史适应模块的输入、监督目标、数据收集与固定模块</td>
+</tr>
+<tr>
+<td>部署可以只更新表征</td>
+<td>用历史估计替换真值编码，控制策略保持已训练权重</td>
+</tr>
+<tr>
+<td>实验应对应方法主张</td>
+<td>分布内外测试、真机测试，以及移除、替换或冻结模块的对照</td>
+</tr>
+</tbody>
+</table>
+<p>HORA 第一阶段的 actor 本身使用特权信息，不能仅因存在 critic 就把整套方法叫作“只有 critic 看真值的非对称 actor–critic”。第二阶段主要训练 latent 估计器，也不能按名字假定它重新模仿整套 teacher 动作。<a href="https://arxiv.org/html/2210.04887v1#S3">论文训练流程</a></p>
+<p>下一篇 <a href="hora-paper-walkthrough.html">HORA 精讲</a> 按任务 → 物体编码 → PPO 特权策略 → 历史监督 → 部署 → 实验组织这些接口，并给出网络维度、符号表与 baseline 结构图。其他论文可以沿用同样的阅读顺序，但需要重新确认各阶段的实际输入、目标与梯度路径。</p>
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
-            <a href="rl-basics-and-training-loop.html">← RL02 · RL 基础：从交互回报到 PPO、SAC 与训练闭环</a>
-            <span></span>
+            <a href="rl-basics-and-training-loop.html">← RL02 · RL 基础：从 Actor–Critic 到 PPO 的数据、目标与梯度</a>
+            <a href="hora-paper-walkthrough.html">RL04 · HORA 精讲：从特权 PPO 策略到本体感知在线适应 →</a>
           </nav>
         </article>
       </main>

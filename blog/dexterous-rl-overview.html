@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="区分目标奖励、示范辅助、轨迹跟踪与训练框架，串联代表论文、路线时间线和常见研究贡献。" />
+    <meta name="description" content="从知识树区分学习信号、网络、PPO 与训练框架，再连接灵巧手路线、实验设计和 HORA 精讲。" />
     <title>灵巧手强化学习：研究范式与学习地图 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -35,10 +35,10 @@
           <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
           <div class="toc">
 <ul>
-<li><a href="#0">0. 先回答两个核心问题</a></li>
-<li><a href="#1">1. 不同术语分别处于哪一层</a></li>
+<li><a href="#0">0. 知识树：先理解一次更新，再理解一篇论文</a></li>
+<li><a href="#1">1. 模块、架构、算法与训练组织的层级</a></li>
 <li><a href="#2-rl">2. 一篇灵巧手 RL 论文的完整流程</a></li>
-<li><a href="#3">3. 奖励与示范怎样进入学习</a><ul>
+<li><a href="#3">3. 奖励与示范进入学习的路径</a><ul>
 <li><a href="#31-rl">3.1 目标奖励 RL：让机器人寻找完成目标的方法</a></li>
 <li><a href="#32-rl">3.2 示范辅助 RL：把示范当作探索与策略先验</a></li>
 <li><a href="#33-tracking-rl">3.3 Tracking RL：用参考状态规定交互过程</a></li>
@@ -50,8 +50,11 @@
 <li><a href="#2026">2026 年的进展：与经典路线分开阅读</a></li>
 </ul>
 </li>
-<li><a href="#6">6. 怎样理解当前活跃方向</a></li>
-<li><a href="#7-contribution">7. Contribution 常见地落在哪里</a></li>
+<li><a href="#6">6. 当前活跃的研究方向</a></li>
+<li><a href="#7">7. 研究贡献与实验证据</a><ul>
+<li><a href="#_1">从方法主张到实验对照</a></li>
+</ul>
+</li>
 <li><a href="#8">8. 推荐学习路线</a><ul>
 <li><a href="#a-rl">路线 A：从模仿学习进入 RL</a></li>
 <li><a href="#b-tracking">路线 B：研究 tracking 与复杂操作</a></li>
@@ -59,7 +62,7 @@
 <li><a href="#d-vla">路线 D：连接 VLA 与底层控制</a></li>
 </ul>
 </li>
-<li><a href="#9">9. 读新论文时填写这张卡片</a></li>
+<li><a href="#9">9. 新论文的结构化阅读记录</a></li>
 </ul>
 </div>
 
@@ -69,64 +72,116 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL01</p>
           <h1>灵巧手强化学习：研究范式与学习地图</h1>
-          <p class="article-meta"><span data-lang="en">入门 · October 2026 · 12 min read</span><span data-lang="zh">入门 · 2026.10 · 约 12 分钟阅读</span></p>
-          <p class="article-deck">区分目标奖励、示范辅助、轨迹跟踪与训练框架，串联代表论文、路线时间线和常见研究贡献。</p>
+          <p class="article-meta"><span data-lang="en">入门 · October 2026 · 15 min read</span><span data-lang="zh">入门 · 2026.10 · 约 15 分钟阅读</span></p>
+          <p class="article-deck">从知识树区分学习信号、网络、PPO 与训练框架，再连接灵巧手路线、实验设计和 HORA 精讲。</p>
           <div class="article-content">
             <blockquote>
-<p>文献核查：2026-10-27。本文按任务、监督来源、学习算法、训练框架和部署接口组织研究地图；代表论文不按引用量排名，近期预印本单独标注。对“多数论文采用什么”只作路线分析，不给出未经统计的比例。</p>
-<p>本卷顺序：本文 RL01 → <a href="rl-basics-and-training-loop.html">RL 基础与训练闭环</a> RL02 → <a href="teacher-student-and-sim-to-real.html">Teacher–Student 与部署</a> RL03。已有 <a href="vla-overview-reading-map.html">VLA 统一研究范式</a> 与 <a href="imitation-learning-behavior-cloning.html">模仿学习基础</a> 分别提供多模态策略和示范学习的背景。</p>
+<p>学习路线更新：2026-10-28；研究时间线沿用 2026-10-27 的文献核查。本文按任务、监督来源、学习算法、训练框架和部署接口组织研究地图；代表论文不按引用量排名，近期预印本单独标注。对“多数论文采用什么”只作路线分析，不给出未经统计的比例。</p>
+<p>本卷顺序：本文 RL01 → <a href="rl-basics-and-training-loop.html">RL 通识：Actor–Critic 与 PPO 训练闭环</a> RL02 → <a href="teacher-student-and-sim-to-real.html">Teacher–Student 与部署</a> RL03 → <a href="hora-paper-walkthrough.html">HORA 精讲</a> RL04。已有 <a href="vla-overview-reading-map.html">VLA 统一研究范式</a> 与 <a href="imitation-learning-behavior-cloning.html">模仿学习基础</a> 分别提供多模态策略和示范学习的背景。</p>
 </blockquote>
-<h2 id="0">0. 先回答两个核心问题</h2>
-<p><strong>灵巧手 RL 不是只有“tracking 一条专家数据”和“手调 reward 从零训练”两种选择。</strong> Tracking 本身可以通过 RL 实现：参考轨迹提供目标状态，奖励衡量实际状态与参考的差距，策略通过环境交互寻找能实现这些状态的动作。</p>
-<p><strong>Teacher–student 是组织知识迁移的框架，不是与 PPO、SAC 并列的 RL 算法。</strong> Teacher 可以通过不同 RL 算法训练，也可以来自规划、优化或已有控制器。Student 可以通过动作监督、分布蒸馏、DAgger 或结合 RL 的方式学习。具体选择必须满足观测、动作和数据接口，不能理解成任意实现都能无修改替换。</p>
-<p>因此下面这句话完全成立：</p>
+<h2 id="0">0. 知识树：先理解一次更新，再理解一篇论文</h2>
+<p>从模仿学习进入 RL，最重要的转换是学习信号的来源。行为克隆（Behavior Cloning，BC）用示范动作构造监督；RL 用交互结果构造策略更新信号。理解这个转换，需要先把网络怎样产生动作、奖励怎样评价后果、损失怎样更新参数连接起来，再讨论特权信息、蒸馏和真机适应。</p>
+<pre><code class="language-text">RL + 灵巧手
+├─ 学习信号：动作标签、任务 reward、参考轨迹
+├─ RL 通识（RL02）
+│  ├─ 状态 / 观测 → 动作 / 动作分布 → 环境交互
+│  ├─ 单步 reward → 累计 return → 状态价值 V / 动作价值 Q → advantage
+│  ├─ encoder / actor / critic 的职责与网络结构
+│  └─ 采样数据 → GAE 与固定目标 → PPO loss → 参数更新
+├─ 训练组织与部署（RL03）
+│  ├─ teacher 的训练方法与 student 的监督目标
+│  ├─ 动作蒸馏 / 分布蒸馏 / latent 监督
+│  └─ 特权信息 → 可部署观测；更新 latent 与更新权重
+└─ 论文实例与证据（RL04：HORA）
+   ├─ 指尖旋转任务、奖励、初始抓持与域随机化
+   ├─ 特权策略 → 历史适应模块 → 真机控制
+   └─ 仿真 / 真机、分布内 / 分布外、baseline / ablation
+</code></pre>
+<p>这棵树对应三组需要分开的边界：<strong>网络结构与训练算法，实际回报与价值预测，通用框架与论文实例</strong>。同样一个 MLP 可以用监督学习或 PPO 训练；同样一个 PPO 可以训练直接部署的策略，也可以训练后续提供监督的 teacher。</p>
+<table>
+<thead>
+<tr>
+<th>阅读层级</th>
+<th>本卷位置</th>
+<th>形成的理解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>通用学习机制</td>
+<td><a href="rl-basics-and-training-loop.html">RL02</a></td>
+<td>Critic 的预测来自网络；回报目标来自交互；Actor 根据优势调整动作分布</td>
+</tr>
+<tr>
+<td>跨阶段知识迁移</td>
+<td><a href="teacher-student-and-sim-to-real.html">RL03</a></td>
+<td>Teacher、student、critic 的角色不同；监督目标决定训练哪些模块</td>
+</tr>
+<tr>
+<td>具体方法与验证</td>
+<td><a href="hora-paper-walkthrough.html">HORA 精讲</a></td>
+<td>把通识代入明确的输入维度、模块、损失、部署路径与实验协议</td>
+</tr>
+</tbody>
+</table>
+<p>目标奖励、参考跟踪和示范辅助可以与训练框架组合。例如：</p>
 <blockquote>
 <p>用 PPO 优化物体轨迹跟踪奖励，得到特权状态 teacher；再用 DAgger 训练只读取视觉、触觉和关节历史的 student。</p>
 </blockquote>
-<p>其中 PPO 是算法，tracking 是奖励与任务定义，teacher–student 是训练框架，DAgger 是交互式模仿学习的数据收集与聚合方法，视觉／触觉是部署观测。这是一个组合示例，不是某篇论文的完整复述。</p>
-<h2 id="1">1. 不同术语分别处于哪一层</h2>
+<p>这里 PPO 是 RL 算法，tracking 规定参考与奖励，teacher–student 组织知识迁移，DAgger 负责交互式模仿学习的数据收集与聚合，视觉／触觉规定部署观测。这是组合示例，具体实现仍需满足观测、动作和数据接口。</p>
+<h2 id="1">1. 模块、架构、算法与训练组织的层级</h2>
 <table>
 <thead>
 <tr>
 <th>层级</th>
-<th>回答的问题</th>
+<th>定义的内容</th>
 <th>常见选择</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>任务</td>
-<td>要获得什么能力？</td>
+<td>要获得的能力</td>
 <td>抓取、手内重定向、工具使用、关节物体操作、双手协作</td>
 </tr>
 <tr>
 <td>任务信号与先验</td>
-<td>什么算做好，怎样帮助找到成功行为？</td>
+<td>成功标准和探索辅助</td>
 <td>目标奖励、参考状态、接触约束、示范动作、初始抓姿</td>
 </tr>
 <tr>
-<td>学习算法</td>
-<td>参数怎样由经验更新？</td>
-<td>PPO、SAC、基于模型的学习方法</td>
+<td>模块职责</td>
+<td>一次计算中的分工</td>
+<td>Encoder 提取表示，actor 决定动作，critic 估计价值</td>
 </tr>
 <tr>
-<td>策略结构</td>
-<td>怎样从输入产生动作？</td>
-<td>MLP、循环策略、Transformer、分层或 residual 策略</td>
+<td>网络架构</td>
+<td>模块的具体实现</td>
+<td>MLP、CNN、PointNet、循环网络、Transformer</td>
+</tr>
+<tr>
+<td>学习算法</td>
+<td>数据组织、目标和更新规则</td>
+<td>PPO、SAC、行为克隆、基于模型的学习方法</td>
+</tr>
+<tr>
+<td>数值优化器</td>
+<td>用梯度修改参数的方法</td>
+<td>Adam、SGD</td>
 </tr>
 <tr>
 <td>训练组织</td>
-<td>哪些阶段和模型协作？</td>
+<td>阶段与模型之间的关系</td>
 <td>BC 后 RL、teacher–student、specialist–generalist、课程学习</td>
 </tr>
 <tr>
 <td>部署接口</td>
-<td>真机能看到什么、实际执行什么？</td>
+<td>真机输入与实际执行量</td>
 <td>RGB、触觉、关节历史；关节目标、力矩或底层控制器目标</td>
 </tr>
 </tbody>
 </table>
-<p>这几层能够组合。比如 goal-conditioned 表示策略以目标为条件，不限定算法；residual 表示输出修正量，也不自动等于 RL。</p>
+<p>“用 PPO 和 Adam 训练 MLP actor–critic，再将其作为 teacher”同时描述了算法、优化器、网络架构、模块职责与训练组织。比如 goal-conditioned 表示策略以目标为条件，不限定算法；residual 表示输出修正量，也不自动等于 RL。</p>
 <p>还要区分任务难度：生成一个静态抓姿、执行抓取、持续换指重定向、完成工具操作，是不同能力。抓姿生成和纯模仿学习论文可以给 RL 提供组件，但不能仅凭名称中有“Dex”就归为 RL 工作。</p>
 <h2 id="2-rl">2. 一篇灵巧手 RL 论文的完整流程</h2>
 <pre><code class="language-text">任务与物理环境
@@ -149,7 +204,7 @@ reward / reference / demonstrations / controller
 </code></pre>
 <p>与 VLA 地图相比，RL 需要额外关注环境、奖励、探索和初始化分布。使用相同的 PPO，改变这些部分，也可能得到完全不同的可学性。</p>
 <p>仿真提供真实物体位姿、接触和物理参数，但这些量是否进入最终 actor，必须单独记录。能在特权状态下完成任务，不代表已经得到可部署的视觉／触觉策略。</p>
-<h2 id="3">3. 奖励与示范怎样进入学习</h2>
+<h2 id="3">3. 奖励与示范进入学习的路径</h2>
 <h3 id="31-rl">3.1 目标奖励 RL：让机器人寻找完成目标的方法</h3>
 <p>例如希望物体持续绕指定轴旋转，可以奖励目标方向角速度，惩罚掉落、偏移和过大动作；不必指定每根手指在每一刻的运动。</p>
 <p>代表路线：<a href="https://arxiv.org/abs/1808.00177">Dactyl</a> 不依赖人类示范，通过仿真 RL 和域随机化实现真机重定向；<a href="https://haozhi.io/hora/">HORA</a> 进一步研究使用本体感知历史适应不同物体。</p>
@@ -169,39 +224,39 @@ r_t=w_g r_{\mathrm{task}}(s_t,g)
     +w_r r_{\mathrm{ref}}(s_t,\hat{s}_{\phi_t})
     -w_c c(s_t,a_t).
 \]</p>
-<p>其中 \(g\) 是任务目标，\(\hat{s}_{\phi_t}\) 是当前参考进度对应的状态，\(c\) 是代价。各方法可以只采用部分项；这不是某篇论文的原始奖励。</p>
+<p>其中 \(t\) 是控制时间步，\(s_t\) 和 \(a_t\) 分别是实际状态与动作；\(g\) 是任务目标，\(\phi_t\) 是参考进度，\(\hat{s}_{\phi_t}\) 是该进度下的参考状态。\(r_{\mathrm{task}}\) 衡量任务进展，\(r_{\mathrm{ref}}\) 衡量参考跟踪，\(c\) 是代价，\(w_g,w_r,w_c\) 是对应权重。这里的 \(\phi_t\) 只是参考索引，与 HORA 论文用 \(\phi\) 表示适应网络的记号无关。各方法可以只采用部分项；这不是某篇论文的原始奖励。</p>
 <p>跟踪对象可以是手关节、指尖、物体位姿、关节物体开合量、接触关系或关键阶段。物体中心的参考允许机器人用不同于人手的动作实现相同效果。<a href="https://proceedings.mlr.press/v305/lum25a.html">Human2Sim2Robot</a> 从单个人类 RGB-D 示范提取物体轨迹构造奖励，并用操作前手姿态辅助探索。</p>
 <table>
 <thead>
 <tr>
-<th>容易混淆的说法</th>
-<th>应怎样理解</th>
+<th>设计维度</th>
+<th>需要区分的情况</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>一条示范就能学</td>
+<td>示范数量与交互预算</td>
 <td>一条示范可以定义任务；训练仍可能使用大量仿真交互</td>
 </tr>
 <tr>
-<td>跟踪人类视频</td>
+<td>参考状态与动作标签</td>
 <td>视频中的手物状态通常不是机器人专家动作标签</td>
 </tr>
 <tr>
-<td>Tracking 就是 BC</td>
+<td>Tracking 与 BC</td>
 <td>BC 学观测到专家动作；tracking RL 通过交互学习实现参考状态的动作</td>
 </tr>
 <tr>
-<td>有反馈就不再是 tracking</td>
+<td>参考与反馈</td>
 <td>跟踪器可以持续读取实际观测；固定参考也能配合闭环控制</td>
 </tr>
 <tr>
-<td>一个 tracker 就是通用技能</td>
-<td>要区分单轨迹专用策略、多参考策略和未见参考泛化</td>
+<td>策略覆盖范围</td>
+<td>单轨迹专用策略、多参考策略和未见参考泛化是不同能力</td>
 </tr>
 <tr>
-<td>训练中用过示范，推理也需要</td>
-<td>取决于具体接口；reference-conditioned tracker 与 BC 初始化策略不同</td>
+<td>训练输入与部署输入</td>
+<td>Reference-conditioned tracker 运行时需要参考；BC 初始化策略未必需要</td>
 </tr>
 </tbody>
 </table>
@@ -374,7 +429,7 @@ r_t=w_g r_{\mathrm{task}}(s_t,g)
 </tbody>
 </table>
 <p>这些近期工作说明研究正在向通用 tracking、反馈调制和真机适配推进，不能据此认定它们已经形成与经典论文相同程度的影响。</p>
-<h2 id="6">6. 怎样理解当前活跃方向</h2>
+<h2 id="6">6. 当前活跃的研究方向</h2>
 <p>从上述代表工作可归纳出以下并行问题。这是研究地图，不是论文数量占比。</p>
 <ol>
 <li><strong>目标条件通用技能：</strong> 从单个物体旋转扩展到跨物体、跨目标的可复用能力。</li>
@@ -386,59 +441,89 @@ r_t=w_g r_{\mathrm{task}}(s_t,g)
 <li><strong>真机数据效率与恢复：</strong> 适应仿真误差，减少训练失败成本，支持失败后的继续操作。</li>
 </ol>
 <p>这几项可以同时出现在一篇论文中。例如感知创新可以配合现成 PPO 和 teacher–student，而无需提出一个新的 RL 更新公式。</p>
-<h2 id="7-contribution">7. Contribution 常见地落在哪里</h2>
+<h2 id="7">7. 研究贡献与实验证据</h2>
 <table>
 <thead>
 <tr>
 <th>创新位置</th>
-<th>可提出的问题</th>
-<th>至少需要什么证据</th>
+<th>设计目标</th>
+<th>至少需要的证据</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>任务与奖励表示</td>
-<td>物体效果、接触或关键阶段是否比关节轨迹更易迁移？</td>
+<td>用物体效果、接触或关键阶段提高任务迁移性</td>
 <td>跨任务或跨手型结果，减少任务定制的记录</td>
 </tr>
 <tr>
 <td>探索与课程</td>
-<td>如何找到首次成功，覆盖困难阶段？</td>
+<td>找到首次成功并覆盖困难阶段</td>
 <td>同交互预算、多随机种子、学习曲线</td>
 </tr>
 <tr>
 <td>参考与重定向</td>
-<td>如何把人类运动变成物理可行的机器人行为？</td>
+<td>把人类运动变成物理可行的机器人行为</td>
 <td>任务成功、物理可行性与跟踪误差分别报告</td>
 </tr>
 <tr>
 <td>感知与记忆</td>
-<td>哪些信息在遮挡后仍能支持动作？</td>
+<td>在遮挡后保留支持动作的信息</td>
 <td>同传感器、同历史、同控制频率的闭环对照</td>
 </tr>
 <tr>
 <td>动作空间与控制结构</td>
-<td>技能空间、分层或 residual 是否更易学？</td>
+<td>通过技能空间、分层或 residual 改善可学性</td>
 <td>相同预算下的效率、精度与稳定性</td>
 </tr>
 <tr>
 <td>通用策略整合</td>
-<td>怎样保留多个专家能力并泛化？</td>
+<td>保留多个专家能力并获得泛化</td>
 <td>已见任务保持与未见物体／轨迹测试</td>
 </tr>
 <tr>
 <td>Sim-to-real</td>
-<td>哪种建模或适应改善真实执行？</td>
+<td>通过建模或适应改善真实执行</td>
 <td>真机重复试验、扰动、失败类型与适配成本</td>
 </tr>
 <tr>
 <td>数据与 benchmark</td>
-<td>哪些能力被现有协议忽略？</td>
+<td>补足现有协议忽略的能力评测</td>
 <td>清晰划分、强 baseline、可复现的评测</td>
 </tr>
 </tbody>
 </table>
 <p>“用了 PPO”“增加触觉”“换成 Transformer”本身只是组件选择。方法贡献需要说明它改变了哪个瓶颈，并由相应层级的证据支持。训练 reward 上升不自动证明任务成功；表示预测更准也不自动证明控制更好。</p>
+<h3 id="_1">从方法主张到实验对照</h3>
+<p>Baseline 用于比较不同解决方案，ablation 用于检验自身设计中的某个因素。特权信息参考策略、动作回放等诊断对照还承担不同作用，不能把实验表中所有行都视为“删一个网络模块”。</p>
+<table>
+<thead>
+<tr>
+<th>对照类型</th>
+<th>应建立的证据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>方法 baseline</td>
+<td>相近任务与预算下，新方案相对于替代方案的收益</td>
+</tr>
+<tr>
+<td>模块／目标消融</td>
+<td>移除或替换特定设计后，性能、效率或泛化如何变化</td>
+</tr>
+<tr>
+<td>特权信息参考</td>
+<td>可直接获得隐藏信息时的表现，作为信息受限策略的参考</td>
+</tr>
+<tr>
+<td>诊断实验</td>
+<td>检验记忆、反馈、适应等机制是否真的参与决策</td>
+</tr>
+</tbody>
+</table>
+<p>DR（域随机化）和 SysID（系统辨识）是通用方法类别，NoAdapt、Periodic 等名字通常表达某篇论文具体设计的对照。它们并非灵巧手 RL 的固定必做清单。触觉论文可能需要有无触觉的对照，奖励论文需要奖励项的对照；HORA 的模块替换与冻结关系见 <a href="hora-paper-walkthrough.html">RL04</a>。</p>
+<p>评测还要同时记录两个独立维度：<strong>仿真／真机描述运行地点，分布内／分布外描述测试条件与训练条件的关系</strong>。改变仿真物体分布就能构成分布外测试；“分布外”本身不等于完成了 sim-to-real。</p>
 <h2 id="8">8. 推荐学习路线</h2>
 <h3 id="a-rl">路线 A：从模仿学习进入 RL</h3>
 <table>
@@ -446,29 +531,29 @@ r_t=w_g r_{\mathrm{task}}(s_t,g)
 <tr>
 <th>阶段</th>
 <th>阅读</th>
-<th>学完应能回答</th>
+<th>能力递进</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>1</td>
 <td><a href="imitation-learning-behavior-cloning.html">BC 基础</a> → <a href="rl-basics-and-training-loop.html">RL02</a></td>
-<td>专家动作标签与交互回报如何分别更新策略？</td>
+<td>从动作监督进入 reward、价值预测和 PPO 的参数更新</td>
 </tr>
 <tr>
 <td>2</td>
-<td>DAPG → Dactyl</td>
-<td>示范辅助探索与无示范 RL 有什么区别？</td>
+<td><a href="teacher-student-and-sim-to-real.html">RL03</a> → <a href="hora-paper-walkthrough.html">HORA 精讲</a></td>
+<td>将特权信息、latent 监督和部署适应落实到完整实例</td>
 </tr>
 <tr>
 <td>3</td>
-<td>HORA → <a href="teacher-student-and-sim-to-real.html">RL03</a></td>
-<td>特权信息如何参与训练，部署怎样适应？</td>
+<td>DAPG → Dactyl</td>
+<td>对照示范辅助探索与无示范 RL 的训练条件</td>
 </tr>
 <tr>
 <td>4</td>
 <td>UniDexGrasp / ++ → DextrAH-RGB</td>
-<td>多物体泛化与感知部署分别怎样获得？</td>
+<td>进一步理解多物体泛化、专家整合与感知部署</td>
 </tr>
 </tbody>
 </table>
@@ -479,7 +564,7 @@ r_t=w_g r_{\mathrm{task}}(s_t,g)
 <p>这一分支关注传感器信息如何改善决策。RL teacher 可以提供技能或监督，但仿真接触力不等于真实触觉读数，特权物体状态也不能直接成为部署输入。</p>
 <h3 id="d-vla">路线 D：连接 VLA 与底层控制</h3>
 <p>先读 <a href="vla-overview-reading-map.html">VLA 研究地图</a>、<a href="robot-data-action-semantics.html">动作接口</a> 与 <a href="teacher-student-and-sim-to-real.html">RL03</a>，再读 DexGen、Scaffolding 和上述 VLA post-training 预印本。重点分清高层条件、低层动作、各阶段训练目标和实际反馈频率。</p>
-<h2 id="9">9. 读新论文时填写这张卡片</h2>
+<h2 id="9">9. 新论文的结构化阅读记录</h2>
 <pre><code class="language-text">Task：任务、手型、对象和成功条件
 Observation：actor / critic / teacher / student 分别看到什么
 Action：输出语义、控制频率和底层控制器
@@ -495,7 +580,7 @@ Contribution：真正改变了哪一层，哪些只是沿用组件
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
             <a href="tactile-memory-experiment-design.html">← TOUCH13 · 触觉记忆的实验设计：从假设到控制证据</a>
-            <a href="rl-basics-and-training-loop.html">RL02 · RL 基础：从交互回报到 PPO、SAC 与训练闭环 →</a>
+            <a href="rl-basics-and-training-loop.html">RL02 · RL 基础：从 Actor–Critic 到 PPO 的数据、目标与梯度 →</a>
           </nav>
         </article>
       </main>
