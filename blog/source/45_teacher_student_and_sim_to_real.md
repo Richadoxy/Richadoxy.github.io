@@ -34,6 +34,8 @@ Teacher 不必比 student 参数更多，也不必始终更强；它可能只是
 
 **算法层面可替换，不表示工程上直接换一个名字就能运行。** 数据收集方式、动作分布、状态输入、奖励尺度和优化器配置都需要重新核对。
 
+域随机化（Domain Randomization，DR）又处在另一层：它规定训练时怎样采样质量、摩擦、尺寸、传感器噪声等环境条件。直接输入状态的 MLP 可以配合 DR，带历史适应器的策略同样可以配合 DR；是否有特权 Encoder、是否做 latent 蒸馏，都不能单独判断一个方法是不是 DR。把“PPO + DR + teacher–student”写在一起，是算法、环境分布和训练框架的组合。
+
 ## 1. 从特权观测到部署观测
 
 仿真容易提供物体位姿、接触、速度和物理参数。先用这些信息获得可靠行为，可以把“动作怎样才有效”和“传感器怎样支持动作”分阶段解决。
@@ -65,6 +67,28 @@ Teacher 可以使用 \(p_t\)，student 的输入不包含它。训练时可以�
 [DextrAH-RGB](https://arxiv.org/abs/2412.01791) 先在仿真训练特权控制策略，再将其蒸馏为 RGB 输入策略，是真实感知接口转换的一个代表案例。
 
 这与单纯压缩模型不同：同观测蒸馏主要改变模型或计算量，特权蒸馏还改变了可获得信息。Student 可能需要记忆，或者使用不同于 teacher 的动作策略才能在部分可观测条件下完成任务。
+
+### 1.1 信息的角色与可获得性是两个维度
+
+“这是 goal”说明它要求系统完成什么；“这是 privileged information”说明在部署条件下能否获得它。两者不能互相替代。
+
+| 量 | 在控制中的角色 | 可获得性需要核对什么 |
+| --- | --- | --- |
+| 当前关节角 | 当前观测 | 编码器能否测量，延迟和噪声是多少 |
+| 仿真器给出的物体精确位姿 | 当前状态 | 真实部署是否有等价的可靠估计 |
+| 用户指定的目标高度 | 任务目标 | 用户或任务系统可以直接提供 |
+| 由可获得点云生成的目标抓姿 | 任务目标 | 生成器的全部输入与预处理是否可部署 |
+| 目标相对当前物体的误差 | 派生控制条件 | 误差计算是否暗中读取物体真值 |
+
+例如目标位置 \(\mathbf p_g\) 是已知的，但目标误差
+
+\[
+\Delta\mathbf p_t=\mathbf p_g-\mathbf p_t^{\mathrm{object}}
+\]
+
+还依赖当前物体位置 \(\mathbf p_t^{\mathrm{object}}\)。若它来自仿真器真值，\(\Delta\mathbf p_t\) 就继承了这个信息依赖。即使删掉名为 `object_state` 的输入块，也不能据此断定剩下的 `goal_delta` 不包含特权信息。
+
+因此要从传感器或任务来源一路检查到坐标变换、误差特征和网络输入。网络框图上的标签描述语义，代码中的依赖链决定实际的信息合同。[UniDexGrasp 精读](47_unidexgrasp_paper_walkthrough.md) 将论文的理想接口与发布实现分开核对。
 
 ## 2. 监督目标决定 student 的学习内容
 
@@ -141,6 +165,53 @@ DAgger 的核心是让训练数据逐步覆盖学习者自身造成的状态：
 动作监督仍来自 teacher，而不是直接最大化环境 reward，所以 DAgger 属于交互式模仿学习。它需要能够在学习者访问的状态上查询有效专家。[DAgger 原论文](https://proceedings.mlr.press/v15/ross11a.html)
 
 在仿真中，同一时刻的完整状态和传感器观测可以配对：teacher 读真值，student 读渲染图像或触觉，监督对应同一次物理状态。真机上若无法获得 teacher 需要的隐藏状态，就不能假定这个查询接口仍然可用。
+
+### 3.1 MSE 规定比较什么，DAgger 规定在哪里取得标签
+
+同一个动作 MSE 可以在专家离线轨迹上训练，也可以放进 DAgger 循环。仅看到 \(\|a_t^S-a_t^T\|^2\)，无法判断数据是不是 DAgger 收集的。
+
+下面是确定性动作策略的概念伪代码。\(k\) 表示第几轮采集，\(\beta_k\in[0,1]\) 表示该轮执行 teacher 动作的概率；`D` 保存历轮聚合数据。`teacher_action` 和 `student_action` 都读取当前同一物理时刻的信息，返回可直接执行的动作。
+
+~~~python
+D = []
+for k in range(num_rounds):
+    obs, privileged, goal = env.reset()
+    for t in range(rollout_steps):
+        with no_grad():
+            label = teacher_action(obs, privileged, goal)
+            action_s = student_action(obs, goal)
+        D.append(copy_sample(obs, goal, label))
+
+        # 混合是选择谁的动作；不是默认对两者动作向量求平均
+        action = label if uniform_0_1() < beta[k] else action_s
+        obs, privileged, goal, done = env.step(action)
+        if done:
+            obs, privileged, goal = env.reset()
+
+    for obs_b, goal_b, label_b in minibatches(D):
+        predicted = student_action(obs_b, goal_b)
+        loss = squared_error(predicted, label_b.detach()).mean()
+        optimizer_student.zero_grad()
+        loss.backward()
+        optimizer_student.step()
+~~~
+
+这里省略历史状态、归一化与并行环境；`copy_sample` 表示复制数据，避免仿真缓冲区后续更新覆盖旧样本。常见安排会逐渐降低 \(\beta_k\)，让数据越来越接近 student 自身的访问分布。Teacher 不随这段 student loss 更新，环境也不需要对动作可微。
+
+聚合数据可以让后续训练继续覆盖过去版本 student 访问过的状态。实际系统可能采用有限缓冲区或其他采样近似，阅读时应记录其实现，而不是仅凭算法名称假定无限保存全部历史。[原始 DAgger 算法](https://proceedings.mlr.press/v15/ross11a/ross11a.pdf)
+
+### 3.2 Latent 监督与交互式采集可以组合
+
+将动作标签换成特权 Encoder 的 latent 标签，改变的是监督对象；让学习者执行还是让专家执行，改变的是状态分布。二者是独立的设计轴：
+
+| 监督对象 | 固定专家数据上的监督 | 学习者访问状态上的监督 |
+| --- | --- | --- |
+| 动作 | 离线 BC | 专家动作查询；配合跨轮聚合可形成 DAgger |
+| 环境 latent | 离线历史估计器拟合 | 在线收集历史并查询特权 latent；是否聚合需另查 |
+
+因此，latent MSE 既不自动等于 DAgger，也不排斥借用数据聚合思想。原始 DAgger 讨论的是专家行为监督；对 latent 学习使用类似收集框架时，应说明扩展了什么，不能把原算法的保证不加条件地迁移过来。
+
+[HORA v0.0.1 的适应代码](https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/padapt/padapt.py) 用估计 latent 的控制器交互，再以特权 latent 做监督，没有采用原始 DAgger 的跨轮数据集聚合循环。更准确的描述是 **on-policy latent supervision，即在当前适应策略访问的状态上学习 latent**；其中 on-policy 描述采样分布，不表示这一步在使用 PPO。UniDexGrasp 的动作蒸馏实例见 [对应精读](47_unidexgrasp_paper_walkthrough.md)。
 
 ## 4. Actor–Critic 与 Teacher–Student 的分工
 
@@ -297,4 +368,4 @@ RL teacher 可以生成机器人技能与监督，随后用于触觉策略。不
 
 HORA 第一阶段的 actor 本身使用特权信息，不能仅因存在 critic 就把整套方法叫作“只有 critic 看真值的非对称 actor–critic”。第二阶段主要训练 latent 估计器，也不能按名字假定它重新模仿整套 teacher 动作。[论文训练流程](https://arxiv.org/html/2210.04887v1#S3)
 
-下一篇 [HORA 精讲](46_hora_paper_walkthrough.md) 按任务 → 物体编码 → PPO 特权策略 → 历史监督 → 部署 → 实验组织这些接口，并给出网络维度、符号表与 baseline 结构图。其他论文可以沿用同样的阅读顺序，但需要重新确认各阶段的实际输入、目标与梯度路径。
+下一篇 [HORA 精讲](46_hora_paper_walkthrough.md) 按任务 → 物体编码 → PPO 特权策略 → 历史监督 → 部署 → 实验组织这些接口，并给出网络维度、符号表与 baseline 结构图。随后可以对照 [UniDexGrasp 精读](47_unidexgrasp_paper_walkthrough.md)：它用生成的目标抓姿规定任务，再将特权策略的动作蒸馏到视觉策略。两篇都包含知识迁移，但监督目标和部署模块不同。其他论文可以沿用同样的阅读顺序，同时重新确认各阶段的实际输入、目标与梯度路径。

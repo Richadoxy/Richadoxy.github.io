@@ -2,7 +2,7 @@
 
 动作生成可以看成一件很具体的事：把当前看到、摸到和记住的信息，转换成接下来要执行的命令。不同方法的区别，在于它们怎样表示多个可能的动作，以及怎样从这些可能性中生成一条动作序列。
 
-本文先建立统一地图，再连接 [DP 与 ACT](36_diffusion_policy_and_act.md)、[Flow Matching](10_flow_matching_training_and_inference.md) 和 [生成一致性与采样蒸馏](37_generative_consistency_and_sampling_distillation.md)。网络的连接方式可以配合 [从对齐表示到 Policy 融合](19_attention_from_embeddings_to_action_expert.md) 阅读。
+本文先建立统一地图，再连接 [DP 与 ACT](36_diffusion_policy_and_act.md)、[Flow Matching](10_flow_matching_training_and_inference.md) 和 [生成一致性与采样蒸馏](37_generative_consistency_and_sampling_distillation.md)。第 8 节补充 Glow 所属的 Normalizing Flow，并区分动作生成、抓姿分布与测试时优化；具体两阶段实例见 [UniDexGrasp 精读](47_unidexgrasp_paper_walkthrough.md)。网络的连接方式可以配合 [从对齐表示到 Policy 融合](19_attention_from_embeddings_to_action_expert.md) 阅读。
 
 ## 1. 数据相同，训练问题可以不同
 
@@ -208,9 +208,71 @@ u_s=A-\epsilon,\qquad s\in[0,1].
 
 这里的速度是动作张量沿生成过程的变化率，通常不是机器人关节速度。生成时钟 \(s\) 也不是机器人实际执行的秒数。动作生成完成后，控制器才根据动作定义执行输出。
 
-## 8. 生成一致性与采样蒸馏
+## 8. Normalizing Flow：可逆变换与显式密度
 
-扩散和 flow 常用多次网络前向得到动作。生成一致性与采样蒸馏关注另一条轴：在保留生成质量的同时，减少需要的前向次数。
+“Flow”并不唯一指 Flow Matching。[Glow](https://arxiv.org/abs/1807.03039) 属于由可逆变换组成的 Normalizing Flow（NF，归一化流），典型训练目标是负对数似然。Flow Matching 则学习连续生成过程的速度场。二者都有把简单分布变成复杂分布的思想，但其网络约束与训练目标不同。
+
+设 \(x\in\mathbb R^d\) 是连续样本，例如展平后的动作块或一组抓姿参数；\(c\) 是观测条件；\(f_\phi\) 是对 \(x\) 可逆、参数为 \(\phi\) 的变换。约定从数据到简单 latent 的方向为：
+
+\[
+z=f_\phi(x;c),\qquad
+\log p_\phi(x\mid c)
+=\log p_Z(z)
++\log\left|\det\frac{\partial f_\phi(x;c)}{\partial x}\right|.
+\]
+
+\(p_Z\) 是容易采样和计算密度的基础分布，如标准高斯；\(\partial f_\phi/\partial x\) 是 Jacobian 矩阵；其行列式的绝对值校正变换造成的体积变化。训练最大化数据的 log-likelihood，等价于最小化：
+
+\[
+\mathcal L_{\mathrm{NLL}}
+=-\mathbb E_{(x,c)\sim\mathcal D}\log p_\phi(x\mid c).
+\]
+
+生成时反过来，先采样 \(z\sim p_Z\)，再计算 \(x=f_\phi^{-1}(z;c)\)。可逆结构让模型同时支持计算密度与生成样本；它不是把当前样本与另一条随机生成样本直接做 MSE。
+
+| 对比项 | Glow 一类离散 Normalizing Flow | 本文第 7 节的 Flow Matching |
+| --- | --- | --- |
+| 学习对象 | 可逆层的复合变换 | 连续时间速度场 |
+| 常见训练信号 | 数据密度与 Jacobian，形成 NLL | 路径上速度回归 |
+| 生成方式 | 从基础随机变量执行逆变换 | 从初始噪声数值积分 |
+| 是否等于 PPO | 否 | 否 |
+
+这里特指 Glow 一类模型；连续归一化流与 Flow Matching 之间还有更紧密的联系，不能把这个对照扩大为“所有 flow 都完全无关”。
+
+### 8.1 概率密度不等于一个精确样本的概率
+
+连续分布通过对区域积分得到概率：
+
+\[
+\Pr(x\in B\mid c)=\int_B p_\phi(x\mid c)\,dx.
+\]
+
+\(B\) 是样本空间中的一个区域。密度可以大于 1，例如在长度为 0.1 的区间上均匀分布，其区间内密度为 10，而积分后的总概率仍是 1。因此，正的 log-likelihood 并不违反概率规则。
+
+密度数值还依赖单位、参数化与参考测度；位置从米改成厘米，密度数值会随坐标尺度变化。比较 log-likelihood 时必须保持数据表示与归一化协议一致，不能把不同实现下的绝对数值直接当作通用模型排名。较高似然说明数据分布拟合的一面，不直接保证物理可行或闭环成功。
+
+### 8.2 条件分解保留变量之间的关系
+
+将生成对象从动作块换成静态抓姿，记为 \(g=(R,\mathbf t,\mathbf q)\)：\(R\) 是手根旋转，\(\mathbf t\) 是位置，\(\mathbf q\) 是关节角，\(X\) 是物体或场景点云。按概率链式法则：
+
+\[
+p(g\mid X)=p(R\mid X)\,p(\mathbf t,\mathbf q\mid X,R).
+\]
+
+这个分解允许先选朝向，再在该朝向下联合决定位置与手型。它没有假设位置与关节互相独立；进一步写成
+
+\[
+p(\mathbf t,\mathbf q\mid X,R)
+=p(\mathbf t\mid X,R)\,p(\mathbf q\mid X,R,\mathbf t)
+\]
+
+同样是合法的条件分解。若把后项中的 \(\mathbf t\) 删除，才额外引入条件独立假设。论文写“拆分建模”时，需要查清其实际条件依赖，不能自动补成独立分布相乘。
+
+旋转所在的 \(\mathrm{SO}(3)\) 是三维旋转群，不是没有约束的普通三维向量空间。[Implicit-PDF](https://proceedings.mlr.press/v139/murphy21a.html) 用网络评价候选旋转的密度，为旋转分布提供一种建模方式。它与位置／关节模型可以组合；如何组合及其效果需要实验检验，不能由分解公式本身保证。
+
+## 9. 生成一致性与采样蒸馏
+
+扩散和 Flow Matching 常用多次网络前向得到动作。生成一致性与采样蒸馏关注另一条轴：在保留生成质量的同时，减少需要的前向次数。
 
 一致性模型希望同一生成轨迹上不同噪声级的点映射到相同端点。一个示意目标是：
 
@@ -235,7 +297,7 @@ f_\theta(x_s,s,c),
 
 这里假设教师采样是确定性的，或已固定教师中途的随机性，使同一份噪声与条件对应确定目标。这只是最直观的端点蒸馏示例，不代表所有蒸馏方法。教师的生成偏差也可能被学生继承。具体训练方式及其与表征一致性的区别，见 [生成一致性与采样蒸馏](37_generative_consistency_and_sampling_distillation.md)。
 
-## 9. 把目标、网络和执行分开比较
+## 10. 把目标、网络和执行分开比较
 
 | 方法 | 训练直接比较的量 | 推理的基本过程 | 主要代价或边界 |
 | --- | --- | --- | --- |
@@ -245,6 +307,7 @@ f_\theta(x_s,s,c),
 | GAN | 判别真假及生成器对抗目标 | 条件与随机变量经生成器 | 对抗训练稳定性与模式覆盖 |
 | Diffusion | 噪声、干净样本或其他目标 | 采样器多步恢复动作 | 采样步数、参数化与噪声调度 |
 | Flow Matching | 生成路径上的速度 | 数值积分得到动作 | 路径、积分器与步数 |
+| Glow 一类 Normalizing Flow | 数据负对数似然 | 基础随机变量经过可逆变换 | 可逆结构、密度计算与表示空间 |
 | Consistency / 蒸馏 | 轨迹端点一致性或教师目标 | 一步或少步生成 | 配对与边界条件、教师误差、质量权衡 |
 
 “Transformer”描述计算结构，“CVAE / diffusion / flow”描述学习与生成方式，“action chunk”描述输出覆盖的时间范围。三者可以组合，所以不能仅凭用了 Transformer 或输出多步动作，就判断它的 loss。
@@ -255,9 +318,9 @@ f_\theta(x_s,s,c),
 
 具体例子可以连接到 [ACT / DP](36_diffusion_policy_and_act.md)、[PI0.5](04_pi05_architecture.md)、[GR00T](11_groot_dit_architecture.md) 与 [FuSe](20_beyond_sight_fuse_paper_reading_notes.md)。这些例子说明可用组合，不构成对整个领域使用比例的统计。
 
-## 10. 训练计算、采样计算与控制反馈
+## 11. 训练计算、采样计算与控制反馈
 
-Diffusion 和 flow 的常见训练方式是随机采一个噪声级，只做一次带噪前向；推理才进行多步采样。某些蒸馏方法需要额外教师计算，不能用这个简化描述覆盖所有训练算法。
+Diffusion 和 Flow Matching 的常见训练方式是随机采一个噪声级或生成时刻，只做一次带噪前向；推理才进行多步采样。某些蒸馏方法需要额外教师计算，不能用这个简化描述覆盖所有训练算法。
 
 生成一个动作块后，还要选择执行多少步再接收新观测：
 
@@ -270,3 +333,24 @@ Diffusion 和 flow 的常见训练方式是随机采一个噪声级，只做一�
 减少生成步数可能降低推理耗时，但闭环反馈还受相机、触觉、通信和控制器影响。网络输出也要经过反归一化、坐标和单位转换；学习到合理动作分布并不自动保证控制接口正确。
 
 本文的知识链可以概括为：**数据定义需要学什么，生成目标定义怎样学，网络提供计算能力，采样器产生候选动作，执行系统决定动作何时真正影响机器人。** 对应的部署时间轴见 [在线执行与 Action Chunk 调度](26_online_execution_runtime.md)。
+
+## 12. 候选生成与样本级优化
+
+生成器可以先提出候选抓姿，再用接触、碰撞或任务约束修正这个样本。设 \(\xi\) 是待优化的抓姿参数，\(g(\xi)\) 将参数转换成有效的旋转、位置与关节配置；\(E(g(\xi);X)\) 是结合当前场景 \(X\) 的优化代价。一个示意更新是：
+
+\[
+\xi^{(k+1)}=\xi^{(k)}-\eta\nabla_\xi E(g(\xi^{(k)});X).
+\]
+
+\(k\) 是优化迭代编号，\(\eta\) 是步长。这次被更新的是当前候选的 \(\xi\)，不是生成器的权重；旋转参数还需采用适当参数化或约束，不能直接把旋转矩阵当任意向量修改。
+
+~~~text
+训练网络：训练数据 → loss → 更新网络参数 φ
+生成候选：当前条件 + 随机变量 → 固定网络 → 初始样本 ξ⁽⁰⁾
+修正样本：当前场景 + 几何代价 → 优化 ξ → 修正后的抓姿
+闭环执行：当前观测 + 目标抓姿 → 控制策略 → 动作
+~~~
+
+术语 Test-Time Adaptation（TTA）在不同领域可能指更新权重，也可能指优化输入或输出变量，必须检查优化器管理的对象。在 [UniDexGrasp 的 TTA 实现](https://github.com/PKU-EPIC/UniDexGrasp/blob/36c9bfcf7cedc987dd15e2384c548e51d5aadc21/dexgrasp_generation/network/eval.py) 中，优化器管理当前 `hand_pose`；它不等于继续训练 PPO，也不等于运行历史适应 Encoder。
+
+若删除测试时修正，生成网络仍可能在训练期受过接触或碰撞损失监督。训练阶段的辅助 loss 与推理阶段的样本优化，需要分别画在各自计算图上。

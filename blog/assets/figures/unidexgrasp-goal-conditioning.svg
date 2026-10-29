@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1430" viewBox="0 0 1400 1430" role="img" aria-labelledby="title desc">
+<title id="title">UniDexGrasp：测试目标扰动与目标条件消融</title><desc id="desc">Table4固定视觉Student，只切换目标抓姿。Table8移除目标条件及目标奖励后重新训练，与Table4不同。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}.muted{fill:#475569}</style>
+<rect width="1400" height="1430" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">UniDexGrasp：测试目标扰动与目标条件消融</text>
+<text x="40" y="94" font-size="21" text-anchor="start" class="">Table 4：同一个训练好的 Student；只改变送入的目标抓姿，网络权重不变。</text>
+<rect x="40" y="120" width="24" height="24" rx="4" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="74" y="140" font-size="20" text-anchor="start" class="">学习模块</text>
+<rect x="270" y="120" width="24" height="24" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="304" y="140" font-size="20" text-anchor="start" class="">输入／表示</text>
+<rect x="500" y="120" width="24" height="24" rx="4" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="534" y="140" font-size="20" text-anchor="start" class="">相对完整方案的改动</text>
+<rect x="880" y="120" width="24" height="24" rx="4" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+<text x="914" y="140" font-size="20" text-anchor="start" class="">移除／跳过</text>
+<rect x="1130" y="120" width="24" height="24" rx="4" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="1164" y="140" font-size="20" text-anchor="start" class="">仿真／评估</text>
+<rect x="24" y="180" width="1352" height="770" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="217" font-size="25" text-anchor="start" class="bold">Table 4：目标来源与扰动测试</text>
+<rect x="60" y="250" width="370" height="90" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="245.0" y="287.7" font-size="22" text-anchor="middle" class="bold">GT</text>
+<text x="245.0" y="317.7" font-size="22" text-anchor="middle" class="">合成数据中的参考抓姿</text>
+<path d="M430 295 L490 295 L490 545 L565 545" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="60" y="370" width="370" height="90" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="245.0" y="407.7" font-size="22" text-anchor="middle" class="bold">pred</text>
+<text x="245.0" y="437.7" font-size="22" text-anchor="middle" class="">生成器预测的抓姿</text>
+<path d="M430 415 L490 415 L490 545 L565 545" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="60" y="490" width="370" height="90" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="245.0" y="527.7" font-size="22" text-anchor="middle" class="bold">(a) 小穿透</text>
+<text x="245.0" y="557.7" font-size="22" text-anchor="middle" class="">扰动预测抓姿</text>
+<path d="M430 535 L490 535 L490 545 L565 545" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="60" y="610" width="370" height="90" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="245.0" y="647.7" font-size="22" text-anchor="middle" class="bold">(b) 大穿透</text>
+<text x="245.0" y="677.7" font-size="22" text-anchor="middle" class="">扰动预测抓姿</text>
+<path d="M430 655 L490 655 L490 545 L565 545" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="60" y="730" width="370" height="90" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="245.0" y="767.7" font-size="22" text-anchor="middle" class="bold">(c) 无接触</text>
+<text x="245.0" y="797.7" font-size="22" text-anchor="middle" class="">扰动预测抓姿</text>
+<path d="M430 775 L490 775 L490 545 L565 545" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="565" y="495" width="270" height="100" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="700.0" y="537.7" font-size="22" text-anchor="middle" class="bold">目标输入 g</text>
+<text x="700.0" y="567.7" font-size="22" text-anchor="middle" class="">每次选择一种设置</text>
+<rect x="565" y="300" width="270" height="110" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="700.0" y="347.7" font-size="22" text-anchor="middle" class="bold">当前场景点云 X_t</text>
+<text x="700.0" y="377.7" font-size="22" text-anchor="middle" class="">机器人本体状态 sʳ</text>
+<path d="M835 355 L885 355 L885 520 L930 520" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M835 545 L930 545" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="930" y="460" width="390" height="145" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1125.0" y="510.2" font-size="22" text-anchor="middle" class="bold">同一个视觉 Student</text>
+<text x="1125.0" y="540.2" font-size="22" text-anchor="middle" class="">PointNet + 动作 MLP</text>
+<text x="1125.0" y="570.2" font-size="22" text-anchor="middle" class="">权重固定</text>
+<rect x="930" y="690" width="390" height="110" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2" />
+<text x="1125.0" y="737.7" font-size="22" text-anchor="middle" class="bold">输出动作 → 仿真执行</text>
+<text x="1125.0" y="767.7" font-size="22" text-anchor="middle" class="">统计抓取成功率</text>
+<path d="M1125 605 L1125 690" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<text x="60" y="916" font-size="23" text-anchor="start" class="bold">这些行不是网络消融；无需为每种扰动重新训练 Student。</text>
+<rect x="24" y="980" width="1352" height="360" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="1017" font-size="25" text-anchor="start" class="bold">Table 8：是否保留目标条件（需要重新训练）</text>
+<rect x="60" y="1050" width="250" height="90" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="185.0" y="1087.7" font-size="22" text-anchor="middle" class="bold">Goal-conditioned</text>
+<text x="185.0" y="1117.7" font-size="22" text-anchor="middle" class="">有目标输入 g</text>
+<rect x="380" y="1050" width="470" height="90" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="615.0" y="1087.7" font-size="22" text-anchor="middle" class="bold">策略与 RL 奖励</text>
+<text x="615.0" y="1117.7" font-size="22" text-anchor="middle" class="">包含目标抓姿项 r_goal</text>
+<rect x="940" y="1050" width="380" height="90" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2" />
+<text x="1130.0" y="1087.7" font-size="22" text-anchor="middle" class="bold">按目标抓取</text>
+<text x="1130.0" y="1117.7" font-size="22" text-anchor="middle" class="">评价成功率与目标误差</text>
+<path d="M310 1095 L380 1095" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M850 1095 L940 1095" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="60" y="1190" width="250" height="90" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="185.0" y="1227.7" font-size="22" text-anchor="middle" class="bold">Non-goal-conditioned</text>
+<text x="185.0" y="1257.7" font-size="22" text-anchor="middle" class="">移除目标输入 g</text>
+<rect x="380" y="1190" width="470" height="90" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="615.0" y="1227.7" font-size="22" text-anchor="middle" class="bold">重新训练策略</text>
+<text x="615.0" y="1257.7" font-size="22" text-anchor="middle" class="">同时移除目标抓姿奖励 r_goal</text>
+<rect x="940" y="1190" width="380" height="90" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2" />
+<text x="1130.0" y="1227.7" font-size="22" text-anchor="middle" class="bold">只要求抓起物体</text>
+<text x="1130.0" y="1257.7" font-size="22" text-anchor="middle" class="">主要比较成功率</text>
+<path d="M310 1235 L380 1235" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M850 1235 L940 1235" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<text x="40" y="1390" font-size="21" text-anchor="start" class="">符号 g 表示目标抓姿；r_goal 表示接近该目标的奖励项。未在图中展开具体观测编码。</text>
+</svg>

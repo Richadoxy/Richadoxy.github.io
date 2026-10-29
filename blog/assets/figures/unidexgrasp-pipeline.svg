@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1480" viewBox="0 0 1400 1480" role="img" aria-labelledby="title desc">
+<title id="title">UniDexGrasp：从目标抓姿生成到闭环执行（Fig. 2 解读）</title><desc id="desc">先由初始点云生成抓姿目标，再由策略依据每步观测执行。生成阶段和策略训练不共用一个端到端 PPO 更新。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}.muted{fill:#475569}</style>
+<rect width="1400" height="1480" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">UniDexGrasp：从目标抓姿生成到闭环执行（Fig. 2 解读）</text>
+<text x="40" y="94" font-size="21" text-anchor="start" class="">R：手根部旋转；t：位置；q：关节角；g：目标抓姿。下标 0 为初始时刻，下标 t 为控制时刻。</text>
+<rect x="40" y="120" width="24" height="24" rx="4" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="74" y="140" font-size="20" text-anchor="start" class="">学习模块</text>
+<rect x="270" y="120" width="24" height="24" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="304" y="140" font-size="20" text-anchor="start" class="">输入／表示</text>
+<rect x="500" y="120" width="24" height="24" rx="4" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="534" y="140" font-size="20" text-anchor="start" class="">相对完整方案的改动</text>
+<rect x="880" y="120" width="24" height="24" rx="4" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+<text x="914" y="140" font-size="20" text-anchor="start" class="">移除／跳过</text>
+<rect x="1130" y="120" width="24" height="24" rx="4" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="1164" y="140" font-size="20" text-anchor="start" class="">仿真／评估</text>
+<rect x="24" y="180" width="1352" height="640" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="217" font-size="25" text-anchor="start" class="bold">A. 生成一个目标：概率采样 → 接触修正 → 恢复坐标</text>
+<rect x="60" y="270" width="220" height="110" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="170.0" y="317.7" font-size="22" text-anchor="middle" class="bold">初始场景点云</text>
+<text x="170.0" y="347.7" font-size="22" text-anchor="middle" class="">X₀</text>
+<path d="M280 325 L330 325" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="330" y="270" width="230" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="445.0" y="317.7" font-size="22" text-anchor="middle" class="bold">GraspIPDF</text>
+<text x="445.0" y="347.7" font-size="22" text-anchor="middle" class="">采样旋转 R</text>
+<path d="M560 325 L610 325" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="610" y="270" width="230" height="110" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="725.0" y="317.7" font-size="22" text-anchor="middle" class="bold">按 R⁻¹ 旋转</text>
+<text x="725.0" y="347.7" font-size="22" text-anchor="middle" class="">规范化点云 X̃₀</text>
+<path d="M840 325 L890 325" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="890" y="270" width="430" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1105.0" y="317.7" font-size="22" text-anchor="middle" class="bold">GraspGlow</text>
+<text x="1105.0" y="347.7" font-size="22" text-anchor="middle" class="">联合采样位置 t̃、关节 q</text>
+<rect x="1040" y="500" width="280" height="145" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="1180.0" y="550.2" font-size="22" text-anchor="middle" class="bold">初始候选抓姿</text>
+<text x="1180.0" y="580.2" font-size="22" text-anchor="middle" class="">手的规范姿态</text>
+<text x="1180.0" y="610.2" font-size="22" text-anchor="middle" class="">与采样旋转 R</text>
+<path d="M1180 380 L1180 500" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="610" y="500" width="380" height="145" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="800.0" y="550.2" font-size="22" text-anchor="middle" class="bold">ContactNet + TTA</text>
+<text x="800.0" y="580.2" font-size="22" text-anchor="middle" class="">预测目标接触分布</text>
+<text x="800.0" y="610.2" font-size="22" text-anchor="middle" class="">微调当前抓姿参数</text>
+<path d="M1040 572 L990 572" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M725 380 L725 500" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<text x="745" y="447" font-size="20" text-anchor="start" class="">场景几何</text>
+<rect x="330" y="500" width="230" height="145" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="445.0" y="565.2" font-size="22" text-anchor="middle" class="bold">按 R 恢复坐标</text>
+<text x="445.0" y="595.2" font-size="22" text-anchor="middle" class="">得到世界系抓姿</text>
+<path d="M610 572 L560 572" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="60" y="500" width="220" height="145" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="170.0" y="565.2" font-size="22" text-anchor="middle" class="bold">目标 g</text>
+<text x="170.0" y="595.2" font-size="22" text-anchor="middle" class="">(R, t, q)</text>
+<path d="M330 572 L280 572" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<text x="60" y="704" font-size="22" text-anchor="start" class="">TTA：固定网络权重，优化当前抓姿；ContactNet 同时读取场景与候选手的几何。</text>
+<text x="60" y="746" font-size="22" text-anchor="start" class="bold">生成网络先训练好；后续控制策略的 PPO 训练不会回传更新这条生成链。</text>
+<text x="60" y="785" font-size="21" text-anchor="start" class="muted">图中省略手部正向运动学与点云采样；t̃ 表示规范坐标系中的位置。</text>
+<rect x="24" y="850" width="1352" height="540" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="887" font-size="25" text-anchor="start" class="bold">B. 执行一个目标：g 在本次抓取中保持为条件，观测每步更新</text>
+<rect x="60" y="940" width="310" height="100" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="215.0" y="982.7" font-size="22" text-anchor="middle" class="bold">当前场景点云 Xₜ</text>
+<text x="215.0" y="1012.7" font-size="22" text-anchor="middle" class="">每步视觉观测</text>
+<rect x="440" y="940" width="310" height="100" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="595.0" y="982.7" font-size="22" text-anchor="middle" class="bold">本体状态 sʳₜ</text>
+<text x="595.0" y="1012.7" font-size="22" text-anchor="middle" class="">关节与机器人状态</text>
+<rect x="820" y="940" width="310" height="100" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="975.0" y="982.7" font-size="22" text-anchor="middle" class="bold">目标 g</text>
+<text x="975.0" y="1012.7" font-size="22" text-anchor="middle" class="">来自上面的生成器</text>
+<rect x="450" y="1130" width="340" height="135" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="620.0" y="1175.2" font-size="22" text-anchor="middle" class="bold">视觉 Student 策略</text>
+<text x="620.0" y="1205.2" font-size="22" text-anchor="middle" class="">SC + PointNet + MLP</text>
+<text x="620.0" y="1235.2" font-size="22" text-anchor="middle" class="">读取观测与目标</text>
+<path d="M215 1040 L215 1080 L530 1080 L530 1130" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M595 1040 L595 1130" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M975 1040 L975 1080 L710 1080 L710 1130" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="850" y="1150" width="180" height="95" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="940.0" y="1190.2" font-size="22" text-anchor="middle" class="bold">动作 aₜ</text>
+<text x="940.0" y="1220.2" font-size="22" text-anchor="middle" class="">坐标恢复</text>
+<rect x="1090" y="1150" width="240" height="95" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2" />
+<text x="1210.0" y="1190.2" font-size="22" text-anchor="middle" class="bold">仿真环境</text>
+<text x="1210.0" y="1220.2" font-size="22" text-anchor="middle" class="">接触与运动</text>
+<path d="M790 1197 L850 1197" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M1030 1197 L1090 1197" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M1210 1245 L1210 1320 L215 1320 L215 1040" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<text x="520" y="1356" font-size="22" text-anchor="start" class="">新观测反馈：下一步重新决定动作</text>
+<text x="40" y="1432" font-size="23" text-anchor="start" class="bold">目标条件策略输出控制动作；生成器输出目标姿态，两者的输出语义不同。</text>
+</svg>

@@ -1,8 +1,8 @@
 # 灵巧手强化学习：研究范式与学习地图
 
-> 学习路线更新：2026-10-28；研究时间线沿用 2026-10-27 的文献核查。本文按任务、监督来源、学习算法、训练框架和部署接口组织研究地图；代表论文不按引用量排名，近期预印本单独标注。对“多数论文采用什么”只作路线分析，不给出未经统计的比例。
+> 学习路线更新：2026-10-29；研究时间线沿用 2026-10-27 的文献核查。本文按任务、监督来源、学习算法、训练框架和部署接口组织研究地图；代表论文不按引用量排名，近期预印本单独标注。对“多数论文采用什么”只作路线分析，不给出未经统计的比例。
 
-> 本卷顺序：本文 RL01 → [RL 通识：Actor–Critic 与 PPO 训练闭环](44_rl_basics_and_training_loop.md) RL02 → [Teacher–Student 与部署](45_teacher_student_and_sim_to_real.md) RL03 → [HORA 精讲](46_hora_paper_walkthrough.md) RL04。已有 [VLA 统一研究范式](27_vla_overview.md) 与 [模仿学习基础](23_imitation_learning_basics.md) 分别提供多模态策略和示范学习的背景。
+> 基础路线：本文 RL01 → [Actor–Critic、PPO 与目标条件策略](44_rl_basics_and_training_loop.md) RL02 → [Teacher–Student、DAgger 与部署](45_teacher_student_and_sim_to_real.md) RL03 → [RL 实验阅读](48_rl_experiment_reading.md) RL05。论文路线：[HORA 精讲](46_hora_paper_walkthrough.md) RL04 → [UniDexGrasp 精读](47_unidexgrasp_paper_walkthrough.md) RL06。已有 [VLA 统一研究范式](27_vla_overview.md) 与 [模仿学习基础](23_imitation_learning_basics.md) 提供多模态策略和示范学习背景；文章编号保留原有顺序，可按知识依赖选择阅读。
 
 ## 0. 知识树：先理解一次更新，再理解一篇论文
 
@@ -15,15 +15,19 @@ RL + 灵巧手
 │  ├─ 状态 / 观测 → 动作 / 动作分布 → 环境交互
 │  ├─ 单步 reward → 累计 return → 状态价值 V / 动作价值 Q → advantage
 │  ├─ encoder / actor / critic 的职责与网络结构
-│  └─ 采样数据 → GAE 与固定目标 → PPO loss → 参数更新
+│  ├─ 采样数据 → GAE 与固定目标 → PPO loss → 参数更新
+│  └─ goal 进入策略与奖励；目标、参考轨迹与动作标签
 ├─ 训练组织与部署（RL03）
 │  ├─ teacher 的训练方法与 student 的监督目标
 │  ├─ 动作蒸馏 / 分布蒸馏 / latent 监督
+│  ├─ BC / DAgger：谁访问状态，谁提供标签，是否聚合数据
 │  └─ 特权信息 → 可部署观测；更新 latent 与更新权重
-└─ 论文实例与证据（RL04：HORA）
-   ├─ 指尖旋转任务、奖励、初始抓持与域随机化
-   ├─ 特权策略 → 历史适应模块 → 真机控制
-   └─ 仿真 / 真机、分布内 / 分布外、baseline / ablation
+├─ 实验阅读（RL05）
+│  ├─ baseline / ablation / 输入扰动 / 任务定义变化
+│  └─ 分布与环境、成功率与条件误差、质量与多样性
+└─ 论文实例
+   ├─ HORA（RL04）：特权策略 → 历史适应模块 → 真机控制
+   └─ UniDexGrasp（RL06）：抓姿生成 → 目标条件 Teacher → 视觉 Student
 ~~~
 
 这棵树对应三组需要分开的边界：**网络结构与训练算法，实际回报与价值预测，通用框架与论文实例**。同样一个 MLP 可以用监督学习或 PPO 训练；同样一个 PPO 可以训练直接部署的策略，也可以训练后续提供监督的 teacher。
@@ -32,7 +36,9 @@ RL + 灵巧手
 | --- | --- | --- |
 | 通用学习机制 | [RL02](44_rl_basics_and_training_loop.md) | Critic 的预测来自网络；回报目标来自交互；Actor 根据优势调整动作分布 |
 | 跨阶段知识迁移 | [RL03](45_teacher_student_and_sim_to_real.md) | Teacher、student、critic 的角色不同；监督目标决定训练哪些模块 |
+| 实验与证据 | [RL05](48_rl_experiment_reading.md) | 区分模块、监督与课程消融；查清分布、统计样本和指标定义 |
 | 具体方法与验证 | [HORA 精讲](46_hora_paper_walkthrough.md) | 把通识代入明确的输入维度、模块、损失、部署路径与实验协议 |
+| 生成与控制组合 | [UniDexGrasp 精读](47_unidexgrasp_paper_walkthrough.md) | 区分抓姿分布、样本优化、PPO 与 DAgger，用 Fig. 2/3 和实验验证贡献 |
 
 目标奖励、参考跟踪和示范辅助可以与训练框架组合。例如：
 
@@ -160,7 +166,8 @@ Teacher–student 的动作、潜变量、梯度与部署分工，放在 [RL03](
 | 2019，预印本 | [Solving Rubik's Cube with a Robot Hand](https://arxiv.org/abs/1910.07113) | 自动域随机化 ADR、记忆和适应；物理操作与魔方求解规划需区分 |
 | 2019，预印本 | [PDDM：Deep Dynamics Models…](https://arxiv.org/abs/1909.11652) | 学习动力学与在线 MPC，关注真实交互数据效率 |
 | 2022，CoRL | [HORA](https://haozhi.io/hora/) | 用本体感知历史进行物体属性适应 |
-| 2023 | [UniDexGrasp](https://arxiv.org/abs/2303.00938) / [UniDexGrasp++](https://arxiv.org/abs/2304.00464) | 抓姿目标、课程、专家与通用策略整合 |
+| 2023，CVPR | [UniDexGrasp](47_unidexgrasp_paper_walkthrough.md) | 多样抓姿生成、目标条件控制、物体课程与视觉蒸馏 |
+| 2023，ICCV | [UniDexGrasp++](https://arxiv.org/abs/2304.00464) | 几何课程与 generalist–specialist 学习；与原版分开阅读 |
 | 2023，CVPR | [DexArt](https://arxiv.org/abs/2305.05706) | 关节物体任务、点云表示和未见物体泛化 |
 | 2023，RSS | [Rotating without Seeing](https://arxiv.org/abs/2303.10880) | 覆盖手掌和手指的接触感知，以及触觉 sim-to-real |
 | 2023–2024 | [Robot Synesthesia](https://arxiv.org/abs/2312.01853) | 以点云形式组织视触觉空间信息，改善手内操作 |
@@ -227,6 +234,8 @@ DR（域随机化）和 SysID（系统辨识）是通用方法类别，NoAdapt�
 
 评测还要同时记录两个独立维度：**仿真／真机描述运行地点，分布内／分布外描述测试条件与训练条件的关系**。改变仿真物体分布就能构成分布外测试；“分布外”本身不等于完成了 sim-to-real。
 
+目标扰动测试还应与训练消融分开：前者可以固定同一个模型，只改变测试输入；后者往往需要按新设置重新训练。成功率、只在成功样本上统计的误差、静态抓姿质量和概率密度也分别回答不同的问题。公式、例子与记录模板见 [RL 实验阅读](48_rl_experiment_reading.md)，具体表格与对照框图见 [UniDexGrasp 精读](47_unidexgrasp_paper_walkthrough.md)。
+
 ## 8. 推荐学习路线
 
 ### 路线 A：从模仿学习进入 RL
@@ -236,7 +245,8 @@ DR（域随机化）和 SysID（系统辨识）是通用方法类别，NoAdapt�
 | 1 | [BC 基础](23_imitation_learning_basics.md) → [RL02](44_rl_basics_and_training_loop.md) | 从动作监督进入 reward、价值预测和 PPO 的参数更新 |
 | 2 | [RL03](45_teacher_student_and_sim_to_real.md) → [HORA 精讲](46_hora_paper_walkthrough.md) | 将特权信息、latent 监督和部署适应落实到完整实例 |
 | 3 | DAPG → Dactyl | 对照示范辅助探索与无示范 RL 的训练条件 |
-| 4 | UniDexGrasp / ++ → DextrAH-RGB | 进一步理解多物体泛化、专家整合与感知部署 |
+| 4 | [动作生成基础](25_action_generation_families.md) → [实验阅读](48_rl_experiment_reading.md) → [UniDexGrasp 精读](47_unidexgrasp_paper_walkthrough.md) | 从 IPDF / Glow 与静态目标进入目标条件 PPO、DAgger 和跨物体实验 |
+| 5 | UniDexGrasp++ → DextrAH-RGB | 进一步理解专家整合与感知部署 |
 
 ### 路线 B：研究 tracking 与复杂操作
 

@@ -167,10 +167,12 @@ POSTS = [
     Post("TOUCH11", "38_cgp_paper_reading_notes.md", "cgp-contact-grounded-policy", "CGP 精读：状态、触觉与接触一致的控制", "区分未来机器人状态、触觉 latent 和控制命令，拆解联合扩散、接触映射及 Visuotactile DP 对照。", "tactile", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("TOUCH12", "40_policy_memory_and_object_centric_tactile_state.md", "policy-memory-and-object-centric-tactile-state", "策略记忆：从历史观测到对象级触觉状态", "串联滑窗、GRU、缓存和 memory tokens，再理解遮挡中的身份 anchor、动态 slot 与接触归属。", "tactile", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("TOUCH13", "41_tactile_memory_experiment_design.md", "tactile-memory-experiment-design", "触觉记忆的实验设计：从假设到控制证据", "把数据、辅助监督、公平 baseline、遮挡扰动和联合成功指标连接成可验证的研究过程。", "tactile", published_en="October 2026", published_zh="2026.10", level="实践"),
-    Post("RL01", "43_dexterous_rl_overview.md", "dexterous-rl-overview", "灵巧手强化学习：研究范式与学习地图", "从知识树区分学习信号、网络、PPO 与训练框架，再连接灵巧手路线、实验设计和 HORA 精讲。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="入门"),
+    Post("RL01", "43_dexterous_rl_overview.md", "dexterous-rl-overview", "灵巧手强化学习：研究范式与学习地图", "从知识树区分学习信号、网络、PPO 与训练框架，再连接实验阅读、HORA 与 UniDexGrasp 精读。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="入门"),
     Post("RL02", "44_rl_basics_and_training_loop.md", "rl-basics-and-training-loop", "RL 基础：从 Actor–Critic 到 PPO 的数据、目标与梯度", "用网络图、数值例子和逐段伪代码连接 reward、return、价值预测、GAE 与 PPO，明确训练目标和梯度边界。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="核心"),
     Post("RL03", "45_teacher_student_and_sim_to_real.md", "teacher-student-and-sim-to-real", "Teacher–Student：策略蒸馏、特权信息与部署", "从特权输入与监督目标组织知识迁移，区分动作、分布与 latent 蒸馏，再连接在线适应和真机部署。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("RL04", "46_hora_paper_walkthrough.md", "hora-paper-walkthrough", "HORA 精讲：从特权 PPO 策略到本体感知在线适应", "将 RL 通识落实到 HORA 的三阶段网络、历史适应、控制接口与对照实验，区分论文设计和公开代码实现。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="精读"),
+    Post("RL05", "48_rl_experiment_reading.md", "rl-experiment-reading", "RL 实验阅读：从指标、分布到消融证据", "区分方法比较、结构与监督消融、课程和输入鲁棒性，理解成功率、条件误差、多样性与随机种子的证据边界。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="基础"),
+    Post("RL06", "47_unidexgrasp_paper_walkthrough.md", "unidexgrasp-paper-walkthrough", "UniDexGrasp 精读：从多样抓姿生成到目标条件策略", "沿 Fig. 2、Fig. 3 串联 IPDF、Glow、接触优化、PPO Teacher 与 DAgger Student，再用六张框图拆解训练、实验和消融。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="精读"),
 ]
 
 
@@ -230,7 +232,7 @@ CHAINS = {
         "title_en": "Part 7: Reinforcement Learning and Dexterity",
         "label_zh": "强化学习",
         "label_en": "RL",
-        "description": "沿研究地图、Actor–Critic 与 PPO 通识、Teacher–Student 框架进入 HORA 精讲，用符号、网络图和实验建立从交互学习到真机适应的知识链。",
+        "description": "从 Actor–Critic、PPO、目标条件策略与 Teacher–Student 建立基础，结合实验读表进入 HORA 和 UniDexGrasp，连接在线适应、抓姿生成与跨物体控制。",
     },
 }
 
@@ -571,7 +573,7 @@ def index_page(reading_times: dict[str, int]) -> str:
       <main class="archive-main" id="main-content">
         <header class="archive-intro">
           <h2><span data-lang="en">Learning paths</span><span data-lang="zh">模仿学习、VLA 与强化学习</span></h2>
-          <p><span data-lang="en">Seven connected paths through representations, imitation learning, VLA architectures, engineering, runtime, tactile robotics, and reinforcement learning. The RL path connects actor–critic networks, PPO training, teacher–student transfer, and a detailed HORA walkthrough.</span><span data-lang="zh">按知识依赖分成七卷。从多模态表示进入模仿学习、VLA、工程与触觉机器人；RL 路线依次展开 Actor–Critic、PPO 训练闭环、Teacher–Student 与 HORA 精讲。</span></p>
+          <p><span data-lang="en">Seven connected paths through representations, imitation learning, VLA architectures, engineering, runtime, tactile robotics, and reinforcement learning. The RL path connects actor–critic networks, PPO, teacher–student transfer, experiment reading, and illustrated walkthroughs of HORA and UniDexGrasp.</span><span data-lang="zh">按知识依赖分成七卷。从多模态表示进入模仿学习、VLA、工程与触觉机器人；RL 路线连接 Actor–Critic、PPO、Teacher–Student、实验阅读，以及 HORA 和 UniDexGrasp 精读。</span></p>
         </header>
         <div class="series-grid">{series_cards}</div>
         <div class="archive-filters" role="group" aria-label="按知识链筛选文章">

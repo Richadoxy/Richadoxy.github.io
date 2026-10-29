@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="2070" viewBox="0 0 1400 2070" role="img" aria-labelledby="title desc">
+<title id="title">UniDexGrasp：抓姿生成方法与消融（Table 1／2）</title><desc id="desc">比较生成抓姿的模型、分解方式和测试时优化。所有框图是功能示意，不代表全部网络层。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}.muted{fill:#475569}</style>
+<rect width="1400" height="2070" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">UniDexGrasp：抓姿生成方法与消融（Table 1／2）</text>
+<text x="40" y="94" font-size="21" text-anchor="start" class="">R：旋转；t：位置；q：关节配置。TTA 调整抓姿数值；图中省略采样批次与坐标恢复。</text>
+<rect x="40" y="120" width="24" height="24" rx="4" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="74" y="140" font-size="20" text-anchor="start" class="">学习模块</text>
+<rect x="270" y="120" width="24" height="24" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="304" y="140" font-size="20" text-anchor="start" class="">输入／表示</text>
+<rect x="500" y="120" width="24" height="24" rx="4" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="534" y="140" font-size="20" text-anchor="start" class="">相对完整方案的改动</text>
+<rect x="880" y="120" width="24" height="24" rx="4" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+<text x="914" y="140" font-size="20" text-anchor="start" class="">移除／跳过</text>
+<rect x="1130" y="120" width="24" height="24" rx="4" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="1164" y="140" font-size="20" text-anchor="start" class="">仿真／评估</text>
+<rect x="24" y="180" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="217" font-size="25" text-anchor="start" class="bold">DDG：直接回归抓姿</text>
+<rect x="65" y="245" width="290" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="210.0" y="296.7" font-size="22" text-anchor="middle" class="bold">多视角深度</text>
+<path d="M355 289 L435 289" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="435" y="245" width="500" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="685.0" y="296.7" font-size="22" text-anchor="middle" class="bold">DDG 回归网络</text>
+<path d="M935 289 L1015 289" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1015" y="245" width="305" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="1167.5" y="296.7" font-size="22" text-anchor="middle" class="bold">R、t、q</text>
+<text x="60" y="365" font-size="20" text-anchor="start" class="muted">保留其原始无桌面设定；论文对此方法不施加桌面穿透过滤。</text>
+<rect x="24" y="402" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="439" font-size="25" text-anchor="start" class="bold">GraspTTA（C + T）：联合 CVAE + 测试时修正</text>
+<rect x="65" y="467" width="290" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="210.0" y="518.7" font-size="22" text-anchor="middle" class="bold">点云</text>
+<path d="M355 511 L435 511" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="435" y="467" width="500" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="685.0" y="503.7" font-size="22" text-anchor="middle" class="bold">CVAE</text>
+<text x="685.0" y="533.7" font-size="22" text-anchor="middle" class="">联合生成 R、t、q</text>
+<path d="M935 511 L1015 511" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1015" y="467" width="305" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1167.5" y="518.7" font-size="22" text-anchor="middle" class="bold">ContactNet + TTA</text>
+<text x="60" y="587" font-size="20" text-anchor="start" class="muted">C：CVAE；T：测试时适应／优化（TTA）。T 不表示 Teacher。</text>
+<rect x="24" y="624" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="661" font-size="25" text-anchor="start" class="bold">R + C + T：固定旋转生成路线，将 Glow 换为 CVAE</text>
+<rect x="60" y="689" width="130" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="125.0" y="740.7" font-size="22" text-anchor="middle" class="bold">点云</text>
+<path d="M190 733 L230 733" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="230" y="689" width="190" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="325.0" y="725.7" font-size="22" text-anchor="middle" class="bold">GraspIPDF</text>
+<text x="325.0" y="755.7" font-size="22" text-anchor="middle" class="">采样旋转 R</text>
+<path d="M420 733 L460 733" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="460" y="689" width="215" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="567.5" y="725.7" font-size="22" text-anchor="middle" class="bold">按 R⁻¹</text>
+<text x="567.5" y="755.7" font-size="22" text-anchor="middle" class="">规范化点云</text>
+<path d="M675 733 L715 733" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="715" y="689" width="265" height="88" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="847.5" y="725.7" font-size="22" text-anchor="middle" class="bold">CVAE</text>
+<text x="847.5" y="755.7" font-size="22" text-anchor="middle" class="">生成位置 t、关节 q</text>
+<path d="M980 733 L1020 733" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1020" y="689" width="300" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1170.0" y="725.7" font-size="22" text-anchor="middle" class="bold">ContactNet + TTA</text>
+<text x="1170.0" y="755.7" font-size="22" text-anchor="middle" class="">优化当前抓姿</text>
+<text x="60" y="809" font-size="20" text-anchor="start" class="muted">与完整方案比较：第二个生成模型从 Glow 换成 CVAE。</text>
+<rect x="24" y="846" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="883" font-size="25" text-anchor="start" class="bold">ReLie + T：旋转与其余抓姿参数联合建模</text>
+<rect x="65" y="911" width="290" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="210.0" y="962.7" font-size="22" text-anchor="middle" class="bold">点云</text>
+<path d="M355 955 L435 955" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="435" y="911" width="500" height="88" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="685.0" y="947.7" font-size="22" text-anchor="middle" class="bold">联合 flow</text>
+<text x="685.0" y="977.7" font-size="22" text-anchor="middle" class="">轴角／Lie 代数旋转表示</text>
+<path d="M935 955 L1015 955" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1015" y="911" width="305" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1167.5" y="962.7" font-size="22" text-anchor="middle" class="bold">ContactNet + TTA</text>
+<text x="60" y="1031" font-size="20" text-anchor="start" class="muted">联合生成 R、t、q；与旋转单独使用 IPDF 的分解方案比较。</text>
+<rect x="24" y="1068" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="1105" font-size="25" text-anchor="start" class="bold">ProHMR + T：另一种旋转表示的联合 flow</text>
+<rect x="65" y="1133" width="290" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="210.0" y="1184.7" font-size="22" text-anchor="middle" class="bold">点云</text>
+<path d="M355 1177 L435 1177" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="435" y="1133" width="500" height="88" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="685.0" y="1169.7" font-size="22" text-anchor="middle" class="bold">联合 flow</text>
+<text x="685.0" y="1199.7" font-size="22" text-anchor="middle" class="">6D 旋转表示 → SO(3)</text>
+<path d="M935 1177 L1015 1177" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1015" y="1133" width="305" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1167.5" y="1184.7" font-size="22" text-anchor="middle" class="bold">ContactNet + TTA</text>
+<text x="60" y="1253" font-size="20" text-anchor="start" class="muted">这是一条替换建模方式的 baseline，不是直接拔掉某个层。</text>
+<rect x="24" y="1290" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="1327" font-size="25" text-anchor="start" class="bold">完整方案（R + GL + T）：旋转分解 + Glow + TTA</text>
+<rect x="60" y="1355" width="130" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="125.0" y="1406.7" font-size="22" text-anchor="middle" class="bold">点云</text>
+<path d="M190 1399 L230 1399" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="230" y="1355" width="190" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="325.0" y="1391.7" font-size="22" text-anchor="middle" class="bold">GraspIPDF</text>
+<text x="325.0" y="1421.7" font-size="22" text-anchor="middle" class="">采样旋转 R</text>
+<path d="M420 1399 L460 1399" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="460" y="1355" width="215" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="567.5" y="1391.7" font-size="22" text-anchor="middle" class="bold">按 R⁻¹</text>
+<text x="567.5" y="1421.7" font-size="22" text-anchor="middle" class="">规范化点云</text>
+<path d="M675 1399 L715 1399" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="715" y="1355" width="265" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="847.5" y="1391.7" font-size="22" text-anchor="middle" class="bold">GraspGlow</text>
+<text x="847.5" y="1421.7" font-size="22" text-anchor="middle" class="">生成位置 t、关节 q</text>
+<path d="M980 1399 L1020 1399" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1020" y="1355" width="300" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1170.0" y="1391.7" font-size="22" text-anchor="middle" class="bold">ContactNet + TTA</text>
+<text x="1170.0" y="1421.7" font-size="22" text-anchor="middle" class="">优化当前抓姿</text>
+<text x="60" y="1475" font-size="20" text-anchor="start" class="muted">GL：GraspGlow。位置与关节配置仍然联合生成。</text>
+<text x="40" y="1547" font-size="26" text-anchor="start" class="bold">Table 2：进一步检查“怎样分解”和“是否保留测试时优化”</text>
+<rect x="24" y="1577" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="1614" font-size="25" text-anchor="start" class="bold">decoup.T：进一步拆开位置与关节生成</text>
+<rect x="60" y="1642" width="270" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="195.0" y="1678.7" font-size="22" text-anchor="middle" class="bold">点云 → GraspIPDF</text>
+<text x="195.0" y="1708.7" font-size="22" text-anchor="middle" class="">采样旋转 R</text>
+<path d="M330 1686 L370 1686" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="370" y="1642" width="215" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="477.5" y="1678.7" font-size="22" text-anchor="middle" class="bold">按 R⁻¹</text>
+<text x="477.5" y="1708.7" font-size="22" text-anchor="middle" class="">规范化点云</text>
+<path d="M585 1686 L625 1686" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="625" y="1642" width="315" height="88" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="782.5" y="1678.7" font-size="22" text-anchor="middle" class="bold">分开生成 t 与 q</text>
+<text x="782.5" y="1708.7" font-size="22" text-anchor="middle" class="">概念示意</text>
+<path d="M940 1686 L980 1686" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="980" y="1642" width="340" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1150.0" y="1693.7" font-size="22" text-anchor="middle" class="bold">ContactNet + TTA</text>
+<text x="60" y="1762" font-size="20" text-anchor="start" class="muted">论文未给出精确条件顺序；此图不假设 t 与 q 独立，也不指定自回归网络。</text>
+<rect x="24" y="1799" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="1836" font-size="25" text-anchor="start" class="bold">w/o TTA：跳过测试时抓姿修正</text>
+<rect x="60" y="1864" width="270" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="195.0" y="1900.7" font-size="22" text-anchor="middle" class="bold">点云 → GraspIPDF</text>
+<text x="195.0" y="1930.7" font-size="22" text-anchor="middle" class="">采样旋转 R</text>
+<path d="M330 1908 L370 1908" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="370" y="1864" width="215" height="88" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="477.5" y="1900.7" font-size="22" text-anchor="middle" class="bold">按 R⁻¹</text>
+<text x="477.5" y="1930.7" font-size="22" text-anchor="middle" class="">规范化点云</text>
+<path d="M585 1908 L625 1908" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="625" y="1864" width="315" height="88" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="782.5" y="1900.7" font-size="22" text-anchor="middle" class="bold">GraspGlow</text>
+<text x="782.5" y="1930.7" font-size="22" text-anchor="middle" class="">联合生成 t、q</text>
+<path d="M940 1908 L980 1908" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="980" y="1864" width="340" height="88" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="1150.0" y="1900.7" font-size="22" text-anchor="middle" class="bold">跳过 TTA</text>
+<text x="1150.0" y="1930.7" font-size="22" text-anchor="middle" class="">直接输出抓姿</text>
+<text x="60" y="1984" font-size="20" text-anchor="start" class="muted">移除的是测试时优化；不能据此说 ContactNet 相关训练损失也被移除。</text>
+<text x="40" y="2040" font-size="21" text-anchor="start" class="">阅读边界：主表没有单独的“去掉端到端接触训练”一行；不额外补造消融。</text>
+</svg>

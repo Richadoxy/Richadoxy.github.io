@@ -185,6 +185,8 @@ z_t=\operatorname{stopgrad}(\mu(e_t)),\qquad
 
 数据采集也需要区分：执行策略使用的是 \(\pi(o_t,\hat z_t)\)，因此历史来自“估计 latent 的控制器”实际访问的状态。与此同时，仿真仍提供 \(e_t\)，冻结的 \(\mu\) 可以为同一状态产生监督目标。它不是只在完美 Expert 的成功轨迹上离线拟合一次。
 
+这可以称为 **on-policy latent supervision**：on-policy 指采样来自当前适应策略，latent supervision 指梯度来自潜变量误差。核对下文链接的 v0.0.1 实现，它没有采用原始 DAgger 的跨轮数据集聚合循环，因此不宜直接称作“用 latent loss 的标准 DAgger”。监督目标与数据采集是两条轴，通用区别见 [RL03 的 BC、DAgger 与 latent 监督](45_teacher_student_and_sim_to_real.md)。
+
 ~~~python
 # 概念化第二阶段；省略归一化与并行环境接口
 for parameter in encoder_and_control_parameters:

@@ -52,4 +52,12 @@ The archive is organized into seven dependency-first series: foundations, imitat
 
 The PI0.5 path separates forward architecture (`VLA02`) from FAST/KI training and fine-tuning (`VLA03`), then connects to the engineering notes. Official openpi code references in the training article are pinned to a commit; BrainCo-IL-specific configuration examples remain identified as project extensions.
 
-The RL path starts with a research map and knowledge tree (RL01), develops actor–critic networks, return targets, GAE, and PPO with worked examples and annotated pseudocode (RL02), then explains teacher–student and deployment (RL03), and applies the concepts in a HORA paper walkthrough (RL04). Markdown sources are 43_dexterous_rl_overview.md through 46_hora_paper_walkthrough.md. Four standalone SVG figures distinguish forward computation, fixed training targets, gradient updates, and HORA baseline variants. Regenerate them with `python3 scripts/build_rl_figures.py` before rebuilding the blog.
+The RL path starts with a research map (RL01), develops actor–critic networks, returns, GAE, PPO, and goal conditioning (RL02), then explains teacher–student transfer, DAgger, and deployment (RL03). HORA (RL04) and UniDexGrasp (RL06) provide detailed paper walkthroughs; the experiment-reading guide (RL05) can be read before either paper. The UniDexGrasp article distinguishes proposal generation, contact optimization, teacher training, student distillation, and evaluation, with six standalone SVG diagrams. The action-generation foundations (IL03) also distinguish Normalizing Flow from Flow Matching. Bundled sources are in `blog/source/`, including `47_unidexgrasp_paper_walkthrough.md` and `48_rl_experiment_reading.md`.
+
+Regenerate the RL diagrams before rebuilding the blog:
+
+```bash
+python3 scripts/build_rl_figures.py
+python3 scripts/build_unidexgrasp_figures.py
+.blog-build-env/bin/python scripts/build_blog.py
+```

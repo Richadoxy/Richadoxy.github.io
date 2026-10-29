@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1540" viewBox="0 0 1400 1540" role="img" aria-labelledby="title desc">
+<title id="title">UniDexGrasp：Teacher 的结构与监督消融（Table 3）</title><desc id="desc">完整教师、去掉坐标规范化、去掉类别辅助监督的对照。PPO更新策略；分类损失更新几何表示。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}.muted{fill:#475569}</style>
+<rect width="1400" height="1540" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">UniDexGrasp：Teacher 的结构与监督消融（Table 3）</text>
+<text x="40" y="94" font-size="21" text-anchor="start" class="">蓝色：保留的学习模块；橙色／灰色：改动。三行均需按对应设置训练和评估。</text>
+<rect x="40" y="120" width="24" height="24" rx="4" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="74" y="140" font-size="20" text-anchor="start" class="">学习模块</text>
+<rect x="270" y="120" width="24" height="24" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="304" y="140" font-size="20" text-anchor="start" class="">输入／表示</text>
+<rect x="500" y="120" width="24" height="24" rx="4" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="534" y="140" font-size="20" text-anchor="start" class="">相对完整方案的改动</text>
+<rect x="880" y="120" width="24" height="24" rx="4" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+<text x="914" y="140" font-size="20" text-anchor="start" class="">移除／跳过</text>
+<rect x="1130" y="120" width="24" height="24" rx="4" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="1164" y="140" font-size="20" text-anchor="start" class="">仿真／评估</text>
+<rect x="24" y="180" width="1352" height="395" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="217" font-size="25" text-anchor="start" class="bold">完整 Teacher</text>
+<rect x="55" y="255" width="215" height="75" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="162.5" y="285.2" font-size="22" text-anchor="middle" class="bold">完整物体点云</text>
+<text x="162.5" y="315.2" font-size="22" text-anchor="middle" class="">Xᴼ</text>
+<rect x="310" y="255" width="210" height="75" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="415.0" y="285.2" font-size="22" text-anchor="middle" class="bold">PointNet</text>
+<text x="415.0" y="315.2" font-size="22" text-anchor="middle" class="">物体几何特征</text>
+<path d="M270 292 L310 292" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="620" y="245" width="260" height="80" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="750.0" y="277.7" font-size="22" text-anchor="middle" class="bold">分类 MLP</text>
+<text x="750.0" y="307.7" font-size="22" text-anchor="middle" class="">类别监督 CE</text>
+<path d="M415 255 L415 237 L750 237 L750 245" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="55" y="395" width="465" height="80" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="287.5" y="427.7" font-size="22" text-anchor="middle" class="bold">物体真值状态 + 本体状态 + 目标</text>
+<text x="287.5" y="457.7" font-size="22" text-anchor="middle" class="">sᵒ、sʳ、g</text>
+<rect x="570" y="395" width="200" height="80" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="670.0" y="427.7" font-size="22" text-anchor="middle" class="bold">SC 输入变换</text>
+<text x="670.0" y="457.7" font-size="22" text-anchor="middle" class="">规范坐标系</text>
+<path d="M520 435 L570 435" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="825" y="370" width="260" height="125" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="955.0" y="410.2" font-size="22" text-anchor="middle" class="bold">Teacher 策略</text>
+<text x="955.0" y="440.2" font-size="22" text-anchor="middle" class="">Actor / Critic MLP</text>
+<text x="955.0" y="470.2" font-size="22" text-anchor="middle" class="">PPO 训练</text>
+<path d="M770 435 L825 435" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M520 292 L560 292 L560 350 L955 350 L955 370" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1130" y="385" width="205" height="95" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="1232.5" y="425.35" font-size="21" text-anchor="middle" class="bold">Actor 动作</text>
+<text x="1232.5" y="454.35" font-size="21" text-anchor="middle" class="">SC 恢复 → 执行</text>
+<path d="M1085 435 L1130 435" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<text x="60" y="537" font-size="21" text-anchor="start" class="">拼接后供控制器读取；分类头只提供辅助训练目标，不是 Critic。</text>
+<rect x="24" y="600" width="1352" height="395" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="637" font-size="25" text-anchor="start" class="bold">w/o SC：移除状态规范化与动作坐标恢复</text>
+<rect x="55" y="675" width="215" height="75" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="162.5" y="705.2" font-size="22" text-anchor="middle" class="bold">完整物体点云</text>
+<text x="162.5" y="735.2" font-size="22" text-anchor="middle" class="">Xᴼ</text>
+<rect x="310" y="675" width="210" height="75" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="415.0" y="705.2" font-size="22" text-anchor="middle" class="bold">PointNet</text>
+<text x="415.0" y="735.2" font-size="22" text-anchor="middle" class="">物体几何特征</text>
+<path d="M270 712 L310 712" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="620" y="665" width="260" height="80" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="750.0" y="697.7" font-size="22" text-anchor="middle" class="bold">分类 MLP</text>
+<text x="750.0" y="727.7" font-size="22" text-anchor="middle" class="">类别监督 CE</text>
+<path d="M415 675 L415 657 L750 657 L750 665" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="55" y="815" width="465" height="80" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="287.5" y="847.7" font-size="22" text-anchor="middle" class="bold">物体真值状态 + 本体状态 + 目标</text>
+<text x="287.5" y="877.7" font-size="22" text-anchor="middle" class="">sᵒ、sʳ、g</text>
+<rect x="570" y="815" width="200" height="80" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="670.0" y="847.7" font-size="22" text-anchor="middle" class="bold">跳过 SC</text>
+<text x="670.0" y="877.7" font-size="22" text-anchor="middle" class="">原坐标输入</text>
+<path d="M520 855 L570 855" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="825" y="790" width="260" height="125" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="955.0" y="830.2" font-size="22" text-anchor="middle" class="bold">Teacher 策略</text>
+<text x="955.0" y="860.2" font-size="22" text-anchor="middle" class="">Actor / Critic MLP</text>
+<text x="955.0" y="890.2" font-size="22" text-anchor="middle" class="">PPO 训练</text>
+<path d="M770 855 L825 855" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M520 712 L560 712 L560 770 L955 770 L955 790" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1130" y="805" width="205" height="95" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="1232.5" y="845.35" font-size="21" text-anchor="middle" class="bold">Actor 动作</text>
+<text x="1232.5" y="874.35" font-size="21" text-anchor="middle" class="">原坐标 → 执行</text>
+<path d="M1085 855 L1130 855" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<text x="60" y="957" font-size="21" text-anchor="start" class="">拼接后供控制器读取；分类头只提供辅助训练目标，不是 Critic。</text>
+<rect x="24" y="1020" width="1352" height="395" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="1057" font-size="25" text-anchor="start" class="bold">w/o cls：移除类别辅助监督，保留 PointNet</text>
+<rect x="55" y="1095" width="215" height="75" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="162.5" y="1125.2" font-size="22" text-anchor="middle" class="bold">完整物体点云</text>
+<text x="162.5" y="1155.2" font-size="22" text-anchor="middle" class="">Xᴼ</text>
+<rect x="310" y="1095" width="210" height="75" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="415.0" y="1125.2" font-size="22" text-anchor="middle" class="bold">PointNet</text>
+<text x="415.0" y="1155.2" font-size="22" text-anchor="middle" class="">物体几何特征</text>
+<path d="M270 1132 L310 1132" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="620" y="1085" width="260" height="80" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="750.0" y="1117.7" font-size="22" text-anchor="middle" class="bold">移除分类分支</text>
+<text x="750.0" y="1147.7" font-size="22" text-anchor="middle" class="">不计算类别 loss</text>
+<path d="M415 1095 L415 1077 L750 1077 L750 1085" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" stroke-dasharray="7 6"/>
+<rect x="55" y="1235" width="465" height="80" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="287.5" y="1267.7" font-size="22" text-anchor="middle" class="bold">物体真值状态 + 本体状态 + 目标</text>
+<text x="287.5" y="1297.7" font-size="22" text-anchor="middle" class="">sᵒ、sʳ、g</text>
+<rect x="570" y="1235" width="200" height="80" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="670.0" y="1267.7" font-size="22" text-anchor="middle" class="bold">SC 输入变换</text>
+<text x="670.0" y="1297.7" font-size="22" text-anchor="middle" class="">规范坐标系</text>
+<path d="M520 1275 L570 1275" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="825" y="1210" width="260" height="125" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="955.0" y="1250.2" font-size="22" text-anchor="middle" class="bold">Teacher 策略</text>
+<text x="955.0" y="1280.2" font-size="22" text-anchor="middle" class="">Actor / Critic MLP</text>
+<text x="955.0" y="1310.2" font-size="22" text-anchor="middle" class="">PPO 训练</text>
+<path d="M770 1275 L825 1275" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M520 1132 L560 1132 L560 1190 L955 1190 L955 1210" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1130" y="1225" width="205" height="95" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="1232.5" y="1265.35" font-size="21" text-anchor="middle" class="bold">Actor 动作</text>
+<text x="1232.5" y="1294.35" font-size="21" text-anchor="middle" class="">SC 恢复 → 执行</text>
+<path d="M1085 1275 L1130 1275" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<text x="60" y="1377" font-size="21" text-anchor="start" class="">拼接后供控制器读取；分类头只提供辅助训练目标，不是 Critic。</text>
+<text x="40" y="1480" font-size="22" text-anchor="start" class="bold">这是论文的模块与监督关系图，不是完整自动微分图。</text>
+<text x="40" y="1515" font-size="21" text-anchor="start" class="">论文的 PointNet 涉及 BC／分类训练；公开 state-based 代码读取预计算点云特征。</text>
+</svg>

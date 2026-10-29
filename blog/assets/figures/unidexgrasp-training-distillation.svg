@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1800" viewBox="0 0 1400 1800" role="img" aria-labelledby="title desc">
+<title id="title">UniDexGrasp：Teacher 训练与 Student 蒸馏（Fig. 3 解读）</title><desc id="desc">Teacher 通过 PPO 从环境回报学习；Student 在自己访问的状态上向冻结 Teacher 请求动作标签。橙色虚线表示参数更新。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}.muted{fill:#475569}</style>
+<rect width="1400" height="1800" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">UniDexGrasp：Teacher 训练与 Student 蒸馏（Fig. 3 解读）</text>
+<text x="40" y="94" font-size="21" text-anchor="start" class="">实线：数据／监督目标流；橙色虚线：参数更新。阶段 B 冻结 Teacher，只训练 Student。</text>
+<rect x="40" y="120" width="24" height="24" rx="4" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="74" y="140" font-size="20" text-anchor="start" class="">学习模块</text>
+<rect x="270" y="120" width="24" height="24" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="304" y="140" font-size="20" text-anchor="start" class="">输入／表示</text>
+<rect x="500" y="120" width="24" height="24" rx="4" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="534" y="140" font-size="20" text-anchor="start" class="">相对完整方案的改动</text>
+<rect x="880" y="120" width="24" height="24" rx="4" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+<text x="914" y="140" font-size="20" text-anchor="start" class="">移除／跳过</text>
+<rect x="1130" y="120" width="24" height="24" rx="4" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="1164" y="140" font-size="20" text-anchor="start" class="">仿真／评估</text>
+<rect x="24" y="180" width="1352" height="690" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="217" font-size="25" text-anchor="start" class="bold">A. 训练 Teacher：控制学习与几何表示辅助学习各有监督</text>
+<rect x="60" y="280" width="300" height="100" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="210.0" y="322.7" font-size="22" text-anchor="middle" class="bold">物体真值 + 本体 + 目标</text>
+<text x="210.0" y="352.7" font-size="22" text-anchor="middle" class="">sᵒₜ、sʳₜ、g</text>
+<rect x="410" y="280" width="230" height="100" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="525.0" y="322.7" font-size="22" text-anchor="middle" class="bold">状态规范化 SC</text>
+<text x="525.0" y="352.7" font-size="22" text-anchor="middle" class="">变换到参考坐标系</text>
+<rect x="700" y="280" width="170" height="100" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="785.0" y="322.7" font-size="22" text-anchor="middle" class="bold">拼接输入</text>
+<text x="785.0" y="352.7" font-size="22" text-anchor="middle" class="">状态 + 几何</text>
+<path d="M360 330 L410 330" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M640 330 L700 330" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="950" y="250" width="190" height="90" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1045.0" y="287.7" font-size="22" text-anchor="middle" class="bold">Actor MLP</text>
+<text x="1045.0" y="317.7" font-size="22" text-anchor="middle" class="">动作分布 πᴱ</text>
+<rect x="950" y="380" width="190" height="90" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1045.0" y="417.7" font-size="22" text-anchor="middle" class="bold">Critic MLP</text>
+<text x="1045.0" y="447.7" font-size="22" text-anchor="middle" class="">价值预测 V</text>
+<path d="M870 315 L910 315 L910 295 L950 295" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M870 345 L910 345 L910 425 L950 425" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1190" y="250" width="140" height="90" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="1260.0" y="288.0" font-size="20" text-anchor="middle" class="bold">动作 aᴱ</text>
+<text x="1260.0" y="316.0" font-size="20" text-anchor="middle" class="">SC 恢复</text>
+<path d="M1140 295 L1190 295" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="60" y="450" width="280" height="90" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="200.0" y="487.7" font-size="22" text-anchor="middle" class="bold">完整物体点云 Xᴼ</text>
+<text x="200.0" y="517.7" font-size="22" text-anchor="middle" class="">预采样物体几何</text>
+<rect x="390" y="450" width="250" height="90" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="515.0" y="487.7" font-size="22" text-anchor="middle" class="bold">PointNet</text>
+<text x="515.0" y="517.7" font-size="22" text-anchor="middle" class="">几何特征</text>
+<path d="M340 495 L390 495" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M640 495 L780 495 L780 380" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="390" y="630" width="320" height="100" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="550.0" y="672.7" font-size="22" text-anchor="middle" class="bold">表示学习辅助目标</text>
+<text x="550.0" y="702.7" font-size="22" text-anchor="middle" class="">BC + 类别分类 CE</text>
+<path d="M470 540 L470 630" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<defs><marker id="grad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ea580c"/></marker></defs>
+<path d="M610 630 L610 540" fill="none" stroke="#ea580c" stroke-width="2.8" stroke-dasharray="8 7" stroke-linejoin="round" marker-end="url(#grad)"/>
+<rect x="1130" y="570" width="200" height="100" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2" />
+<text x="1230.0" y="612.7" font-size="22" text-anchor="middle" class="bold">仿真环境</text>
+<text x="1230.0" y="642.7" font-size="22" text-anchor="middle" class="">交互轨迹与奖励</text>
+<path d="M1260 340 L1260 570" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="800" y="630" width="280" height="125" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="940.0" y="670.2" font-size="22" text-anchor="middle" class="bold">PPO 更新</text>
+<text x="940.0" y="700.2" font-size="22" text-anchor="middle" class="">回报目标 / 优势</text>
+<text x="940.0" y="730.2" font-size="22" text-anchor="middle" class="">Actor 与 Critic loss</text>
+<path d="M1130 620 L1100 620 L1100 690 L1080 690" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M1000 470 L1000 560 L940 560 L940 630" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M890 630 L890 230 L1045 230 L1045 250" fill="none" stroke="#ea580c" stroke-width="2.8" stroke-dasharray="8 7" stroke-linejoin="round" marker-end="url(#grad)"/>
+<path d="M1030 630 L1030 520 L1080 520 L1080 470" fill="none" stroke="#ea580c" stroke-width="2.8" stroke-dasharray="8 7" stroke-linejoin="round" marker-end="url(#grad)"/>
+<text x="60" y="800" font-size="22" text-anchor="start" class="bold">PPO 训练控制网络；BC／分类辅助训练 PointNet，不把分类头当作 Critic。</text>
+<text x="60" y="840" font-size="21" text-anchor="start" class="">这是模块关系图：发布的 state-based Teacher 代码读取预计算点云特征。</text>
+<rect x="24" y="900" width="1352" height="840" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="937" font-size="25" text-anchor="start" class="bold">B. 动作蒸馏：在 Student 访问的状态上获得 Teacher 标签</text>
+<rect x="60" y="1000" width="340" height="90" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="230.0" y="1037.7" font-size="22" text-anchor="middle" class="bold">Student 观测与目标</text>
+<text x="230.0" y="1067.7" font-size="22" text-anchor="middle" class="">Xₜ、sʳₜ、g</text>
+<rect x="450" y="1000" width="270" height="90" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="585.0" y="1037.7" font-size="22" text-anchor="middle" class="bold">SC + 点云编码</text>
+<text x="585.0" y="1067.7" font-size="22" text-anchor="middle" class="">输入表示</text>
+<rect x="800" y="1000" width="270" height="90" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="935.0" y="1037.7" font-size="22" text-anchor="middle" class="bold">Student 策略 πˢ</text>
+<text x="935.0" y="1067.7" font-size="22" text-anchor="middle" class="">可训练参数 θˢ</text>
+<rect x="1140" y="1000" width="190" height="90" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="1235.0" y="1038.0" font-size="20" text-anchor="middle" class="bold">预测动作 aˢ</text>
+<text x="1235.0" y="1066.0" font-size="20" text-anchor="middle" class="">SC 恢复后执行</text>
+<path d="M400 1045 L450 1045" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M720 1045 L800 1045" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M1070 1045 L1140 1045" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1120" y="1180" width="220" height="90" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2" />
+<text x="1230.0" y="1217.7" font-size="22" text-anchor="middle" class="bold">仿真环境</text>
+<text x="1230.0" y="1247.7" font-size="22" text-anchor="middle" class="">Student rollout</text>
+<path d="M1235 1090 L1235 1180" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M1340 1225 L1360 1225 L1360 975 L230 975 L230 1000" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="60" y="1180" width="340" height="90" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="230.0" y="1217.7" font-size="22" text-anchor="middle" class="bold">同一个访问状态</text>
+<text x="230.0" y="1247.7" font-size="22" text-anchor="middle" class="">对应特权输入与目标</text>
+<rect x="450" y="1180" width="320" height="90" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="610.0" y="1217.7" font-size="22" text-anchor="middle" class="bold">冻结 Teacher πᴱ</text>
+<text x="610.0" y="1247.7" font-size="22" text-anchor="middle" class="">提供动作标签</text>
+<rect x="820" y="1180" width="190" height="90" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="915.0" y="1217.7" font-size="22" text-anchor="middle" class="bold">标签动作 aᴱ</text>
+<text x="915.0" y="1247.7" font-size="22" text-anchor="middle" class="">无梯度</text>
+<path d="M1120 1235 L1090 1235 L1090 1310 L230 1310 L230 1270" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M400 1225 L450 1225" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M770 1225 L820 1225" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="60" y="1430" width="360" height="120" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2" />
+<text x="240.0" y="1467.7" font-size="22" text-anchor="middle" class="bold">收集／聚合标注样本</text>
+<text x="240.0" y="1497.7" font-size="22" text-anchor="middle" class="">(Student 输入, aᴱ)</text>
+<text x="240.0" y="1527.7" font-size="22" text-anchor="middle" class="">反复交互并重新拟合</text>
+<path d="M915 1270 L915 1380 L240 1380 L240 1430" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="550" y="1430" width="430" height="120" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="765.0" y="1467.7" font-size="22" text-anchor="middle" class="bold">动作模仿损失</text>
+<text x="765.0" y="1497.7" font-size="22" text-anchor="middle" class="">L = ‖aˢ − aᴱ‖²</text>
+<text x="765.0" y="1527.7" font-size="22" text-anchor="middle" class="">更新 Student 编码器与策略</text>
+<path d="M420 1490 L550 1490" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M1330 1045 L1350 1045 L1350 1490 L980 1490" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<path d="M980 1520 L1040 1520 L1040 1090" fill="none" stroke="#ea580c" stroke-width="2.8" stroke-dasharray="8 7" stroke-linejoin="round" marker-end="url(#grad)"/>
+<path d="M550 1520 L430 1520 L430 1115 L585 1115 L585 1090" fill="none" stroke="#ea580c" stroke-width="2.8" stroke-dasharray="8 7" stroke-linejoin="round" marker-end="url(#grad)"/>
+<text x="60" y="1624" font-size="22" text-anchor="start" class="bold">DAgger 的关键是访问状态与标签采集方式；动作 MSE 本身并不等于 DAgger。</text>
+<text x="60" y="1662" font-size="21" text-anchor="start" class="">E / S 分别表示 Teacher / Student；图中 θˢ 包含 Student 的感知编码与动作网络参数。</text>
+<text x="60" y="1700" font-size="21" text-anchor="start" class="">g 是共享任务条件；目标特征的构造是否读取真值位姿，仍需检查代码的数据来源。</text>
+<text x="40" y="1775" font-size="21" text-anchor="start" class="">SC 为固定坐标变换；橙色更新仅作用于神经网络参数。图中省略批次与回合终止细节。</text>
+</svg>

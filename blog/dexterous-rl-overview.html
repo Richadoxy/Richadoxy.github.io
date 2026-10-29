@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="从知识树区分学习信号、网络、PPO 与训练框架，再连接灵巧手路线、实验设计和 HORA 精讲。" />
+    <meta name="description" content="从知识树区分学习信号、网络、PPO 与训练框架，再连接实验阅读、HORA 与 UniDexGrasp 精读。" />
     <title>灵巧手强化学习：研究范式与学习地图 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -72,12 +72,12 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL01</p>
           <h1>灵巧手强化学习：研究范式与学习地图</h1>
-          <p class="article-meta"><span data-lang="en">入门 · October 2026 · 15 min read</span><span data-lang="zh">入门 · 2026.10 · 约 15 分钟阅读</span></p>
-          <p class="article-deck">从知识树区分学习信号、网络、PPO 与训练框架，再连接灵巧手路线、实验设计和 HORA 精讲。</p>
+          <p class="article-meta"><span data-lang="en">入门 · October 2026 · 16 min read</span><span data-lang="zh">入门 · 2026.10 · 约 16 分钟阅读</span></p>
+          <p class="article-deck">从知识树区分学习信号、网络、PPO 与训练框架，再连接实验阅读、HORA 与 UniDexGrasp 精读。</p>
           <div class="article-content">
             <blockquote>
-<p>学习路线更新：2026-10-28；研究时间线沿用 2026-10-27 的文献核查。本文按任务、监督来源、学习算法、训练框架和部署接口组织研究地图；代表论文不按引用量排名，近期预印本单独标注。对“多数论文采用什么”只作路线分析，不给出未经统计的比例。</p>
-<p>本卷顺序：本文 RL01 → <a href="rl-basics-and-training-loop.html">RL 通识：Actor–Critic 与 PPO 训练闭环</a> RL02 → <a href="teacher-student-and-sim-to-real.html">Teacher–Student 与部署</a> RL03 → <a href="hora-paper-walkthrough.html">HORA 精讲</a> RL04。已有 <a href="vla-overview-reading-map.html">VLA 统一研究范式</a> 与 <a href="imitation-learning-behavior-cloning.html">模仿学习基础</a> 分别提供多模态策略和示范学习的背景。</p>
+<p>学习路线更新：2026-10-29；研究时间线沿用 2026-10-27 的文献核查。本文按任务、监督来源、学习算法、训练框架和部署接口组织研究地图；代表论文不按引用量排名，近期预印本单独标注。对“多数论文采用什么”只作路线分析，不给出未经统计的比例。</p>
+<p>基础路线：本文 RL01 → <a href="rl-basics-and-training-loop.html">Actor–Critic、PPO 与目标条件策略</a> RL02 → <a href="teacher-student-and-sim-to-real.html">Teacher–Student、DAgger 与部署</a> RL03 → <a href="rl-experiment-reading.html">RL 实验阅读</a> RL05。论文路线：<a href="hora-paper-walkthrough.html">HORA 精讲</a> RL04 → <a href="unidexgrasp-paper-walkthrough.html">UniDexGrasp 精读</a> RL06。已有 <a href="vla-overview-reading-map.html">VLA 统一研究范式</a> 与 <a href="imitation-learning-behavior-cloning.html">模仿学习基础</a> 提供多模态策略和示范学习背景；文章编号保留原有顺序，可按知识依赖选择阅读。</p>
 </blockquote>
 <h2 id="0">0. 知识树：先理解一次更新，再理解一篇论文</h2>
 <p>从模仿学习进入 RL，最重要的转换是学习信号的来源。行为克隆（Behavior Cloning，BC）用示范动作构造监督；RL 用交互结果构造策略更新信号。理解这个转换，需要先把网络怎样产生动作、奖励怎样评价后果、损失怎样更新参数连接起来，再讨论特权信息、蒸馏和真机适应。</p>
@@ -87,15 +87,19 @@
 │  ├─ 状态 / 观测 → 动作 / 动作分布 → 环境交互
 │  ├─ 单步 reward → 累计 return → 状态价值 V / 动作价值 Q → advantage
 │  ├─ encoder / actor / critic 的职责与网络结构
-│  └─ 采样数据 → GAE 与固定目标 → PPO loss → 参数更新
+│  ├─ 采样数据 → GAE 与固定目标 → PPO loss → 参数更新
+│  └─ goal 进入策略与奖励；目标、参考轨迹与动作标签
 ├─ 训练组织与部署（RL03）
 │  ├─ teacher 的训练方法与 student 的监督目标
 │  ├─ 动作蒸馏 / 分布蒸馏 / latent 监督
+│  ├─ BC / DAgger：谁访问状态，谁提供标签，是否聚合数据
 │  └─ 特权信息 → 可部署观测；更新 latent 与更新权重
-└─ 论文实例与证据（RL04：HORA）
-   ├─ 指尖旋转任务、奖励、初始抓持与域随机化
-   ├─ 特权策略 → 历史适应模块 → 真机控制
-   └─ 仿真 / 真机、分布内 / 分布外、baseline / ablation
+├─ 实验阅读（RL05）
+│  ├─ baseline / ablation / 输入扰动 / 任务定义变化
+│  └─ 分布与环境、成功率与条件误差、质量与多样性
+└─ 论文实例
+   ├─ HORA（RL04）：特权策略 → 历史适应模块 → 真机控制
+   └─ UniDexGrasp（RL06）：抓姿生成 → 目标条件 Teacher → 视觉 Student
 </code></pre>
 <p>这棵树对应三组需要分开的边界：<strong>网络结构与训练算法，实际回报与价值预测，通用框架与论文实例</strong>。同样一个 MLP 可以用监督学习或 PPO 训练；同样一个 PPO 可以训练直接部署的策略，也可以训练后续提供监督的 teacher。</p>
 <table>
@@ -118,9 +122,19 @@
 <td>Teacher、student、critic 的角色不同；监督目标决定训练哪些模块</td>
 </tr>
 <tr>
+<td>实验与证据</td>
+<td><a href="rl-experiment-reading.html">RL05</a></td>
+<td>区分模块、监督与课程消融；查清分布、统计样本和指标定义</td>
+</tr>
+<tr>
 <td>具体方法与验证</td>
 <td><a href="hora-paper-walkthrough.html">HORA 精讲</a></td>
 <td>把通识代入明确的输入维度、模块、损失、部署路径与实验协议</td>
+</tr>
+<tr>
+<td>生成与控制组合</td>
+<td><a href="unidexgrasp-paper-walkthrough.html">UniDexGrasp 精读</a></td>
+<td>区分抓姿分布、样本优化、PPO 与 DAgger，用 Fig. 2/3 和实验验证贡献</td>
 </tr>
 </tbody>
 </table>
@@ -345,9 +359,14 @@ r_t=w_g r_{\mathrm{task}}(s_t,g)
 <td>用本体感知历史进行物体属性适应</td>
 </tr>
 <tr>
-<td>2023</td>
-<td><a href="https://arxiv.org/abs/2303.00938">UniDexGrasp</a> / <a href="https://arxiv.org/abs/2304.00464">UniDexGrasp++</a></td>
-<td>抓姿目标、课程、专家与通用策略整合</td>
+<td>2023，CVPR</td>
+<td><a href="unidexgrasp-paper-walkthrough.html">UniDexGrasp</a></td>
+<td>多样抓姿生成、目标条件控制、物体课程与视觉蒸馏</td>
+</tr>
+<tr>
+<td>2023，ICCV</td>
+<td><a href="https://arxiv.org/abs/2304.00464">UniDexGrasp++</a></td>
+<td>几何课程与 generalist–specialist 学习；与原版分开阅读</td>
 </tr>
 <tr>
 <td>2023，CVPR</td>
@@ -524,6 +543,7 @@ r_t=w_g r_{\mathrm{task}}(s_t,g)
 </table>
 <p>DR（域随机化）和 SysID（系统辨识）是通用方法类别，NoAdapt、Periodic 等名字通常表达某篇论文具体设计的对照。它们并非灵巧手 RL 的固定必做清单。触觉论文可能需要有无触觉的对照，奖励论文需要奖励项的对照；HORA 的模块替换与冻结关系见 <a href="hora-paper-walkthrough.html">RL04</a>。</p>
 <p>评测还要同时记录两个独立维度：<strong>仿真／真机描述运行地点，分布内／分布外描述测试条件与训练条件的关系</strong>。改变仿真物体分布就能构成分布外测试；“分布外”本身不等于完成了 sim-to-real。</p>
+<p>目标扰动测试还应与训练消融分开：前者可以固定同一个模型，只改变测试输入；后者往往需要按新设置重新训练。成功率、只在成功样本上统计的误差、静态抓姿质量和概率密度也分别回答不同的问题。公式、例子与记录模板见 <a href="rl-experiment-reading.html">RL 实验阅读</a>，具体表格与对照框图见 <a href="unidexgrasp-paper-walkthrough.html">UniDexGrasp 精读</a>。</p>
 <h2 id="8">8. 推荐学习路线</h2>
 <h3 id="a-rl">路线 A：从模仿学习进入 RL</h3>
 <table>
@@ -552,8 +572,13 @@ r_t=w_g r_{\mathrm{task}}(s_t,g)
 </tr>
 <tr>
 <td>4</td>
-<td>UniDexGrasp / ++ → DextrAH-RGB</td>
-<td>进一步理解多物体泛化、专家整合与感知部署</td>
+<td><a href="action-generation-mse-token-diffusion-flow.html">动作生成基础</a> → <a href="rl-experiment-reading.html">实验阅读</a> → <a href="unidexgrasp-paper-walkthrough.html">UniDexGrasp 精读</a></td>
+<td>从 IPDF / Glow 与静态目标进入目标条件 PPO、DAgger 和跨物体实验</td>
+</tr>
+<tr>
+<td>5</td>
+<td>UniDexGrasp++ → DextrAH-RGB</td>
+<td>进一步理解专家整合与感知部署</td>
 </tr>
 </tbody>
 </table>

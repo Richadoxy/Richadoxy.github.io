@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1180" viewBox="0 0 1400 1180" role="img" aria-labelledby="title desc">
+<title id="title">UniDexGrasp：物体课程消融（Table 3）</title><desc id="desc">改变物体任务分布的顺序，保持策略模块结构。比较无课程、一阶段、二阶段和完整三阶段课程。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}.muted{fill:#475569}</style>
+<rect width="1400" height="1180" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">UniDexGrasp：物体课程消融（Table 3）</text>
+<text x="40" y="94" font-size="21" text-anchor="start" class="">a：单物体；b：单类别多个物体；c：三个代表类别；d：所有类别。箭头表示继续训练。</text>
+<rect x="40" y="120" width="24" height="24" rx="4" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="74" y="140" font-size="20" text-anchor="start" class="">学习模块</text>
+<rect x="270" y="120" width="24" height="24" rx="4" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="304" y="140" font-size="20" text-anchor="start" class="">输入／表示</text>
+<rect x="500" y="120" width="24" height="24" rx="4" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="534" y="140" font-size="20" text-anchor="start" class="">相对完整方案的改动</text>
+<rect x="880" y="120" width="24" height="24" rx="4" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+<text x="914" y="140" font-size="20" text-anchor="start" class="">移除／跳过</text>
+<rect x="1130" y="120" width="24" height="24" rx="4" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="1164" y="140" font-size="20" text-anchor="start" class="">仿真／评估</text>
+<rect x="24" y="180" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="217" font-size="25" text-anchor="start" class="bold">w/o OCL：直接训练所有类别</text>
+<rect x="70" y="245" width="270" height="85" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2" />
+<text x="205.0" y="295.2" font-size="22" text-anchor="middle" class="bold">d：所有类别</text>
+<text x="65" y="363" font-size="21" text-anchor="start" class="muted">从初始化直接面对全部物体分布。</text>
+<rect x="24" y="405" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="442" font-size="25" text-anchor="start" class="bold">1-stage OCL</text>
+<rect x="70" y="470" width="270" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="205.0" y="520.2" font-size="22" text-anchor="middle" class="bold">a：单物体</text>
+<path d="M340 512 L395 512" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="395" y="470" width="270" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="530.0" y="520.2" font-size="22" text-anchor="middle" class="bold">d：所有类别</text>
+<text x="65" y="588" font-size="21" text-anchor="start" class="muted">先学一个物体，再扩展到全部类别。</text>
+<rect x="24" y="630" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="667" font-size="25" text-anchor="start" class="bold">2-stage OCL</text>
+<rect x="70" y="695" width="270" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="205.0" y="745.2" font-size="22" text-anchor="middle" class="bold">a：单物体</text>
+<path d="M340 737 L395 737" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="395" y="695" width="270" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="530.0" y="730.2" font-size="22" text-anchor="middle" class="bold">b：单类别</text>
+<text x="530.0" y="760.2" font-size="22" text-anchor="middle" class="">多个物体</text>
+<path d="M665 737 L720 737" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="720" y="695" width="270" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="855.0" y="745.2" font-size="22" text-anchor="middle" class="bold">d：所有类别</text>
+<text x="65" y="813" font-size="21" text-anchor="start" class="muted">增加同类别内的物体变化。</text>
+<rect x="24" y="855" width="1352" height="205" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="55" y="892" font-size="25" text-anchor="start" class="bold">完整 3-stage OCL</text>
+<rect x="70" y="920" width="270" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="205.0" y="970.2" font-size="22" text-anchor="middle" class="bold">a：单物体</text>
+<path d="M340 962 L395 962" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="395" y="920" width="270" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="530.0" y="955.2" font-size="22" text-anchor="middle" class="bold">b：单类别</text>
+<text x="530.0" y="985.2" font-size="22" text-anchor="middle" class="">多个物体</text>
+<path d="M665 962 L720 962" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="720" y="920" width="270" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="855.0" y="955.2" font-size="22" text-anchor="middle" class="bold">c：三个</text>
+<text x="855.0" y="985.2" font-size="22" text-anchor="middle" class="">代表类别</text>
+<path d="M990 962 L1045 962" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arr)" />
+<rect x="1045" y="920" width="270" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+<text x="1180.0" y="970.2" font-size="22" text-anchor="middle" class="bold">d：所有类别</text>
+<text x="65" y="1038" font-size="21" text-anchor="start" class="muted">在全部类别前，增加代表类别之间的几何变化。</text>
+<text x="40" y="1125" font-size="22" text-anchor="start" class="bold">四组不靠删掉 Actor、Critic 或 Encoder 区分；改变的是训练任务分布与训练顺序。</text>
+<text x="40" y="1160" font-size="20" text-anchor="start" class="">这里的阶段不是“靠近 → 闭指 → 抬升”的动作阶段，也不是 UniDexGrasp++ 的专家整合流程。</text>
+</svg>
