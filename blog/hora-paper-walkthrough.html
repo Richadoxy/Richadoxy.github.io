@@ -36,7 +36,10 @@
           <div class="toc">
 <ul>
 <li><a href="#1">1. 从任务确定研究路线</a></li>
-<li><a href="#2">2. 符号、信息来源与维度</a></li>
+<li><a href="#2">2. 符号、信息来源与维度</a><ul>
+<li><a href="#21-observation">2.1 训练和部署究竟读哪些 observation？</a></li>
+</ul>
+</li>
 <li><a href="#3">3. 三个阶段对应三条不同的信息流</a></li>
 <li><a href="#4-ppo">4. 第一阶段：PPO 同时塑造环境表示与控制策略</a><ul>
 <li><a href="#41">4.1 物体信息编码器并不处理图像</a></li>
@@ -78,12 +81,12 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL04</p>
           <h1>HORA 精讲：从特权 PPO 策略到本体感知在线适应</h1>
-          <p class="article-meta"><span data-lang="en">精读 · October 2026 · 20 min read</span><span data-lang="zh">精读 · 2026.10 · 约 20 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">精读 · October 2026 · 22 min read</span><span data-lang="zh">精读 · 2026.10 · 约 22 分钟阅读</span></p>
           <p class="article-deck">将 RL 通识落实到 HORA 的三阶段网络、历史适应、控制接口与对照实验，区分论文设计和公开代码实现。</p>
           <div class="article-content">
             <blockquote>
 <p>阅读位置：<a href="dexterous-rl-overview.html">灵巧手 RL 研究地图</a> → <a href="rl-basics-and-training-loop.html">RL 基础：网络、回报与 PPO</a> → <a href="teacher-student-and-sim-to-real.html">Teacher–Student 与部署</a> → 本文。通识章节解释 Actor、Critic、GAE 和 PPO 如何工作；这里将这些概念落实到一篇论文的输入、网络、训练阶段与证据上。</p>
-<p>论文：Haozhi Qi 等，<em>In-Hand Object Rotation via Rapid Motor Adaptation</em>，CoRL 2022。本文结合<a href="https://arxiv.org/abs/2210.04887">论文</a>、<a href="https://haozhi.io/hora/">项目页</a>与<a href="https://github.com/HaozhiQi/hora/tree/v0.0.1">官方代码 v0.0.1</a>，于 2026-10-28 核对。下面明确区分论文的概念描述和公开实现细节；固定版本有助于定位代码，不代表所有实验数值都能逐项复现。</p>
+<p>论文：Haozhi Qi 等，<em>In-Hand Object Rotation via Rapid Motor Adaptation</em>，CoRL 2022。本文结合<a href="https://arxiv.org/abs/2210.04887">论文</a>、<a href="https://haozhi.io/hora/">项目页</a>与<a href="https://github.com/HaozhiQi/hora/tree/v0.0.1">官方代码 v0.0.1</a>，观测接口于 2026-11-01 补充核对。下面明确区分论文的概念描述和公开实现细节；固定版本有助于定位代码，不代表所有实验数值都能逐项复现。</p>
 </blockquote>
 <h2 id="1">1. 从任务确定研究路线</h2>
 <p>HORA 研究的是：物体已经被四指 Allegro Hand 稳定抓住后，利用指尖持续绕指定轴向旋转，并在物体尺寸、质量、形状等变化时保持操作。主体任务是手内持续旋转，不包含从桌面发现、接近并抓起物体的完整流程，也不能直接等同于任意目标姿态的通用重定向。</p>
@@ -228,6 +231,84 @@
 </table>
 <p>论文使用 \(o_t=(q_{t-2:t},a_{t-3:t-1})\) 表达短历史。阅读实现时，<code>compute_observations()</code> 和部署代码保存的是关节读数与 <code>cur_targets</code>／历史位置目标。本文的 \(u\) 特意将这类目标与原始高斯采样动作 \(a\) 分开。<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/tasks/allegro_hand_hora.py">观测与控制实现</a>、<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/deploy/deploy.py">部署实现</a></p>
 <p>\(e_t\) 也不全是固定物理常数：物体位置会随时间变化。\(z_t\) 的每一维没有预先指定必须代表质量或摩擦；它由控制任务的训练目标塑造。预测 \(z_t\) 成功，不意味着恢复了每个物理参数的精确值。</p>
+<h3 id="21-observation">2.1 训练和部署究竟读哪些 observation？</h3>
+<p>先区分<strong>网络接收的原始数据</strong>与<strong>编码后送入控制 MLP 的向量</strong>。忽略 batch 维度，公开实现将每一步记录成 <code>[关节位置 16, 位置目标 16]</code>；最近 3 步按时间顺序展平为 96 维，最近 30 步保留为 <code>30 × 32</code> 的历史。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>决策所需的原始输入</th>
+<th>控制 MLP 的实际输入</th>
+<th>特权信息还做什么？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第一阶段：训练特权 Teacher</td>
+<td><code>obs: [96]</code>；<code>priv_info: [9]</code></td>
+<td>短历史 96 + 特权编码器输出 8 = <strong>104 维</strong></td>
+<td>9 维信息经过编码器，直接影响动作；Critic 共享此控制骨干</td>
+</tr>
+<tr>
+<td>第二阶段：训练历史适应模块</td>
+<td><code>obs: [96]</code>；<code>proprio_hist: [30, 32]</code></td>
+<td>短历史 96 + 历史预测 latent 8 = <strong>104 维</strong></td>
+<td>仿真仍提供 9 维特权信息，但它用于生成 latent 监督标签，不用于当前动作的条件分支</td>
+</tr>
+<tr>
+<td>真机部署</td>
+<td><code>obs: [96]</code>；<code>proprio_hist: [30, 32]</code></td>
+<td>短历史 96 + 历史预测 latent 8 = <strong>104 维</strong></td>
+<td>不再需要物体特权信息或其编码器</td>
+</tr>
+</tbody>
+</table>
+<p>若同时运行 \(B\) 个环境，上述原始张量对应 <code>[B, 96]</code>、<code>[B, 9]</code> 和 <code>[B, 30, 32]</code>。短历史和长历史使用同一类记录；它们不是两套额外传感器。环境返回某个字段，也不等于当前阶段的 Actor 一定读取它。</p>
+<p>9 维特权向量在 <code>v0.0.1</code> 中的具体排列为：</p>
+<table>
+<thead>
+<tr>
+<th>切片，左闭右开</th>
+<th>字段</th>
+<th>维数</th>
+<th>真机部署如何处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0:3</code></td>
+<td>物体位置</td>
+<td>3</td>
+<td>整个特权分支由历史模块替代</td>
+</tr>
+<tr>
+<td><code>3:4</code></td>
+<td>物体尺寸缩放系数</td>
+<td>1</td>
+<td>同上；不是三轴尺寸向量</td>
+</tr>
+<tr>
+<td><code>4:5</code></td>
+<td>物体质量</td>
+<td>1</td>
+<td>不需要称重后作为输入</td>
+</tr>
+<tr>
+<td><code>5:6</code></td>
+<td>物体摩擦系数</td>
+<td>1</td>
+<td>不需要在线直接测得摩擦</td>
+</tr>
+<tr>
+<td><code>6:9</code></td>
+<td>物体质心偏移</td>
+<td>3</td>
+<td>不需要提供真实质心</td>
+</tr>
+</tbody>
+</table>
+<p>部署所需的关节位置来自机器人编码器，位置目标来自控制程序的命令记录。Actor 输入没有物体图像、物体朝向、关节速度或触觉；底层 PD 控制器使用关节速度，不代表高层 Actor 的 observation 也包含它。</p>
+<p>因此，HORA 中的“Student”更适合理解为<strong>历史适应模块与保留下来的控制器共同组成的部署策略</strong>。训练与部署都能形成 104 维控制输入，但其中 8 维 latent 的信息来源改变了。<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/tasks/allegro_hand_hora.py">观测实现</a>、<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/padapt/padapt.py">适应训练</a>、<a href="https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/deploy/deploy.py">真机部署</a></p>
 <h2 id="3">3. 三个阶段对应三条不同的信息流</h2>
 <p><img alt="HORA 的特权策略训练、历史适应学习和真机部署：实线为前向数据流，虚线为参数更新；第二阶段只训练历史适应模块" src="assets/figures/hora-training-deployment.svg" /></p>
 <p><a href="assets/figures/hora-training-deployment.svg">打开三阶段矢量图</a>。</p>

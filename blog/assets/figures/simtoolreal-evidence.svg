@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1370" viewBox="0 0 1400 1370" role="img" aria-labelledby="title desc">
+<title id="title">实验地图：不同对照支持不同结论</title>
+<desc id="desc">分别展示120次真机评估、刷子基线比较、仿真专用策略比较、训练相关性和训练消融，明确分布与证据边界。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}</style>
+<rect width="1400" height="1370" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">实验地图：不同对照支持不同结论</text>
+<text x="40" y="96" font-size="21" text-anchor="start">所有图表编号与协议均指 arXiv v2；Task Progress 是轨迹进度，不是功能成功率。</text>
+<rect x="24" y="135" width="1352" height="215" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="173" font-size="25" text-anchor="start" class="bold">Fig. 4／Table II：真实未见工具与轨迹</text>
+<rect x="55" y="200" width="600" height="125" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="355.0" y="238.2" font-size="22" text-anchor="middle" class="bold">6 类 × 2 实例 × 2 轨迹</text>
+<text x="355.0" y="270.2" font-size="22" text-anchor="middle">每组合 5 次，共 120 次</text>
+<text x="355.0" y="302.2" font-size="22" text-anchor="middle">测量：Task Progress</text>
+<rect x="745" y="200" width="600" height="125" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1045.0" y="238.2" font-size="22" text-anchor="middle" class="bold">通用策略的真实迁移</text>
+<text x="1045.0" y="270.2" font-size="22" text-anchor="middle">分工具、分轨迹差异</text>
+<text x="1045.0" y="302.2" font-size="22" text-anchor="middle">不能等同功能任务完成</text>
+<path d="M655 262 L745 262" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="24" y="375" width="1352" height="215" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="413" font-size="25" text-anchor="start" class="bold">Fig. 5：真机 red brush，两个初始条件</text>
+<rect x="55" y="440" width="600" height="125" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="355.0" y="478.2" font-size="22" text-anchor="middle" class="bold">完整方法／Fixed Grasp／Retargeting</text>
+<text x="355.0" y="510.2" font-size="22" text-anchor="middle">不需旋转：98.0／61.0／8.1%</text>
+<text x="355.0" y="542.2" font-size="22" text-anchor="middle">需要旋转：82.7／10.8／0.0%</text>
+<rect x="745" y="440" width="600" height="125" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1045.0" y="478.2" font-size="22" text-anchor="middle" class="bold">联合手臂与手的闭环控制有价值</text>
+<text x="1045.0" y="510.2" font-size="22" text-anchor="middle">同时涉及换指与反馈差异</text>
+<text x="1045.0" y="542.2" font-size="22" text-anchor="middle">不是 24 组合上的全面对照</text>
+<path d="M655 502 L745 502" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="24" y="615" width="1352" height="215" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="653" font-size="25" text-anchor="start" class="bold">Fig. 6／16：仿真中的 Specialist 泛化</text>
+<rect x="55" y="680" width="600" height="125" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="355.0" y="718.2" font-size="22" text-anchor="middle" class="bold">训练 Obj A／Traj A</text>
+<text x="355.0" y="750.2" font-size="22" text-anchor="middle">测试 A/A、A/B、B/A</text>
+<text x="355.0" y="782.2" font-size="22" text-anchor="middle">每类、每条件 10 次</text>
+<rect x="745" y="680" width="600" height="125" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1045.0" y="718.2" font-size="22" text-anchor="middle" class="bold">比较训练分布与跨物体／轨迹迁移</text>
+<text x="1045.0" y="750.2" font-size="22" text-anchor="middle">通用策略在变化条件下保持性能</text>
+<text x="1045.0" y="782.2" font-size="22" text-anchor="middle">未报告 B/B 第四栏</text>
+<path d="M655 742 L745 742" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="24" y="855" width="1352" height="215" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="893" font-size="25" text-anchor="start" class="bold">Fig. 7：不同 checkpoint 的训练与测试表现</text>
+<rect x="55" y="920" width="600" height="125" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="355.0" y="958.2" font-size="22" text-anchor="middle" class="bold">左：程序物体随机目标 reward</text>
+<text x="355.0" y="990.2" font-size="22" text-anchor="middle">右：仿真 DexToolBench 进度</text>
+<text x="355.0" y="1022.2" font-size="22" text-anchor="middle">累计环境步到约 120B</text>
+<rect x="745" y="920" width="600" height="125" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1045.0" y="958.2" font-size="22" text-anchor="middle" class="bold">两种目标的表现总体相关</text>
+<text x="1045.0" y="990.2" font-size="22" text-anchor="middle">测试进度并非逐点单调</text>
+<text x="1045.0" y="1022.2" font-size="22" text-anchor="middle">不是因果消融或真机训练曲线</text>
+<path d="M655 982 L745 982" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="24" y="1095" width="1352" height="215" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="1133" font-size="25" text-anchor="start" class="bold">Fig. 8：SAPG 与不对称 Critic 消融</text>
+<rect x="55" y="1160" width="600" height="125" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="355.0" y="1198.2" font-size="22" text-anchor="middle" class="bold">SAPG＋特权 Critic：完整配置</text>
+<text x="355.0" y="1230.2" font-size="22" text-anchor="middle">PPO＋特权／SAPG＋受限 Critic</text>
+<text x="355.0" y="1262.2" font-size="22" text-anchor="middle">5 个种子；训练 reward；约 9B 步</text>
+<rect x="745" y="1160" width="600" height="125" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1045.0" y="1198.2" font-size="22" text-anchor="middle" class="bold">优化／探索与价值信息均影响学习</text>
+<text x="1045.0" y="1230.2" font-size="22" text-anchor="middle">没有完整 2×2 组合</text>
+<text x="1045.0" y="1262.2" font-size="22" text-anchor="middle">未单独证明 LSTM 或触觉收益</text>
+<path d="M655 1222 L745 1222" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+</svg>

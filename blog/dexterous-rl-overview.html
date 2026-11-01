@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="从知识树区分学习信号、网络、PPO 与训练框架，再连接实验阅读、HORA 与 UniDexGrasp 精读。" />
+    <meta name="description" content="从知识树区分学习信号、网络、PPO 与训练框架，再连接实验阅读与 HORA、UniDexGrasp、SimToolReal、AdaDexTrack 精读。" />
     <title>灵巧手强化学习：研究范式与学习地图 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -72,12 +72,12 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL01</p>
           <h1>灵巧手强化学习：研究范式与学习地图</h1>
-          <p class="article-meta"><span data-lang="en">入门 · October 2026 · 16 min read</span><span data-lang="zh">入门 · 2026.10 · 约 16 分钟阅读</span></p>
-          <p class="article-deck">从知识树区分学习信号、网络、PPO 与训练框架，再连接实验阅读、HORA 与 UniDexGrasp 精读。</p>
+          <p class="article-meta"><span data-lang="en">入门 · October 2026 · 17 min read</span><span data-lang="zh">入门 · 2026.10 · 约 17 分钟阅读</span></p>
+          <p class="article-deck">从知识树区分学习信号、网络、PPO 与训练框架，再连接实验阅读与 HORA、UniDexGrasp、SimToolReal、AdaDexTrack 精读。</p>
           <div class="article-content">
             <blockquote>
-<p>学习路线更新：2026-10-29；研究时间线沿用 2026-10-27 的文献核查。本文按任务、监督来源、学习算法、训练框架和部署接口组织研究地图；代表论文不按引用量排名，近期预印本单独标注。对“多数论文采用什么”只作路线分析，不给出未经统计的比例。</p>
-<p>基础路线：本文 RL01 → <a href="rl-basics-and-training-loop.html">Actor–Critic、PPO 与目标条件策略</a> RL02 → <a href="teacher-student-and-sim-to-real.html">Teacher–Student、DAgger 与部署</a> RL03 → <a href="rl-experiment-reading.html">RL 实验阅读</a> RL05。论文路线：<a href="hora-paper-walkthrough.html">HORA 精讲</a> RL04 → <a href="unidexgrasp-paper-walkthrough.html">UniDexGrasp 精读</a> RL06。已有 <a href="vla-overview-reading-map.html">VLA 统一研究范式</a> 与 <a href="imitation-learning-behavior-cloning.html">模仿学习基础</a> 提供多模态策略和示范学习背景；文章编号保留原有顺序，可按知识依赖选择阅读。</p>
+<p>学习路线更新：2026-11-01；研究时间线沿用 2026-10-27 的文献核查，补充 SimToolReal v2、AdaDexTrack v1 精读、四篇论文的训练／部署观测对照及视觉状态估计前置知识。本文按任务、监督来源、学习算法、训练框架和部署接口组织研究地图；代表论文不按引用量排名，近期预印本单独标注。对“多数论文采用什么”只作路线分析，不给出未经统计的比例。</p>
+<p>基础路线：本文 RL01 → <a href="rl-basics-and-training-loop.html">Actor–Critic、PPO 与目标条件策略</a> RL02 → <a href="teacher-student-and-sim-to-real.html">Teacher–Student、DAgger 与部署</a> RL03 → <a href="rl-experiment-reading.html">RL 实验阅读</a> RL05。论文路线：<a href="hora-paper-walkthrough.html">HORA 精讲</a> RL04 → <a href="unidexgrasp-paper-walkthrough.html">UniDexGrasp 精读</a> RL06 → <a href="simtoolreal-paper-walkthrough.html">SimToolReal 精读</a> RL07 → <a href="adadextrack-paper-walkthrough.html">AdaDexTrack 精读</a> RL08。已有 <a href="vla-overview-reading-map.html">VLA 统一研究范式</a> 与 <a href="imitation-learning-behavior-cloning.html">模仿学习基础</a> 提供多模态策略和示范学习背景；文章编号保留原有顺序，可按知识依赖选择阅读。</p>
 </blockquote>
 <h2 id="0">0. 知识树：先理解一次更新，再理解一篇论文</h2>
 <p>从模仿学习进入 RL，最重要的转换是学习信号的来源。行为克隆（Behavior Cloning，BC）用示范动作构造监督；RL 用交互结果构造策略更新信号。理解这个转换，需要先把网络怎样产生动作、奖励怎样评价后果、损失怎样更新参数连接起来，再讨论特权信息、蒸馏和真机适应。</p>
@@ -94,12 +94,17 @@
 │  ├─ 动作蒸馏 / 分布蒸馏 / latent 监督
 │  ├─ BC / DAgger：谁访问状态，谁提供标签，是否聚合数据
 │  └─ 特权信息 → 可部署观测；更新 latent 与更新权重
+├─ 视觉状态估计（F05，按需补充）
+│  ├─ 位姿 / 四元数 / RGB-D / mesh / 坐标标定
+│  └─ FoundationPose → 工具状态估计 → 部署观测
 ├─ 实验阅读（RL05）
 │  ├─ baseline / ablation / 输入扰动 / 任务定义变化
 │  └─ 分布与环境、成功率与条件误差、质量与多样性
 └─ 论文实例
    ├─ HORA（RL04）：特权策略 → 历史适应模块 → 真机控制
-   └─ UniDexGrasp（RL06）：抓姿生成 → 目标条件 Teacher → 视觉 Student
+   ├─ UniDexGrasp（RL06）：抓姿生成 → 目标条件 Teacher → 视觉 Student
+   ├─ SimToolReal（RL07）：程序工具与随机目标 → 递归策略 → 未见工具轨迹跟踪
+   └─ AdaDexTrack（RL08）：参考状态 → PPO 专家 → BC 通用 Tracker → RL 调制器
 </code></pre>
 <p>这棵树对应三组需要分开的边界：<strong>网络结构与训练算法，实际回报与价值预测，通用框架与论文实例</strong>。同样一个 MLP 可以用监督学习或 PPO 训练；同样一个 PPO 可以训练直接部署的策略，也可以训练后续提供监督的 teacher。</p>
 <table>
@@ -122,6 +127,11 @@
 <td>Teacher、student、critic 的角色不同；监督目标决定训练哪些模块</td>
 </tr>
 <tr>
+<td>真实视觉接口</td>
+<td><a href="visual-state-estimation-and-foundationpose.html">F05</a></td>
+<td>物体位姿怎样从图像估计，如何变换坐标并成为策略观测</td>
+</tr>
+<tr>
 <td>实验与证据</td>
 <td><a href="rl-experiment-reading.html">RL05</a></td>
 <td>区分模块、监督与课程消融；查清分布、统计样本和指标定义</td>
@@ -135,6 +145,16 @@
 <td>生成与控制组合</td>
 <td><a href="unidexgrasp-paper-walkthrough.html">UniDexGrasp 精读</a></td>
 <td>区分抓姿分布、样本优化、PPO 与 DAgger，用 Fig. 2/3 和实验验证贡献</td>
+</tr>
+<tr>
+<td>跨工具目标控制</td>
+<td><a href="simtoolreal-paper-walkthrough.html">SimToolReal 精读</a></td>
+<td>先学通用控制，再用视频指定任务；分清 RL 网络、140 维观测、真实感知与泛化范围</td>
+</tr>
+<tr>
+<td>多专家跟踪与执行调整</td>
+<td><a href="adadextrack-paper-walkthrough.html">AdaDexTrack 精读</a></td>
+<td>分清参考状态与动作标签，理解 273 维观测、专家整合、三种调制和消融证据</td>
 </tr>
 </tbody>
 </table>
@@ -431,11 +451,11 @@ r_t=w_g r_{\mathrm{task}}(s_t,g)
 <tbody>
 <tr>
 <td><a href="https://janebek.github.io/AdaDexTrack/">AdaDexTrack，CVPR 2026</a></td>
-<td>在通用 tracker 周围加入 RL 调制器，反馈修正参考、物体表示和执行目标</td>
+<td>在通用 tracker 周围加入 RL 调制器，反馈修正参考、物体表示和执行目标；<a href="adadextrack-paper-walkthrough.html">v1 精读</a></td>
 </tr>
 <tr>
 <td><a href="https://www.roboticsproceedings.org/rss22/p151.html">SimToolReal，RSS 2026</a></td>
-<td>用程序生成的工具类物体训练统一目标位姿策略，减少逐工具和逐任务训练</td>
+<td>用程序生成的工具类物体训练统一目标位姿策略，减少逐工具和逐任务训练；<a href="simtoolreal-paper-walkthrough.html">v2 精读</a></td>
 </tr>
 <tr>
 <td><a href="https://arxiv.org/abs/2610.19089">DexMimic，2026-10 预印本</a></td>
@@ -583,7 +603,7 @@ r_t=w_g r_{\mathrm{task}}(s_t,g)
 </tbody>
 </table>
 <h3 id="b-tracking">路线 B：研究 tracking 与复杂操作</h3>
-<p>先理解 RL02 的 reward、reset 与 curriculum，再读 DexTrack → Human2Sim2Robot → DexMachina，最后看 AdaDexTrack 与 DexMimic。每篇记录“参考什么、谁生成参考、一个策略覆盖多少参考、部署时需要什么”。</p>
+<p>先理解 RL02 的 reward、reset 与 curriculum，再读 DexTrack → Human2Sim2Robot → <a href="simtoolreal-paper-walkthrough.html">SimToolReal 精读</a> → DexMachina，最后看 AdaDexTrack 与 DexMimic。每篇记录“参考什么、谁生成参考、一个策略覆盖多少参考、部署时需要什么”。SimToolReal 将训练中的随机目标与部署时的人类工具轨迹分开，是理解通用目标控制的一个具体实例。</p>
 <h3 id="c">路线 C：研究触觉与灵巧手</h3>
 <p>Rotating without Seeing → Robot Synesthesia → <a href="tactile-input-representation.html">触觉输入表示</a> → <a href="policy-memory-and-object-centric-tactile-state.html">对象级触觉记忆</a> → <a href="tactile-memory-experiment-design.html">实验设计</a>。</p>
 <p>这一分支关注传感器信息如何改善决策。RL teacher 可以提供技能或监督，但仿真接触力不等于真实触觉读数，特权物体状态也不能直接成为部署输入。</p>

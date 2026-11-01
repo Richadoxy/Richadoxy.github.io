@@ -88,7 +88,7 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL06</p>
           <h1>UniDexGrasp 精读：从多样抓姿生成到目标条件策略</h1>
-          <p class="article-meta"><span data-lang="en">精读 · October 2026 · 29 min read</span><span data-lang="zh">精读 · 2026.10 · 约 29 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">精读 · October 2026 · 32 min read</span><span data-lang="zh">精读 · 2026.10 · 约 32 分钟阅读</span></p>
           <p class="article-deck">沿 Fig. 2、Fig. 3 串联 IPDF、Glow、接触优化、PPO Teacher 与 DAgger Student，再用六张框图拆解训练、实验和消融。</p>
           <div class="article-content">
             <blockquote>
@@ -308,6 +308,135 @@ p(\widetilde{\mathbf t},\mathbf q\mid\widetilde X_0).
 <p>因此，UniDexGrasp 并不是“没有 object encoder”。它使用几何编码器，只是没有采用 HORA 那种显式的“特权环境 latent → 历史 latent”对齐结构。</p>
 <p>论文还采用源于 ILAD 的几何表示学习做法：通过行为克隆训练 PointNet，并加入物体类别分类目标。分类监督塑造几何表示，PPO 学习如何执行控制；不能仅凭图中有拼接，就断言同一个 PPO loss 更新了所有编码器。</p>
 <p>发布代码的 state-based 训练路径读取预计算的 64 维物体点云特征；需要将这条实现路径与论文的表示训练描述区分。复现时应分别追踪特征如何预训练、如何缓存、控制器何时读取它们。<a href="https://arxiv.org/html/2303.00938v2#S3.SS3.SSS1">Teacher 方法</a>、<a href="https://github.com/PKU-EPIC/UniDexGrasp/blob/36c9bfcf7cedc987dd15e2384c548e51d5aadc21/dexgrasp_policy/dexgrasp/tasks/shadow_hand_grasp.py">状态与特征实现</a></p>
+<p><strong>把训练和执行的 observation 摊开看：</strong></p>
+<table>
+<thead>
+<tr>
+<th>输入部分</th>
+<th>PPO Teacher</th>
+<th>DAgger Student 与执行接口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>机器人状态 \(s_t^r\)</td>
+<td>关节、指尖、手根部、受力与动作记录</td>
+<td>保留同类机器人状态；并非只有关节角</td>
+</tr>
+<tr>
+<td>显式物体状态 \(s_t^o\)</td>
+<td>物体位姿、线速度、角速度，由仿真提供</td>
+<td>论文接口移除这块显式 oracle 状态</td>
+</tr>
+<tr>
+<td>几何／视觉</td>
+<td>从完整物体 mesh 预采样的 <strong>2048 点</strong>，再提取几何特征</td>
+<td>当前场景中手与物体的 <strong>1024 点</strong>，再提取视觉特征</td>
+</tr>
+<tr>
+<td>目标 \(g\)</td>
+<td>希望形成的手根部位置、朝向和手指关节配置</td>
+<td>同样以目标抓姿为条件；目标误差的实现依赖见 §5.1</td>
+</tr>
+</tbody>
+</table>
+<p>Student 训练时，由仿真相机生成场景点云，并向固定 Teacher 查询动作标签。执行时运行 Student，仍需提供同样语义的机器人状态、场景点云和目标。论文主要执行评测在仿真中；这里的“部署接口”表示设计所需输入，不能据此宣称论文已经完成全部真机感知与控制验证。<a href="https://arxiv.org/html/2303.00938v2#A3.SS1">论文附录 C.1</a></p>
+<p>机器人状态的具体分量如下。<strong>论文 Table 5 与所固定代码的字段维数存在差别，两者应分别阅读：</strong></p>
+<table>
+<thead>
+<tr>
+<th>机器人状态字段</th>
+<th>论文 Table 5</th>
+<th>固定代码的默认手模型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>关节位置</td>
+<td>18</td>
+<td>22</td>
+</tr>
+<tr>
+<td>关节速度</td>
+<td>18</td>
+<td>22</td>
+</tr>
+<tr>
+<td>关节受力／力矩读数</td>
+<td>24</td>
+<td>22</td>
+</tr>
+<tr>
+<td>5 个指尖的位置与朝向</td>
+<td><code>5 × (3 + 4) = 35</code></td>
+<td>35；朝向用四元数</td>
+</tr>
+<tr>
+<td>5 个指尖的线速度与角速度</td>
+<td><code>5 × (3 + 3) = 30</code></td>
+<td>30</td>
+</tr>
+<tr>
+<td>5 个指尖的力与力矩</td>
+<td><code>5 × (3 + 3) = 30</code></td>
+<td>30</td>
+</tr>
+<tr>
+<td>手根部的位置与朝向</td>
+<td><code>3 + 3 × 3 = 12</code></td>
+<td><code>3 + 3 = 6</code>；代码用欧拉角</td>
+</tr>
+<tr>
+<td>最近执行的动作</td>
+<td>24</td>
+<td>24</td>
+</tr>
+<tr>
+<td>合计</td>
+<td><strong>191</strong></td>
+<td><strong>191</strong></td>
+</tr>
+</tbody>
+</table>
+<p>两边总数恰好相同，不代表内部格式相同。仿真直接提供上述状态；真机上的位置、速度和运动学量需要传感器与计算，受力／力矩还需要相应测量或估计。不能把整块机器人状态都简化成“读取关节编码器即可”。这里的质量、摩擦系数也不是物体 oracle 状态的默认字段。</p>
+<p><strong>读代码时，再区分原始缓冲区与编码后的 Actor 输入。</strong> 下表针对固定提交的 <code>full_state</code> 路径；切片均为左闭右开，并省略 batch 维度。</p>
+<table>
+<thead>
+<tr>
+<th>原始状态块</th>
+<th>切片</th>
+<th>内容与维数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>机器人状态</td>
+<td><code>0:191</code></td>
+<td>上表代码列，共 191 维</td>
+</tr>
+<tr>
+<td>物体相关状态</td>
+<td><code>191:207</code></td>
+<td>位置 3 + 四元数 4 + 线速度 3 + 角速度 3 + 抬升／移动目标相对物体的位置差 3 = 16</td>
+</tr>
+<tr>
+<td>抓姿目标误差</td>
+<td><code>207:236</code></td>
+<td>手掌相对目标的位置差 3 + 旋转差四元数 4 + 关节目标差 22 = 29</td>
+</tr>
+<tr>
+<td>完整物体几何特征</td>
+<td><code>236:300</code></td>
+<td>预计算的 64 维特征</td>
+</tr>
+</tbody>
+</table>
+<p>Teacher 控制网络读取这 <strong>300 维</strong>。视觉环境还在后面附加 <code>1024 × 6</code> 的 XYZ/RGB、1024 个手部掩码值和 1024 个物体掩码值，缓冲区合计 <strong>8492 维</strong>；其中的完整状态块也供 Teacher 标注使用。</p>
+<p>启用 <code>use_pc</code> 的视觉 Student 选取机器人状态 <code>0:191</code> 和目标误差 <code>207:236</code>，再拼接点云编码器输出的 128 维特征。因此，Student 的控制 MLP 实际读取：</p>
+<pre><code class="language-text">Teacher：机器人 191 + 物体相关状态 16 + 目标误差 29 + 完整几何特征 64 = 300
+Student：机器人 191                  + 目标误差 29 + 当前场景特征 128 = 348
+</code></pre>
+<p>8492 是环境缓冲区长度，348 是这个视觉分支编码后的控制输入长度。点云和掩码的打包方式还取决于所选 backbone，复现时需核对具体切片与 reshape。Student 不读取 Teacher 的 16 维显式物体块和 64 维完整几何特征，但其保留的目标误差仍有物体真值依赖，§5.1 会单独说明。<a href="https://github.com/PKU-EPIC/UniDexGrasp/blob/36c9bfcf7cedc987dd15e2384c548e51d5aadc21/dexgrasp_policy/dexgrasp/tasks/shadow_hand_random_load_vision.py">视觉环境与打包</a>、<a href="https://github.com/PKU-EPIC/UniDexGrasp/blob/36c9bfcf7cedc987dd15e2384c548e51d5aadc21/dexgrasp_policy/dexgrasp/algorithms/rl/dagger/module.py">Student 编码与切片</a></p>
 <h3 id="42-ppo">4.2 PPO 学的是完成目标所需的动作</h3>
 <p>Teacher 的目标可写成：</p>
 <p>\[
@@ -1083,7 +1212,7 @@ e_{\mathrm{MPE}}=
           </div>
           <nav class="post-pagination" aria-label="上一篇和下一篇">
             <a href="rl-experiment-reading.html">← RL05 · RL 实验阅读：从指标、分布到消融证据</a>
-            <span></span>
+            <a href="simtoolreal-paper-walkthrough.html">RL07 · SimToolReal 精读：先学会控制工具，再用视频指定任务 →</a>
           </nav>
         </article>
       </main>

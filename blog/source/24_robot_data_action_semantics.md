@@ -32,6 +32,8 @@ target
 
 `state_t` 描述机器人在哪里，`action_t` 描述控制器下一步应该做什么。二者维度可能相同，但语义不能互换。
 
+物体位姿也可以由外部视觉模块估计后加入 observation。关于 6D 位姿、四元数、相机到机器人的坐标转换，以及 FoundationPose 如何提供这类数值，见 [视觉状态估计基础](50_visual_state_estimation_and_foundationpose.md)。
+
 ## 3. 常见 Action 表示
 
 | 表示 | 示例 | 部署端含义 |

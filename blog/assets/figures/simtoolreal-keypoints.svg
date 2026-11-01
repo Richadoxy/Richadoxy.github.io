@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1080" viewBox="0 0 1400 1080" role="img" aria-labelledby="title desc">
+<title id="title">两套关键点：几何条件与成功度量分开</title>
+<desc id="desc">观测关键点使用工具抓握区域尺寸，奖励关键点使用固定参考尺寸；最大对应点距离衡量平移和旋转的联合误差。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}</style>
+<rect width="1400" height="1080" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">两套关键点：几何条件与成功度量分开</text>
+<text x="40" y="96" font-size="21" text-anchor="start">两路都从局部点经位姿变换得到世界点；尺度的来源不同。对应 v2 Fig. 9、附录 A／C。</text>
+<rect x="24" y="135" width="1352" height="530" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="173" font-size="25" text-anchor="start" class="bold">同一个工具位姿，构造两种不同用途的点</text>
+<rect x="65" y="210" width="590" height="90" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="360.0" y="263.4" font-size="24" text-anchor="middle" class="bold">观测分支：s = 当前工具抓握区域尺寸</text>
+<rect x="745" y="210" width="590" height="90" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1040.0" y="263.05" font-size="23" text-anchor="middle" class="bold">奖励分支：sʳᵉʷ = [0.14, 0.03, 0.03] m</text>
+<polygon points="110,365 495,400 550,470 165,435" fill="#f8fafc" stroke="#2563eb" stroke-width="2"/>
+<circle cx="110" cy="365" r="7" fill="#2563eb"/>
+<text x="110" y="349" font-size="20" text-anchor="middle">k3</text>
+<circle cx="495" cy="400" r="7" fill="#2563eb"/>
+<text x="495" y="384" font-size="20" text-anchor="middle">k1</text>
+<circle cx="550" cy="470" r="7" fill="#2563eb"/>
+<text x="550" y="454" font-size="20" text-anchor="middle">k2</text>
+<circle cx="165" cy="435" r="7" fill="#2563eb"/>
+<text x="165" y="419" font-size="20" text-anchor="middle">k4</text>
+<text x="330" y="513" font-size="22" text-anchor="middle">尺寸随工具变化</text>
+<polygon points="790,365 1175,400 1230,470 845,435" fill="#f8fafc" stroke="#ea580c" stroke-width="2"/>
+<circle cx="790" cy="365" r="7" fill="#ea580c"/>
+<text x="790" y="349" font-size="20" text-anchor="middle">k3</text>
+<circle cx="1175" cy="400" r="7" fill="#ea580c"/>
+<text x="1175" y="384" font-size="20" text-anchor="middle">k1</text>
+<circle cx="1230" cy="470" r="7" fill="#ea580c"/>
+<text x="1230" y="454" font-size="20" text-anchor="middle">k2</text>
+<circle cx="845" cy="435" r="7" fill="#ea580c"/>
+<text x="845" y="419" font-size="20" text-anchor="middle">k4</text>
+<text x="1010" y="513" font-size="22" text-anchor="middle">跨工具固定尺度</text>
+<text x="360" y="555" font-size="20" text-anchor="middle">局部四点示意，非八角点／语义检测点</text>
+<text x="1040" y="555" font-size="21" text-anchor="middle">长 x 轴对横向旋转更敏感</text>
+<rect x="65" y="580" width="590" height="55" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="360.0" y="614.85" font-size="21" text-anchor="middle" class="bold">进入 Actor：相对手掌位置＋目标点误差＋s</text>
+<rect x="745" y="580" width="590" height="55" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1040.0" y="614.85" font-size="21" text-anchor="middle" class="bold">进入 reward／评估：最差对应点的距离</text>
+<rect x="24" y="690" width="1352" height="350" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="728" font-size="25" text-anchor="start" class="bold">世界坐标中的同一距离计算，含平移与旋转误差</text>
+<rect x="60" y="775" width="390" height="100" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="255.0" y="816.4" font-size="24" text-anchor="middle" class="bold">当前点</text>
+<text x="255.0" y="850.4" font-size="24" text-anchor="middle">pₜ,ᵢ = Rₜ kᵢ + pₜ</text>
+<rect x="510" y="775" width="390" height="100" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="705.0" y="816.4" font-size="24" text-anchor="middle" class="bold">目标点</text>
+<text x="705.0" y="850.4" font-size="24" text-anchor="middle">pɢ,ᵢ = Rɢ kᵢ + pɢ</text>
+<rect x="960" y="775" width="380" height="100" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1150.0" y="816.4" font-size="24" text-anchor="middle" class="bold">距离 d</text>
+<text x="1150.0" y="850.4" font-size="24" text-anchor="middle">maxᵢ ‖pₜ,ᵢ − pɢ,ᵢ‖₂</text>
+<path d="M255 775 L255 745 L1150 745 L1150 775" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M900 825 L960 825" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="60" y="930" font-size="23" text-anchor="start">v2：训练阈值 1 cm；评估阈值 2 cm。它们不是独立的平移与角度阈值。</text>
+<text x="60" y="980" font-size="22" text-anchor="start">中心到达目标仍可能朝向错误；对应点误差会保留这部分旋转差异。</text>
+</svg>

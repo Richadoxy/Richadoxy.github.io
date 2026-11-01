@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1040" viewBox="0 0 1400 1040" role="img" aria-labelledby="title desc">
+<title id="title">FoundationPose：先找到物体，再持续跟踪</title>
+<desc id="desc">首帧生成候选位姿，通过渲染比较、Refiner修正和Scorer选择得到初始位姿。后续帧使用前一结果与新图像继续修正，再将位姿转换到机器人坐标系供控制使用。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}</style>
+<rect width="1400" height="1040" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">FoundationPose：先找到物体，再持续跟踪</text>
+<text x="40" y="96" font-size="21" text-anchor="start">以已提供工具 mesh 的用法为例。位姿估计负责感知；后续控制器负责选择动作。</text>
+<rect x="24" y="135" width="1352" height="285" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="173" font-size="25" text-anchor="start" class="bold">① 首帧：mesh＋RGB-D＋相机内参＋目标 mask</text>
+<rect x="55" y="220" width="280" height="120" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="195.0" y="255.7" font-size="22" text-anchor="middle" class="bold">提出候选位姿</text>
+<text x="195.0" y="287.7" font-size="22" text-anchor="middle">粗略位置</text>
+<text x="195.0" y="319.7" font-size="22" text-anchor="middle">多种可能的朝向</text>
+<rect x="390" y="220" width="315" height="120" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="547.5" y="255.7" font-size="22" text-anchor="middle" class="bold">渲染比较＋Refiner</text>
+<text x="547.5" y="287.7" font-size="22" text-anchor="middle">对比实拍与假设画面</text>
+<text x="547.5" y="319.7" font-size="22" text-anchor="middle">修正位置和朝向</text>
+<rect x="760" y="220" width="265" height="120" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="892.5" y="255.7" font-size="22" text-anchor="middle" class="bold">Scorer</text>
+<text x="892.5" y="287.7" font-size="22" text-anchor="middle">评价修正后的候选</text>
+<text x="892.5" y="319.7" font-size="22" text-anchor="middle">选出最匹配者</text>
+<rect x="1080" y="220" width="265" height="120" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1212.5" y="255.7" font-size="22" text-anchor="middle" class="bold">初始位姿</text>
+<text x="1212.5" y="287.7" font-size="22" text-anchor="middle">物体相对相机</text>
+<text x="1212.5" y="319.7" font-size="22" text-anchor="middle">4×4 变换矩阵</text>
+<path d="M335 280 L390 280" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M705 280 L760 280" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M1025 280 L1080 280" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="385" font-size="22" text-anchor="start">Refiner 与 Scorer 是预训练的视觉网络；Scorer 的分数不是 RL 累计回报。</text>
+<rect x="24" y="445" width="1352" height="250" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="483" font-size="25" text-anchor="start" class="bold">② 后续帧：利用上一步结果，减少重新搜索</text>
+<rect x="55" y="525" width="365" height="100" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="237.5" y="566.55" font-size="23" text-anchor="middle" class="bold">上一帧位姿＋新 RGB-D</text>
+<text x="237.5" y="599.55" font-size="23" text-anchor="middle">mesh 与相机内参沿用</text>
+<rect x="510" y="525" width="380" height="100" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="700.0" y="566.55" font-size="23" text-anchor="middle" class="bold">Refiner 继续修正</text>
+<text x="700.0" y="599.55" font-size="23" text-anchor="middle">从已有位姿开始</text>
+<rect x="980" y="525" width="365" height="100" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1162.5" y="566.55" font-size="23" text-anchor="middle" class="bold">当前位姿</text>
+<text x="1162.5" y="599.55" font-size="23" text-anchor="middle">保存给下一帧使用</text>
+<path d="M420 575 L510 575" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M890 575 L980 575" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="665" font-size="22" text-anchor="start">官方跟踪接口沿用前一位姿；保留这个结果不等于使用 LSTM。</text>
+<rect x="24" y="720" width="1352" height="285" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="758" font-size="25" text-anchor="start" class="bold">③ 接入机器人：让状态、目标与手掌处于共同坐标系</text>
+<rect x="55" y="805" width="280" height="110" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="195.0" y="851.7" font-size="22" text-anchor="middle" class="bold">相机中的工具位姿</text>
+<text x="195.0" y="883.7" font-size="22" text-anchor="middle">FoundationPose 输出</text>
+<rect x="390" y="805" width="315" height="110" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="547.5" y="851.7" font-size="22" text-anchor="middle" class="bold">相机 → 机器人坐标</text>
+<text x="547.5" y="883.7" font-size="22" text-anchor="middle">使用标定变换</text>
+<rect x="760" y="805" width="265" height="110" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="892.5" y="851.85" font-size="21" text-anchor="middle" class="bold">构造策略观测</text>
+<text x="892.5" y="882.85" font-size="21" text-anchor="middle">加入目标、本体状态</text>
+<rect x="1080" y="805" width="265" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="1212.5" y="851.7" font-size="22" text-anchor="middle" class="bold">Actor → 动作</text>
+<text x="1212.5" y="883.7" font-size="22" text-anchor="middle">执行后继续观测</text>
+<path d="M335 860 L390 860" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M705 860 L760 860" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M1025 860 L1080 860" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="967" font-size="22" text-anchor="start">物体几何与任务目标需另外提供；位姿估计本身不决定机器人应该完成什么任务。</text>
+</svg>

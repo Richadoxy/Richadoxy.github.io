@@ -54,7 +54,7 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span> · IL02</p>
           <h1>机器人数据：Observation、Action 与时间窗口</h1>
-          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 2 min read</span><span data-lang="zh">入门 · 2026.09 · 约 2 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 3 min read</span><span data-lang="zh">入门 · 2026.09 · 约 3 分钟阅读</span></p>
           <p class="article-deck">统一 state/action 语义、episode、action chunk、horizon、控制频率、归一化和 mask。</p>
           <div class="article-content">
             <p>这篇文章把机器人数据中最容易引发“shape 正确但语义错误”的概念放到一条时间轴上。</p>
@@ -79,6 +79,7 @@ target
   └─ future actions a[t:t+H]
 </code></pre>
 <p><code>state_t</code> 描述机器人在哪里，<code>action_t</code> 描述控制器下一步应该做什么。二者维度可能相同，但语义不能互换。</p>
+<p>物体位姿也可以由外部视觉模块估计后加入 observation。关于 6D 位姿、四元数、相机到机器人的坐标转换，以及 FoundationPose 如何提供这类数值，见 <a href="visual-state-estimation-and-foundationpose.html">视觉状态估计基础</a>。</p>
 <h2 id="3-action">3. 常见 Action 表示</h2>
 <table>
 <thead>

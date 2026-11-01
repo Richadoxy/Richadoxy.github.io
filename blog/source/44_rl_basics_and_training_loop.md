@@ -4,6 +4,23 @@
 
 强化学习的入门难点往往在几个接口：模块叫什么、网络输出什么、训练目标从哪里来，以及梯度究竟更新谁。本章沿着“环境交互 → 价值预测 → 动作评价 → 策略更新”的顺序组织这些概念。理解主线后，再进入部分可观测、特权信息和真实部署。
 
+## 0. 先用一个例子理解分工
+
+假设机器人正在把工具举起来。Actor 根据当前观测选择一组手臂和手指动作；执行以后，环境根据是否举高、是否接近目标等规则返回奖励。Critic 同时估计：从当前情况继续做下去，预计能获得多少累计奖励。
+
+为了帮助理解，先假设这次经历得到的累计回报是 8，而 Critic 原先预测是 5：
+
+| 参与者 | 这次训练中做什么 |
+| --- | --- |
+| 环境 | 提供执行动作后的状态和每步 reward |
+| Critic | 将预测 5 与回报目标 8 比较，用误差更新自己，使估值更准确 |
+| 训练算法 | 根据交互奖励和价值预测估计 advantage；这个简化例子中为 8−5＝3 |
+| Actor | 利用正优势的信号，提高以后类似情况下选择这类动作的倾向 |
+
+**Actor 不负责输出 advantage；Critic 也不是拿预测值只与当前一步 reward 比较。** 实际 PPO 通常用多步奖励、价值估计和 GAE 构造目标，后文再展开。初读时先建立“行动 → 结果 → 评价 → 更新”的闭环。
+
+Actor–Critic 规定模块职责，MLP／LSTM 规定网络结构，PPO／SAPG 规定学习算法；Teacher–Student 则描述模型之间的监督关系。可以用 PPO 训练一个 LSTM Actor，也可以先用 Actor–Critic 训练 Teacher，再让它教 Student。关于后者，见 [RL03](45_teacher_student_and_sim_to_real.md)。
+
 ## 1. 从动作标签到交互结果
 
 行为克隆用专家提供的观测—动作配对训练策略。使用 flow matching 的动作模型，也可以从示范动作和采样噪声构造速度场目标；目标的正负号取决于插值路径与时间方向。两者都能从数据构造明确的动作学习目标，背景见 [模仿学习基础](23_imitation_learning_basics.md) 与 [Flow Matching](10_flow_matching_training_and_inference.md)。
@@ -140,6 +157,23 @@ PPO 常用 \(V\) Critic；SAC 等方法常用以状态和动作为输入的 \(Q\
 | 编码后的特征到动作或价值 | MLP 与线性输出头，也可结合循环或注意力结构 |
 
 例如 [DexPoint](https://proceedings.mlr.press/v205/qin23a/qin23a.pdf) 使用 PointNet 编码点云，再接 Actor／Critic MLP，并用 PPO 训练。MLP 是低维控制的常见实现，不能据此给整个灵巧手领域下未经统计的“多数都是 MLP”的结论。上述策略与价值概念可对照 [OpenAI Spinning Up](https://github.com/openai/spinningup/blob/master/docs/spinningup/rl_intro.rst)。
+
+### 3.4 MLP 与 LSTM：是否在网络里保留跨步记忆
+
+MLP（多层感知机）通过多层全连接变换，将输入映射到输出。给定相同输入和固定参数，它会产生相同的输出；如果要利用过去，必须把历史或历史提取的特征显式放进输入。
+
+LSTM 是循环网络，会保留两组跨时间步传递的状态，通常记为 hidden state 和 cell state。初学时可以把它们看成会不断更新的内部记忆：
+
+~~~text
+普通 MLP：当前输入 → 特征 → 动作分布参数
+
+LSTM + MLP：当前输入 + 上一步记忆 → LSTM → MLP → 动作分布参数
+                                      └→ 新记忆，留给下一步
+~~~
+
+若物体短暂被挡住，或者同一动作在不同工具上产生不同运动，历史就可能帮助判断当前情况。LSTM 提供利用历史的能力；记忆具体学到什么取决于训练信号，并不自动获得准确的物理状态。
+
+需要区分两种变化：**训练更新网络权重，推理更新记忆状态。** 固定权重的 LSTM 在真机上仍能持续更新记忆，这不等于在真机重新训练。HORA 使用 MLP 控制器与另外的历史适应模块；[SimToolReal](49_simtoolreal_paper_walkthrough.md) 则将 LSTM 放入 Actor，经 RL 训练。一般原理可参照 [PyTorch LSTM 定义](https://docs.pytorch.org/docs/stable/generated/torch.nn.LSTM.html)。
 
 ## 4. 从环境奖励到 Return、V、Q 与 Advantage
 

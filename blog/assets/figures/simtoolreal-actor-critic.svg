@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="905" viewBox="0 0 1400 905" role="img" aria-labelledby="title desc">
+<title id="title">Actor 选择动作，Critic 学习预测回报</title>
+<desc id="desc">Actor将140维部署观测输入LSTM和MLP产生29维动作。Critic读取更完整的仿真状态预测累计回报，训练算法结合奖励与预测计算优势并更新Actor。没有额外的Student蒸馏。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}</style>
+<rect width="1400" height="905" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">Actor 选择动作，Critic 学习预测回报</text>
+<text x="40" y="96" font-size="21" text-anchor="start">两条前向路径使用不同的信息；底部说明训练算法如何将它们联系起来。</text>
+<rect x="24" y="135" width="1352" height="265" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="173" font-size="25" text-anchor="start" class="bold">① Actor：训练后直接部署的控制网络</text>
+<rect x="55" y="220" width="280" height="110" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="195.0" y="251.35" font-size="21" text-anchor="middle" class="bold">140 维物理观测</text>
+<text x="195.0" y="282.35" font-size="21" text-anchor="middle">机器人自身状态</text>
+<text x="195.0" y="313.35" font-size="21" text-anchor="middle">工具、目标与抓握尺寸</text>
+<rect x="390" y="220" width="255" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="517.5" y="251.35" font-size="21" text-anchor="middle" class="bold">LSTM</text>
+<text x="517.5" y="282.35" font-size="21" text-anchor="middle">当前输入＋上一步记忆</text>
+<text x="517.5" y="313.35" font-size="21" text-anchor="middle">更新内部记忆</text>
+<rect x="700" y="220" width="305" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="852.5" y="250.7" font-size="22" text-anchor="middle" class="bold">MLP</text>
+<text x="852.5" y="282.7" font-size="22" text-anchor="middle">将特征映射为</text>
+<text x="852.5" y="314.7" font-size="22" text-anchor="middle">29 维动作均值</text>
+<rect x="1060" y="220" width="285" height="110" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1202.5" y="250.7" font-size="22" text-anchor="middle" class="bold">选择动作并转换</text>
+<text x="1202.5" y="282.7" font-size="22" text-anchor="middle">7 维手臂＋22 维手</text>
+<text x="1202.5" y="314.7" font-size="22" text-anchor="middle">发送关节目标</text>
+<path d="M335 275 L390 275" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M645 275 L700 275" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M1005 275 L1060 275" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="373" font-size="22" text-anchor="start">训练时从动作分布采样进行探索；真机前向中继续更新 LSTM 记忆。</text>
+<rect x="24" y="425" width="1352" height="270" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="463" font-size="25" text-anchor="start" class="bold">② Critic：利用额外仿真信息，辅助训练</text>
+<rect x="55" y="510" width="390" height="110" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="250.0" y="540.7" font-size="22" text-anchor="middle" class="bold">较完整的仿真状态</text>
+<text x="250.0" y="572.7" font-size="22" text-anchor="middle">干净的工具状态与速度</text>
+<text x="250.0" y="604.7" font-size="22" text-anchor="middle">历史进展、是否已举起等</text>
+<rect x="510" y="510" width="350" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="685.0" y="540.7" font-size="22" text-anchor="middle" class="bold">独立 Critic MLP</text>
+<text x="685.0" y="572.7" font-size="22" text-anchor="middle">预测未来累计回报</text>
+<text x="685.0" y="604.7" font-size="22" text-anchor="middle">输出一个价值标量</text>
+<rect x="925" y="510" width="420" height="110" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1135.0" y="540.7" font-size="22" text-anchor="middle" class="bold">与回报目标比较</text>
+<text x="1135.0" y="572.7" font-size="22" text-anchor="middle">目标由交互奖励等构造</text>
+<text x="1135.0" y="604.7" font-size="22" text-anchor="middle">用误差更新 Critic</text>
+<path d="M445 565 L510 565" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M860 565 L925 565" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="668" font-size="22" text-anchor="start">Critic 只帮助估值；它不提供“正确的手指动作”，也不是这里的 Teacher。</text>
+<text x="55" y="752" font-size="24" text-anchor="start" class="bold">训练算法：环境奖励＋价值预测 → 估计 advantage → 更新 Actor 的动作分布</text>
+<text x="55" y="808" font-size="23" text-anchor="start">Advantage 由训练算法计算，不是 Actor 的一个输出。</text>
+<text x="55" y="858" font-size="23" text-anchor="start">部署：保留 Actor，权重固定、记忆更新；没有额外训练 Student 的阶段。</text>
+</svg>

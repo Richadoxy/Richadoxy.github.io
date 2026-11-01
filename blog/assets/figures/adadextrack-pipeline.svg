@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1430" viewBox="0 0 1400 1430" role="img" aria-labelledby="title desc">
+<title id="title">AdaDexTrack：参考、专家技能与在线调节</title>
+<desc id="desc">文本与物体几何生成并重定向为状态参考。PPO 专家提供动作数据，行为克隆得到通用 Tracker，冻结 Tracker 后训练 Modulator。部署使用 273 维原始观测，通过参考、物体 latent 和动作调节，控制 22 个关节；机器人状态和 FoundationPose 提供反馈。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}</style>
+<rect width="1400" height="1430" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">AdaDexTrack：参考、专家技能与在线调节</text>
+<text x="40" y="96" font-size="21" text-anchor="start">依据论文 Fig. 2 重组；按参考准备、三阶段学习和部署闭环阅读。</text>
+<rect x="24" y="130" width="1352" height="245" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="168" font-size="25" text-anchor="start" class="bold">① 准备参考：规定希望机器人与物体怎样运动</text>
+<rect x="55" y="205" width="375" height="105" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="242.5" y="249.05" font-size="23" text-anchor="middle" class="bold">文本＋物体几何</text>
+<text x="242.5" y="282.05" font-size="23" text-anchor="middle">语言描述希望完成的动作</text>
+<rect x="510" y="205" width="375" height="105" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="697.5" y="249.05" font-size="23" text-anchor="middle" class="bold">DiffH2O</text>
+<text x="697.5" y="282.05" font-size="23" text-anchor="middle">生成人手与物体运动</text>
+<rect x="965" y="205" width="380" height="105" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="1155.0" y="249.05" font-size="23" text-anchor="middle" class="bold">重定向到机器人</text>
+<text x="1155.0" y="282.05" font-size="23" text-anchor="middle">关节＋物体位姿参考</text>
+<path d="M430 258 L510 258" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M885 258 L965 258" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="350" font-size="22" text-anchor="start">这里得到的是状态参考；机器人关节控制动作需要通过环境交互学习。</text>
+<rect x="24" y="400" width="1352" height="350" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="438" font-size="25" text-anchor="start" class="bold">② 三阶段学习：先学专家，再合并技能，最后学习调节</text>
+<rect x="55" y="485" width="280" height="120" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="195.0" y="521.35" font-size="21" text-anchor="middle" class="bold">阶段 A：PPO 专家</text>
+<text x="195.0" y="552.35" font-size="21" text-anchor="middle">每个语义组一个策略</text>
+<text x="195.0" y="583.35" font-size="21" text-anchor="middle">跟踪该组参考</text>
+<rect x="390" y="485" width="280" height="120" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="530.0" y="521.35" font-size="21" text-anchor="middle" class="bold">采集专家执行数据</text>
+<text x="530.0" y="552.35" font-size="21" text-anchor="middle">实际访问的观测</text>
+<text x="530.0" y="583.35" font-size="21" text-anchor="middle">专家输出的动作</text>
+<rect x="725" y="485" width="280" height="120" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="865.0" y="521.35" font-size="21" text-anchor="middle" class="bold">阶段 B：BC 蒸馏</text>
+<text x="865.0" y="552.35" font-size="21" text-anchor="middle">多个专家 → 一个</text>
+<text x="865.0" y="583.35" font-size="21" text-anchor="middle">通用 Tracker</text>
+<rect x="1060" y="485" width="285" height="120" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="1202.5" y="521.35" font-size="21" text-anchor="middle" class="bold">阶段 C：RL 调节</text>
+<text x="1202.5" y="552.35" font-size="21" text-anchor="middle">冻结 Tracker</text>
+<text x="1202.5" y="583.35" font-size="21" text-anchor="middle">训练 Modulator</text>
+<path d="M335 545 L390 545" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M670 545 L725 545" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M1005 545 L1060 545" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="659" font-size="22" text-anchor="start">专家与 BC Tracker 均使用 273 维观测；蒸馏整合专家技能，观测字段不变。</text>
+<text x="55" y="710" font-size="22" text-anchor="start">Modulator 的奖励仍按原始参考计算；质量、摩擦等随机化参数不直接进入观测。</text>
+<rect x="24" y="775" width="1352" height="625" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="813" font-size="25" text-anchor="start" class="bold">③ 部署闭环：固定网络权重，根据观测调节条件与动作</text>
+<rect x="55" y="855" width="300" height="110" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="205.0" y="887.0" font-size="20" text-anchor="middle" class="bold">原始 273 维观测</text>
+<text x="205.0" y="917.0" font-size="20" text-anchor="middle">机器人与物体当前状态</text>
+<text x="205.0" y="947.0" font-size="20" text-anchor="middle">参考信息＋物体 latent</text>
+<rect x="455" y="855" width="380" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="645.0" y="886.35" font-size="21" text-anchor="middle" class="bold">Modulator</text>
+<text x="645.0" y="917.35" font-size="21" text-anchor="middle">R：参考  O：物体 latent</text>
+<text x="645.0" y="948.35" font-size="21" text-anchor="middle">T：关节动作残差</text>
+<path d="M355 910 L455 910" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="455" y="1045" width="380" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="645.0" y="1076.35" font-size="21" text-anchor="middle" class="bold">冻结的通用 Tracker</text>
+<text x="645.0" y="1107.35" font-size="21" text-anchor="middle">调节后的 273 维观测</text>
+<text x="645.0" y="1138.35" font-size="21" text-anchor="middle">输出 22 维动作</text>
+<path d="M645 965 L645 1045" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="665" y="1008" font-size="20" text-anchor="start">R／O 调节输入</text>
+<path d="M355 910 L395 910 L395 1100 L455 1100" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="380" y="1008" font-size="18" text-anchor="end">保留其余字段</text>
+<rect x="935" y="1045" width="410" height="110" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="1140.0" y="1075.7" font-size="22" text-anchor="middle" class="bold">Tracker 动作＋T</text>
+<text x="1140.0" y="1107.7" font-size="22" text-anchor="middle">22 维关节目标 → 真机</text>
+<text x="1140.0" y="1139.7" font-size="22" text-anchor="middle">手臂 6＋灵巧手 16</text>
+<path d="M835 1100 L935 1100" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M835 910 L1140 910 L1140 1045" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="985" y="895" font-size="20" text-anchor="start">T 调节动作</text>
+<rect x="55" y="1045" width="300" height="110" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="205.0" y="1077.0" font-size="20" text-anchor="middle" class="bold">获取新的观测</text>
+<text x="205.0" y="1107.0" font-size="20" text-anchor="middle">机器人读数与运动学</text>
+<text x="205.0" y="1137.0" font-size="20" text-anchor="middle">FoundationPose 位姿</text>
+<path d="M205 1045 L205 965" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M1140 1155 L1140 1210 L205 1210 L205 1155" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="700" y="1200" font-size="21" text-anchor="middle">执行后，继续获取观测并反馈</text>
+<text x="55" y="1275" font-size="22" text-anchor="start">原 Tracker 本身已有状态反馈；新增的是参考、物体表示和动作三个位置的调节。</text>
+<text x="55" y="1320" font-size="21" text-anchor="start">图示表达模块依赖；缓存更新顺序及 R／O 的生效时刻以实现为准。</text>
+<text x="55" y="1365" font-size="21" text-anchor="start">部署时不反向更新网络；物体几何与参考需事先准备，相机与机器人坐标需对齐。</text>
+</svg>

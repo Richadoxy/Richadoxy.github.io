@@ -38,6 +38,7 @@ POSTS = [
     Post("F02", "31_multimodal_encoder_alignment_and_infonce.md", "multimodal-encoder-alignment-infonce", "从原始模态到公共语义空间", "串联 token、encoder、ViT、CLIP、CLS/readout、projector、语义锚点与 InfoNCE，理解多模态表示怎样建立共同坐标。", "foundations", published_en="September 2026", published_zh="2026.09", level="核心"),
     Post("F03", "32_three_consistency_supervision_paradigms.md", "multimodal-consistency-supervision", "多模态表示的监督配方", "统一跨模态对齐、时间连续性、增强或遮挡一致性，并说明 reconstruction、future prediction 与任务监督的分工。", "foundations", published_en="September 2026", published_zh="2026.09", level="核心"),
     Post("F04", "19_attention_from_embeddings_to_action_expert.md", "19-attention-openclip-tactile-groot", "从对齐表示到 Policy 融合", "把 Transformer 基础放回策略数据流，系统理解 self/cross/joint attention、readout、projector、gate、AdaNorm 与 Action Head。", "foundations", published_en="September 2026", published_zh="2026.09", level="核心"),
+    Post("F05", "50_visual_state_estimation_and_foundationpose.md", "visual-state-estimation-and-foundationpose", "视觉状态估计：从 6D 位姿到 FoundationPose", "从位置与朝向、RGB-D、mesh 和坐标标定入门，理解 FoundationPose 的估计与跟踪，以及它如何为 RL 提供部署观测。", "foundations", published_en="November 2026", published_zh="2026.11", level="入门"),
     Post("IL01", "23_imitation_learning_basics.md", "imitation-learning-behavior-cloning", "模仿学习与 Behavior Cloning 入门", "从 demonstration、policy 和 BC 出发，理解离线监督、闭环 rollout 与分布偏移。", "imitation", published_en="September 2026", published_zh="2026.09", level="入门"),
     Post("IL02", "24_robot_data_action_semantics.md", "robot-data-action-semantics", "机器人数据：Observation、Action 与时间窗口", "统一 state/action 语义、episode、action chunk、horizon、控制频率、归一化和 mask。", "imitation", published_en="September 2026", published_zh="2026.09", level="入门"),
     Post("IL03", "25_action_generation_families.md", "action-generation-mse-token-diffusion-flow", "动作生成方法：从连续回归到概率生成", "串联回归、自回归、CVAE、GAN、扩散、Flow Matching 与生成一致性，区分训练目标、采样和执行。", "imitation", published_en="September 2026", published_zh="2026.09", level="进阶"),
@@ -167,12 +168,14 @@ POSTS = [
     Post("TOUCH11", "38_cgp_paper_reading_notes.md", "cgp-contact-grounded-policy", "CGP 精读：状态、触觉与接触一致的控制", "区分未来机器人状态、触觉 latent 和控制命令，拆解联合扩散、接触映射及 Visuotactile DP 对照。", "tactile", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("TOUCH12", "40_policy_memory_and_object_centric_tactile_state.md", "policy-memory-and-object-centric-tactile-state", "策略记忆：从历史观测到对象级触觉状态", "串联滑窗、GRU、缓存和 memory tokens，再理解遮挡中的身份 anchor、动态 slot 与接触归属。", "tactile", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("TOUCH13", "41_tactile_memory_experiment_design.md", "tactile-memory-experiment-design", "触觉记忆的实验设计：从假设到控制证据", "把数据、辅助监督、公平 baseline、遮挡扰动和联合成功指标连接成可验证的研究过程。", "tactile", published_en="October 2026", published_zh="2026.10", level="实践"),
-    Post("RL01", "43_dexterous_rl_overview.md", "dexterous-rl-overview", "灵巧手强化学习：研究范式与学习地图", "从知识树区分学习信号、网络、PPO 与训练框架，再连接实验阅读、HORA 与 UniDexGrasp 精读。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="入门"),
-    Post("RL02", "44_rl_basics_and_training_loop.md", "rl-basics-and-training-loop", "RL 基础：从 Actor–Critic 到 PPO 的数据、目标与梯度", "用网络图、数值例子和逐段伪代码连接 reward、return、价值预测、GAE 与 PPO，明确训练目标和梯度边界。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="核心"),
-    Post("RL03", "45_teacher_student_and_sim_to_real.md", "teacher-student-and-sim-to-real", "Teacher–Student：策略蒸馏、特权信息与部署", "从特权输入与监督目标组织知识迁移，区分动作、分布与 latent 蒸馏，再连接在线适应和真机部署。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="进阶"),
+    Post("RL01", "43_dexterous_rl_overview.md", "dexterous-rl-overview", "灵巧手强化学习：研究范式与学习地图", "从知识树区分学习信号、网络、PPO 与训练框架，再连接实验阅读与 HORA、UniDexGrasp、SimToolReal、AdaDexTrack 精读。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="入门"),
+    Post("RL02", "44_rl_basics_and_training_loop.md", "rl-basics-and-training-loop", "RL 基础：从 Actor–Critic 到 PPO 的数据、目标与梯度", "先用数值例子理解 Actor、Critic 和优势计算，再区分 MLP 与 LSTM，逐步连接回报、GAE、PPO 与参数更新。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="核心"),
+    Post("RL03", "45_teacher_student_and_sim_to_real.md", "teacher-student-and-sim-to-real", "Teacher–Student：策略蒸馏、特权信息与部署", "分清 Actor–Critic 与 Teacher–Student，理解动作与 latent 蒸馏、DAgger，并对照四篇论文的训练和部署观测。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="进阶"),
     Post("RL04", "46_hora_paper_walkthrough.md", "hora-paper-walkthrough", "HORA 精讲：从特权 PPO 策略到本体感知在线适应", "将 RL 通识落实到 HORA 的三阶段网络、历史适应、控制接口与对照实验，区分论文设计和公开代码实现。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="精读"),
     Post("RL05", "48_rl_experiment_reading.md", "rl-experiment-reading", "RL 实验阅读：从指标、分布到消融证据", "区分方法比较、结构与监督消融、课程和输入鲁棒性，理解成功率、条件误差、多样性与随机种子的证据边界。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="基础"),
     Post("RL06", "47_unidexgrasp_paper_walkthrough.md", "unidexgrasp-paper-walkthrough", "UniDexGrasp 精读：从多样抓姿生成到目标条件策略", "沿 Fig. 2、Fig. 3 串联 IPDF、Glow、接触优化、PPO Teacher 与 DAgger Student，再用六张框图拆解训练、实验和消融。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="精读"),
+    Post("RL07", "49_simtoolreal_paper_walkthrough.md", "simtoolreal-paper-walkthrough", "SimToolReal 精读：先学会控制工具，再用视频指定任务", "从训练与视频的分工讲起，拆开 LSTM Actor、140 维观测和真实感知，再对照 HORA、UniDexGrasp 理解泛化与实验边界。", "reinforcement", published_en="October 2026", published_zh="2026.10", level="精读"),
+    Post("RL08", "51_adadextrack_paper_walkthrough.md", "adadextrack-paper-walkthrough", "AdaDexTrack 精读：先学会跟踪，再根据执行状态调整", "从参考轨迹、PPO 专家与 BC 通用 Tracker 讲起，拆开三种调制、273 维训练／部署观测、域随机化和消融证据。", "reinforcement", published_en="November 2026", published_zh="2026.11", level="精读"),
 ]
 
 
@@ -190,7 +193,7 @@ CHAINS = {
         "title_en": "Part 1: Foundations",
         "label_zh": "基础概念",
         "label_en": "Foundations",
-        "description": "先建立多模态 VLA 与模仿学习的统一范式，再依次理解表示接口、公共空间、监督配方与 Policy 融合。",
+        "description": "先建立多模态策略的研究范式，理解表示、监督与 Policy 融合；视觉状态估计分支补齐位姿、坐标标定和 FoundationPose。",
     },
     "imitation": {
         "title": "第二卷：模仿学习",
@@ -232,7 +235,7 @@ CHAINS = {
         "title_en": "Part 7: Reinforcement Learning and Dexterity",
         "label_zh": "强化学习",
         "label_en": "RL",
-        "description": "从 Actor–Critic、PPO、目标条件策略与 Teacher–Student 建立基础，结合实验读表进入 HORA 和 UniDexGrasp，连接在线适应、抓姿生成与跨物体控制。",
+        "description": "从 Actor–Critic、PPO、目标条件策略与 Teacher–Student 建立基础，通过四篇精读连接在线适应、抓姿生成、通用工具控制和跟踪调制，并对照训练与部署观测。",
     },
 }
 
@@ -573,7 +576,7 @@ def index_page(reading_times: dict[str, int]) -> str:
       <main class="archive-main" id="main-content">
         <header class="archive-intro">
           <h2><span data-lang="en">Learning paths</span><span data-lang="zh">模仿学习、VLA 与强化学习</span></h2>
-          <p><span data-lang="en">Seven connected paths through representations, imitation learning, VLA architectures, engineering, runtime, tactile robotics, and reinforcement learning. The RL path connects actor–critic networks, PPO, teacher–student transfer, experiment reading, and illustrated walkthroughs of HORA and UniDexGrasp.</span><span data-lang="zh">按知识依赖分成七卷。从多模态表示进入模仿学习、VLA、工程与触觉机器人；RL 路线连接 Actor–Critic、PPO、Teacher–Student、实验阅读，以及 HORA 和 UniDexGrasp 精读。</span></p>
+          <p><span data-lang="en">Seven connected paths through representations, imitation learning, VLA architectures, engineering, runtime, tactile robotics, and reinforcement learning. The RL path connects actor–critic networks, PPO, teacher–student transfer, experiment reading, and illustrated walkthroughs of HORA, UniDexGrasp, SimToolReal, and AdaDexTrack.</span><span data-lang="zh">按知识依赖分成七卷。从多模态表示进入模仿学习、VLA、工程与触觉机器人；RL 路线连接 Actor–Critic、PPO、Teacher–Student、实验阅读，以及 HORA、UniDexGrasp、SimToolReal 和 AdaDexTrack 精读。</span></p>
         </header>
         <div class="series-grid">{series_cards}</div>
         <div class="archive-filters" role="group" aria-label="按知识链筛选文章">

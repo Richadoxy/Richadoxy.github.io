@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1100" viewBox="0 0 1400 1100" role="img" aria-labelledby="title desc">
+<title id="title">Reward：阶段切换与刷新最好距离</title>
+<desc id="desc">举起前奖励指尖靠近与抬升，举起后以目标进展和到达奖励为主；历史最小距离防止反复进退刷奖励。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}</style>
+<rect width="1400" height="1100" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">Reward：阶段切换与刷新最好距离</text>
+<text x="40" y="96" font-size="21" text-anchor="start">按 v2 附录 A 解释机制；保持步数、权重和课程设置需另查对应版本代码。</text>
+<rect x="24" y="135" width="1352" height="285" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="173" font-size="25" text-anchor="start" class="bold">① 举起工具，触发训练中的阶段标志</text>
+<rect x="55" y="220" width="350" height="125" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="230.0" y="258.85" font-size="21" text-anchor="middle" class="bold">从桌面开始</text>
+<text x="230.0" y="289.85" font-size="21" text-anchor="middle">指尖接近进展</text>
+<text x="230.0" y="320.85" font-size="21" text-anchor="middle">抬升高度＋首次举起 bonus</text>
+<rect x="480" y="220" width="400" height="125" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="680.0" y="258.85" font-size="21" text-anchor="middle" class="bold">达到举起门槛</text>
+<text x="680.0" y="289.85" font-size="21" text-anchor="middle">I_grasped 锁存为 1</text>
+<text x="680.0" y="320.85" font-size="21" text-anchor="middle">不是触觉 force-closure 检测</text>
+<rect x="955" y="220" width="390" height="125" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="1150.0" y="258.85" font-size="21" text-anchor="middle" class="bold">转向目标控制</text>
+<text x="1150.0" y="289.85" font-size="21" text-anchor="middle">最好距离进展＋到达 bonus</text>
+<text x="1150.0" y="320.85" font-size="21" text-anchor="middle">允许手内换指和重定向</text>
+<path d="M405 282 L480 282" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M880 282 L955 282" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="390" font-size="22" text-anchor="start">整个过程另有关节速度 L1 惩罚；手臂与手采用不同权重。</text>
+<rect x="24" y="445" width="1352" height="400" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="483" font-size="25" text-anchor="start" class="bold">② 对同一个目标：先算进展，再更新最好值</text>
+<text x="60" y="530" font-size="28" text-anchor="start" class="bold">正进展 = max(d* − d, 0)       更新：d* ← min(d*, d)</text>
+<text x="110" y="590" font-size="23" text-anchor="start" class="bold">当前距离 d</text>
+<text x="420" y="590" font-size="23" text-anchor="start" class="bold">更新前最好 d*</text>
+<text x="740" y="590" font-size="23" text-anchor="start" class="bold">本步正进展</text>
+<text x="1070" y="590" font-size="23" text-anchor="start" class="bold">更新后最好 d*</text>
+<path d="M60 611L1340 611" stroke="#cbd5e1" stroke-width="2" fill="none"/>
+<text x="110" y="650" font-size="24" text-anchor="start">0.08 m</text>
+<text x="420" y="650" font-size="24" text-anchor="start">0.10 m</text>
+<text x="740" y="650" font-size="24" text-anchor="start">0.02 m</text>
+<text x="1070" y="650" font-size="24" text-anchor="start">0.08 m</text>
+<text x="110" y="698" font-size="24" text-anchor="start">0.09 m</text>
+<text x="420" y="698" font-size="24" text-anchor="start">0.08 m</text>
+<text x="740" y="698" font-size="24" text-anchor="start">0</text>
+<text x="1070" y="698" font-size="24" text-anchor="start">0.08 m</text>
+<text x="110" y="746" font-size="24" text-anchor="start">0.08 m</text>
+<text x="420" y="746" font-size="24" text-anchor="start">0.08 m</text>
+<text x="740" y="746" font-size="24" text-anchor="start">0</text>
+<text x="1070" y="746" font-size="24" text-anchor="start">0.08 m</text>
+<text x="110" y="794" font-size="24" text-anchor="start">0.06 m</text>
+<text x="420" y="794" font-size="24" text-anchor="start">0.08 m</text>
+<text x="740" y="794" font-size="24" text-anchor="start">0.02 m</text>
+<text x="1070" y="794" font-size="24" text-anchor="start">0.06 m</text>
+<rect x="24" y="870" width="1352" height="190" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="908" font-size="25" text-anchor="start" class="bold">③ 达到目标：奖励成功，切换目标，重建距离基准</text>
+<text x="60" y="957" font-size="25" text-anchor="start">旧目标 gᵏ → 新目标 gᵏ⁺¹；用当前工具到新目标的距离初始化 d*。</text>
+<text x="60" y="1010" font-size="23" text-anchor="start">同一目标下退远再靠近不会重复获得旧进展；换目标后也不能沿用旧记录。</text>
+</svg>

@@ -2,7 +2,7 @@
 
 > 阅读位置：[灵巧手 RL 研究地图](43_dexterous_rl_overview.md) → [RL 基础：网络、回报与 PPO](44_rl_basics_and_training_loop.md) → [Teacher–Student 与部署](45_teacher_student_and_sim_to_real.md) → 本文。通识章节解释 Actor、Critic、GAE 和 PPO 如何工作；这里将这些概念落实到一篇论文的输入、网络、训练阶段与证据上。
 
-> 论文：Haozhi Qi 等，*In-Hand Object Rotation via Rapid Motor Adaptation*，CoRL 2022。本文结合[论文](https://arxiv.org/abs/2210.04887)、[项目页](https://haozhi.io/hora/)与[官方代码 v0.0.1](https://github.com/HaozhiQi/hora/tree/v0.0.1)，于 2026-10-28 核对。下面明确区分论文的概念描述和公开实现细节；固定版本有助于定位代码，不代表所有实验数值都能逐项复现。
+> 论文：Haozhi Qi 等，*In-Hand Object Rotation via Rapid Motor Adaptation*，CoRL 2022。本文结合[论文](https://arxiv.org/abs/2210.04887)、[项目页](https://haozhi.io/hora/)与[官方代码 v0.0.1](https://github.com/HaozhiQi/hora/tree/v0.0.1)，观测接口于 2026-11-01 补充核对。下面明确区分论文的概念描述和公开实现细节；固定版本有助于定位代码，不代表所有实验数值都能逐项复现。
 
 ## 1. 从任务确定研究路线
 
@@ -48,6 +48,32 @@ HORA 继承了腿足机器人 [RMA](https://arxiv.org/abs/2107.04034) 的快速�
 论文使用 \(o_t=(q_{t-2:t},a_{t-3:t-1})\) 表达短历史。阅读实现时，`compute_observations()` 和部署代码保存的是关节读数与 `cur_targets`／历史位置目标。本文的 \(u\) 特意将这类目标与原始高斯采样动作 \(a\) 分开。[观测与控制实现](https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/tasks/allegro_hand_hora.py)、[部署实现](https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/deploy/deploy.py)
 
 \(e_t\) 也不全是固定物理常数：物体位置会随时间变化。\(z_t\) 的每一维没有预先指定必须代表质量或摩擦；它由控制任务的训练目标塑造。预测 \(z_t\) 成功，不意味着恢复了每个物理参数的精确值。
+
+### 2.1 训练和部署究竟读哪些 observation？
+
+先区分**网络接收的原始数据**与**编码后送入控制 MLP 的向量**。忽略 batch 维度，公开实现将每一步记录成 `[关节位置 16, 位置目标 16]`；最近 3 步按时间顺序展平为 96 维，最近 30 步保留为 `30 × 32` 的历史。
+
+| 阶段 | 决策所需的原始输入 | 控制 MLP 的实际输入 | 特权信息还做什么？ |
+| --- | --- | --- | --- |
+| 第一阶段：训练特权 Teacher | `obs: [96]`；`priv_info: [9]` | 短历史 96 + 特权编码器输出 8 = **104 维** | 9 维信息经过编码器，直接影响动作；Critic 共享此控制骨干 |
+| 第二阶段：训练历史适应模块 | `obs: [96]`；`proprio_hist: [30, 32]` | 短历史 96 + 历史预测 latent 8 = **104 维** | 仿真仍提供 9 维特权信息，但它用于生成 latent 监督标签，不用于当前动作的条件分支 |
+| 真机部署 | `obs: [96]`；`proprio_hist: [30, 32]` | 短历史 96 + 历史预测 latent 8 = **104 维** | 不再需要物体特权信息或其编码器 |
+
+若同时运行 \(B\) 个环境，上述原始张量对应 `[B, 96]`、`[B, 9]` 和 `[B, 30, 32]`。短历史和长历史使用同一类记录；它们不是两套额外传感器。环境返回某个字段，也不等于当前阶段的 Actor 一定读取它。
+
+9 维特权向量在 `v0.0.1` 中的具体排列为：
+
+| 切片，左闭右开 | 字段 | 维数 | 真机部署如何处理 |
+| --- | --- | --- | --- |
+| `0:3` | 物体位置 | 3 | 整个特权分支由历史模块替代 |
+| `3:4` | 物体尺寸缩放系数 | 1 | 同上；不是三轴尺寸向量 |
+| `4:5` | 物体质量 | 1 | 不需要称重后作为输入 |
+| `5:6` | 物体摩擦系数 | 1 | 不需要在线直接测得摩擦 |
+| `6:9` | 物体质心偏移 | 3 | 不需要提供真实质心 |
+
+部署所需的关节位置来自机器人编码器，位置目标来自控制程序的命令记录。Actor 输入没有物体图像、物体朝向、关节速度或触觉；底层 PD 控制器使用关节速度，不代表高层 Actor 的 observation 也包含它。
+
+因此，HORA 中的“Student”更适合理解为**历史适应模块与保留下来的控制器共同组成的部署策略**。训练与部署都能形成 104 维控制输入，但其中 8 维 latent 的信息来源改变了。[观测实现](https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/tasks/allegro_hand_hora.py)、[适应训练](https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/padapt/padapt.py)、[真机部署](https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/deploy/deploy.py)
 
 ## 3. 三个阶段对应三条不同的信息流
 

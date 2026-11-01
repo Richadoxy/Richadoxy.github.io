@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="用网络图、数值例子和逐段伪代码连接 reward、return、价值预测、GAE 与 PPO，明确训练目标和梯度边界。" />
+    <meta name="description" content="先用数值例子理解 Actor、Critic 和优势计算，再区分 MLP 与 LSTM，逐步连接回报、GAE、PPO 与参数更新。" />
     <title>RL 基础：从 Actor–Critic 到 PPO 的数据、目标与梯度 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -35,6 +35,7 @@
           <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
           <div class="toc">
 <ul>
+<li><a href="#0">0. 先用一个例子理解分工</a></li>
 <li><a href="#1">1. 从动作标签到交互结果</a></li>
 <li><a href="#2">2. 环境、状态、观测与动作</a><ul>
 <li><a href="#21-goal-conditioned">2.1 Goal-conditioned：把“希望怎样完成任务”作为条件</a></li>
@@ -44,6 +45,7 @@
 <li><a href="#31-actor">3.1 Actor 是策略的可学习实现</a></li>
 <li><a href="#32-critic">3.2 Critic 是价值回归网络</a></li>
 <li><a href="#33">3.3 架构由输入和记忆需求决定</a></li>
+<li><a href="#34-mlp-lstm">3.4 MLP 与 LSTM：是否在网络里保留跨步记忆</a></li>
 </ul>
 </li>
 <li><a href="#4-returnvq-advantage">4. 从环境奖励到 Return、V、Q 与 Advantage</a><ul>
@@ -91,13 +93,44 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL02</p>
           <h1>RL 基础：从 Actor–Critic 到 PPO 的数据、目标与梯度</h1>
-          <p class="article-meta"><span data-lang="en">核心 · October 2026 · 23 min read</span><span data-lang="zh">核心 · 2026.10 · 约 23 分钟阅读</span></p>
-          <p class="article-deck">用网络图、数值例子和逐段伪代码连接 reward、return、价值预测、GAE 与 PPO，明确训练目标和梯度边界。</p>
+          <p class="article-meta"><span data-lang="en">核心 · October 2026 · 25 min read</span><span data-lang="zh">核心 · 2026.10 · 约 25 分钟阅读</span></p>
+          <p class="article-deck">先用数值例子理解 Actor、Critic 和优势计算，再区分 MLP 与 LSTM，逐步连接回报、GAE、PPO 与参数更新。</p>
           <div class="article-content">
             <blockquote>
 <p>阅读位置：<a href="dexterous-rl-overview.html">灵巧手研究地图 RL01</a> → 本文 RL02 → <a href="teacher-student-and-sim-to-real.html">Teacher–Student 与部署 RL03</a> → <a href="hora-paper-walkthrough.html">HORA 精讲 RL04</a>。本文讲通用原理；HORA 的维度、物体分布、奖励实现和实验结论放在 RL04。</p>
 </blockquote>
 <p>强化学习的入门难点往往在几个接口：模块叫什么、网络输出什么、训练目标从哪里来，以及梯度究竟更新谁。本章沿着“环境交互 → 价值预测 → 动作评价 → 策略更新”的顺序组织这些概念。理解主线后，再进入部分可观测、特权信息和真实部署。</p>
+<h2 id="0">0. 先用一个例子理解分工</h2>
+<p>假设机器人正在把工具举起来。Actor 根据当前观测选择一组手臂和手指动作；执行以后，环境根据是否举高、是否接近目标等规则返回奖励。Critic 同时估计：从当前情况继续做下去，预计能获得多少累计奖励。</p>
+<p>为了帮助理解，先假设这次经历得到的累计回报是 8，而 Critic 原先预测是 5：</p>
+<table>
+<thead>
+<tr>
+<th>参与者</th>
+<th>这次训练中做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>环境</td>
+<td>提供执行动作后的状态和每步 reward</td>
+</tr>
+<tr>
+<td>Critic</td>
+<td>将预测 5 与回报目标 8 比较，用误差更新自己，使估值更准确</td>
+</tr>
+<tr>
+<td>训练算法</td>
+<td>根据交互奖励和价值预测估计 advantage；这个简化例子中为 8−5＝3</td>
+</tr>
+<tr>
+<td>Actor</td>
+<td>利用正优势的信号，提高以后类似情况下选择这类动作的倾向</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Actor 不负责输出 advantage；Critic 也不是拿预测值只与当前一步 reward 比较。</strong> 实际 PPO 通常用多步奖励、价值估计和 GAE 构造目标，后文再展开。初读时先建立“行动 → 结果 → 评价 → 更新”的闭环。</p>
+<p>Actor–Critic 规定模块职责，MLP／LSTM 规定网络结构，PPO／SAPG 规定学习算法；Teacher–Student 则描述模型之间的监督关系。可以用 PPO 训练一个 LSTM Actor，也可以先用 Actor–Critic 训练 Teacher，再让它教 Student。关于后者，见 <a href="teacher-student-and-sim-to-real.html">RL03</a>。</p>
 <h2 id="1">1. 从动作标签到交互结果</h2>
 <p>行为克隆用专家提供的观测—动作配对训练策略。使用 flow matching 的动作模型，也可以从示范动作和采样噪声构造速度场目标；目标的正负号取决于插值路径与时间方向。两者都能从数据构造明确的动作学习目标，背景见 <a href="imitation-learning-behavior-cloning.html">模仿学习基础</a> 与 <a href="10-flow-matching-training-inference.html">Flow Matching</a>。</p>
 <p>RL 的任务信号来自执行动作后的结果。环境按照奖励规则返回一个数，算法再用一段经历评价动作的后续影响。没有专家动作标签，并不意味着没有训练目标：价值目标和策略损失可以由交互数据构造。</p>
@@ -322,6 +355,16 @@ a_t=m_\theta(x_t)+\sigma\odot\xi_t,\quad
 </tbody>
 </table>
 <p>例如 <a href="https://proceedings.mlr.press/v205/qin23a/qin23a.pdf">DexPoint</a> 使用 PointNet 编码点云，再接 Actor／Critic MLP，并用 PPO 训练。MLP 是低维控制的常见实现，不能据此给整个灵巧手领域下未经统计的“多数都是 MLP”的结论。上述策略与价值概念可对照 <a href="https://github.com/openai/spinningup/blob/master/docs/spinningup/rl_intro.rst">OpenAI Spinning Up</a>。</p>
+<h3 id="34-mlp-lstm">3.4 MLP 与 LSTM：是否在网络里保留跨步记忆</h3>
+<p>MLP（多层感知机）通过多层全连接变换，将输入映射到输出。给定相同输入和固定参数，它会产生相同的输出；如果要利用过去，必须把历史或历史提取的特征显式放进输入。</p>
+<p>LSTM 是循环网络，会保留两组跨时间步传递的状态，通常记为 hidden state 和 cell state。初学时可以把它们看成会不断更新的内部记忆：</p>
+<pre><code class="language-text">普通 MLP：当前输入 → 特征 → 动作分布参数
+
+LSTM + MLP：当前输入 + 上一步记忆 → LSTM → MLP → 动作分布参数
+                                      └→ 新记忆，留给下一步
+</code></pre>
+<p>若物体短暂被挡住，或者同一动作在不同工具上产生不同运动，历史就可能帮助判断当前情况。LSTM 提供利用历史的能力；记忆具体学到什么取决于训练信号，并不自动获得准确的物理状态。</p>
+<p>需要区分两种变化：<strong>训练更新网络权重，推理更新记忆状态。</strong> 固定权重的 LSTM 在真机上仍能持续更新记忆，这不等于在真机重新训练。HORA 使用 MLP 控制器与另外的历史适应模块；<a href="simtoolreal-paper-walkthrough.html">SimToolReal</a> 则将 LSTM 放入 Actor，经 RL 训练。一般原理可参照 <a href="https://docs.pytorch.org/docs/stable/generated/torch.nn.LSTM.html">PyTorch LSTM 定义</a>。</p>
 <h2 id="4-returnvq-advantage">4. 从环境奖励到 Return、V、Q 与 Advantage</h2>
 <h3 id="41">4.1 实际经历和预测值</h3>
 <p>环境先计算每一步的奖励，再由轨迹得到折扣回报：</p>

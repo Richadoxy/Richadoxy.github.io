@@ -6,6 +6,8 @@
 
 > 强化学习分支：[灵巧手 RL 研究地图](43_dexterous_rl_overview.md) → [交互训练基础](44_rl_basics_and_training_loop.md) → [Teacher–Student 与部署](45_teacher_student_and_sim_to_real.md)。该分支补充奖励、探索和仿真交互，并区分学习算法与知识迁移框架。
 
+> 视觉状态估计分支：[6D 位姿、坐标标定与 FoundationPose](50_visual_state_estimation_and_foundationpose.md) F05。用于理解“先从图像恢复物体状态，再交给控制策略”的系统，可在阅读 [SimToolReal](49_simtoolreal_paper_walkthrough.md) 时按需补充。
+
 若已经能读懂 VLA 前向框图，可以沿 [动作生成](25_action_generation_families.md) → [π₀.₅结构](04_pi05_architecture.md) → [FAST 与 KI](42_fast_ki_and_pi_training.md) → [参数更新](05_train_state_jit_checkpoint.md) 继续。这条路线补齐“表示什么、由什么监督、梯度更新谁、部署运行什么”四个理解关口。
 
 ## 0. 先记住整条主线

@@ -18,6 +18,17 @@ Student 也不一定使用 RL。常见流程是：
 
 Teacher 不必比 student 参数更多，也不必始终更强；它可能只是掌握更丰富的训练信息，或者只擅长一个任务。[Policy Distillation](https://arxiv.org/abs/1511.06295) 展示了策略压缩与多任务专家整合，说明这是一种知识迁移组织方式。
 
+初读时可以用四个问题判断层级：
+
+| 要问什么 | 对应概念 | 示例 |
+| --- | --- | --- |
+| 谁产生动作，谁预测回报？ | 模块职责 | Actor 与 Critic |
+| 各模块用什么网络实现？ | 网络结构 | MLP、LSTM＋MLP |
+| 怎样利用数据更新参数？ | 学习算法 | PPO、SAPG、行为克隆 |
+| 谁教谁，有没有后续迁移阶段？ | 训练组织 | Teacher–Student、latent 监督 |
+
+因此，“采用 Actor–Critic”本身不能回答“有没有 Teacher–Student”。要继续检查是否存在专家输出、学生模型以及对应的监督训练阶段。
+
 ### 算法、目标与角色的组合边界
 
 | Teacher 来源 | 提供什么 | 需要注意 |
@@ -230,6 +241,34 @@ Critic 的价值预测不是专家动作标签。它通过环境回报构造的�
 非对称 actor–critic 让 actor 只读图像等可部署观测，critic 在训练中利用完整状态估值；并不是让 actor 回归 critic 给出的专家动作。[Asymmetric Actor Critic](https://arxiv.org/abs/1710.06542)
 
 二者也能组合。例如先用 actor–critic 算法训练特权 teacher，再训练视觉 student；或让 student 在蒸馏之后使用非对称 actor–critic 做 RL 微调。应按阶段分别画图。
+
+### 4.1 没有 Student 时，真实观测也可以由外部感知提供
+
+[SimToolReal](49_simtoolreal_paper_walkthrough.md) 提供了一个具体例子：训练时，Actor 读取加噪声和延迟的物体状态；真机时，由 FoundationPose 估计相应的工具位姿，再构造相同含义的输入。训练中额外的干净状态交给 Critic，最终直接部署 Actor。
+
+由此要分清两个问题：
+
+- **数值是什么？** 例如物体位置、朝向、尺寸。
+- **部署时能怎样获得？** 仿真真值、相机估计、机器人读数，还是根本无法获得。
+
+“物体位姿”并非天然属于特权信息。只在仿真中可得的精确位姿可以是特权输入；通过真实相机估计的位姿则可以作为部署观测，但会带误差和延迟。两者字段相同，不代表信息质量相同。
+
+没有 Student 也不会自动保证 sim-to-real 成功。仍需对齐输入顺序、单位、坐标系、归一化和时间关系，并让训练覆盖合理的估计误差。感知侧的基础见 [F05：视觉状态估计与 FoundationPose](50_visual_state_estimation_and_foundationpose.md)。
+
+### 4.2 四篇论文：训练与部署究竟换了什么输入？
+
+下面只比较**负责动作的策略输入**。Critic 的额外状态、监督标签与 Actor 的 observation 要分别记录。每篇精读都列出了字段、维度及信息来源。
+
+| 论文 | 训练时的 Teacher／Actor 输入 | Student／部署输入 | 知识迁移的目的 |
+| --- | --- | --- | --- |
+| [HORA](46_hora_paper_walkthrough.md) | 3 步关节位置与位置目标共 96 维＋由 9 维特权信息编码的 8 维 latent | 同样的 96 维＋由 `30×32` 维本体历史估计的 8 维 latent；控制器仍接收 104 维 | 用历史适应模块替换特权信息来源，保留控制技能 |
+| [UniDexGrasp](47_unidexgrasp_paper_walkthrough.md) | 机器人状态＋物体精确位姿／速度＋完整物体点云＋目标抓姿 | 机器人状态＋实时场景点云＋目标抓姿；公开实现中部分目标误差仍由仿真物体状态构造 | 将状态与完整几何条件下的专家动作迁移到视觉策略 |
+| [SimToolReal](49_simtoolreal_paper_walkthrough.md) | 140 维数值观测：机器人状态、工具关键点、目标误差和抓握尺寸；另有 LSTM 记忆 | 同一组 140 维字段；工具当前位姿由真实视觉估计，目标由示范序列提供 | 没有额外 Student，训练后直接部署 Actor |
+| [AdaDexTrack](51_adadextrack_paper_walkthrough.md) | 273 维：机器人／物体状态、当前参考误差、未来参考、物体几何 latent | BC Student 仍读同一组 273 维；最终部署加上 Modulator，调整 Tracker 的参考与 latent，并修正动作 | 将多个专用专家整合成通用 Tracker，再学习执行调整 |
+
+**Teacher–Student 不要求二者的观测不同。** AdaDexTrack 主要整合技能覆盖范围；HORA 改变 latent 的来源；UniDexGrasp 改变感知接口。也不能从“质量、摩擦没有进入 Actor”推断没有域随机化：环境参数可以随机变化，而不作为观测直接提供给策略。
+
+部署观测需要追溯到实际传感器或预处理数据。例如，UniDexGrasp 的 Student 虽然去掉了显式物体状态输入，代码中的相对目标仍依赖物体位姿；要部署到真机，还要解决这部分信息怎样估计，详见该篇观测表。
 
 ## 5. 训练图、梯度图和推理图
 

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="从特权输入与监督目标组织知识迁移，区分动作、分布与 latent 蒸馏，再连接在线适应和真机部署。" />
+    <meta name="description" content="分清 Actor–Critic 与 Teacher–Student，理解动作与 latent 蒸馏、DAgger，并对照四篇论文的训练和部署观测。" />
     <title>Teacher–Student：策略蒸馏、特权信息与部署 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -54,7 +54,11 @@
 <li><a href="#32-latent">3.2 Latent 监督与交互式采集可以组合</a></li>
 </ul>
 </li>
-<li><a href="#4-actorcritic-teacherstudent">4. Actor–Critic 与 Teacher–Student 的分工</a></li>
+<li><a href="#4-actorcritic-teacherstudent">4. Actor–Critic 与 Teacher–Student 的分工</a><ul>
+<li><a href="#41-student">4.1 没有 Student 时，真实观测也可以由外部感知提供</a></li>
+<li><a href="#42">4.2 四篇论文：训练与部署究竟换了什么输入？</a></li>
+</ul>
+</li>
 <li><a href="#5">5. 训练图、梯度图和推理图</a></li>
 <li><a href="#6">6. 将目标奖励、参考跟踪与蒸馏组合</a><ul>
 <li><a href="#a-teacher-student">示例 A：目标奖励 teacher → 感知 student</a></li>
@@ -80,8 +84,8 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL03</p>
           <h1>Teacher–Student：策略蒸馏、特权信息与部署</h1>
-          <p class="article-meta"><span data-lang="en">进阶 · October 2026 · 18 min read</span><span data-lang="zh">进阶 · 2026.10 · 约 18 分钟阅读</span></p>
-          <p class="article-deck">从特权输入与监督目标组织知识迁移，区分动作、分布与 latent 蒸馏，再连接在线适应和真机部署。</p>
+          <p class="article-meta"><span data-lang="en">进阶 · October 2026 · 21 min read</span><span data-lang="zh">进阶 · 2026.10 · 约 21 分钟阅读</span></p>
+          <p class="article-deck">分清 Actor–Critic 与 Teacher–Student，理解动作与 latent 蒸馏、DAgger，并对照四篇论文的训练和部署观测。</p>
           <div class="article-content">
             <blockquote>
 <p>阅读位置：<a href="dexterous-rl-overview.html">灵巧手 RL 研究地图</a> → <a href="rl-basics-and-training-loop.html">RL 通识与 PPO 训练闭环</a> → 本文 → <a href="hora-paper-walkthrough.html">HORA 精讲</a>。RL02 说明单个 actor–critic 怎样从交互中学习；本文说明不同模型、输入与训练阶段之间怎样传递知识，RL04 再代入 HORA 的具体网络和实验。</p>
@@ -95,6 +99,39 @@
 阶段 C：可选的 RL 微调或在线适应 → 部署
 </code></pre>
 <p>Teacher 不必比 student 参数更多，也不必始终更强；它可能只是掌握更丰富的训练信息，或者只擅长一个任务。<a href="https://arxiv.org/abs/1511.06295">Policy Distillation</a> 展示了策略压缩与多任务专家整合，说明这是一种知识迁移组织方式。</p>
+<p>初读时可以用四个问题判断层级：</p>
+<table>
+<thead>
+<tr>
+<th>要问什么</th>
+<th>对应概念</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>谁产生动作，谁预测回报？</td>
+<td>模块职责</td>
+<td>Actor 与 Critic</td>
+</tr>
+<tr>
+<td>各模块用什么网络实现？</td>
+<td>网络结构</td>
+<td>MLP、LSTM＋MLP</td>
+</tr>
+<tr>
+<td>怎样利用数据更新参数？</td>
+<td>学习算法</td>
+<td>PPO、SAPG、行为克隆</td>
+</tr>
+<tr>
+<td>谁教谁，有没有后续迁移阶段？</td>
+<td>训练组织</td>
+<td>Teacher–Student、latent 监督</td>
+</tr>
+</tbody>
+</table>
+<p>因此，“采用 Actor–Critic”本身不能回答“有没有 Teacher–Student”。要继续检查是否存在专家输出、学生模型以及对应的监督训练阶段。</p>
 <h3 id="_1">算法、目标与角色的组合边界</h3>
 <table>
 <thead>
@@ -414,6 +451,55 @@ for k in range(num_rounds):
 </table>
 <p>非对称 actor–critic 让 actor 只读图像等可部署观测，critic 在训练中利用完整状态估值；并不是让 actor 回归 critic 给出的专家动作。<a href="https://arxiv.org/abs/1710.06542">Asymmetric Actor Critic</a></p>
 <p>二者也能组合。例如先用 actor–critic 算法训练特权 teacher，再训练视觉 student；或让 student 在蒸馏之后使用非对称 actor–critic 做 RL 微调。应按阶段分别画图。</p>
+<h3 id="41-student">4.1 没有 Student 时，真实观测也可以由外部感知提供</h3>
+<p><a href="simtoolreal-paper-walkthrough.html">SimToolReal</a> 提供了一个具体例子：训练时，Actor 读取加噪声和延迟的物体状态；真机时，由 FoundationPose 估计相应的工具位姿，再构造相同含义的输入。训练中额外的干净状态交给 Critic，最终直接部署 Actor。</p>
+<p>由此要分清两个问题：</p>
+<ul>
+<li><strong>数值是什么？</strong> 例如物体位置、朝向、尺寸。</li>
+<li><strong>部署时能怎样获得？</strong> 仿真真值、相机估计、机器人读数，还是根本无法获得。</li>
+</ul>
+<p>“物体位姿”并非天然属于特权信息。只在仿真中可得的精确位姿可以是特权输入；通过真实相机估计的位姿则可以作为部署观测，但会带误差和延迟。两者字段相同，不代表信息质量相同。</p>
+<p>没有 Student 也不会自动保证 sim-to-real 成功。仍需对齐输入顺序、单位、坐标系、归一化和时间关系，并让训练覆盖合理的估计误差。感知侧的基础见 <a href="visual-state-estimation-and-foundationpose.html">F05：视觉状态估计与 FoundationPose</a>。</p>
+<h3 id="42">4.2 四篇论文：训练与部署究竟换了什么输入？</h3>
+<p>下面只比较<strong>负责动作的策略输入</strong>。Critic 的额外状态、监督标签与 Actor 的 observation 要分别记录。每篇精读都列出了字段、维度及信息来源。</p>
+<table>
+<thead>
+<tr>
+<th>论文</th>
+<th>训练时的 Teacher／Actor 输入</th>
+<th>Student／部署输入</th>
+<th>知识迁移的目的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="hora-paper-walkthrough.html">HORA</a></td>
+<td>3 步关节位置与位置目标共 96 维＋由 9 维特权信息编码的 8 维 latent</td>
+<td>同样的 96 维＋由 <code>30×32</code> 维本体历史估计的 8 维 latent；控制器仍接收 104 维</td>
+<td>用历史适应模块替换特权信息来源，保留控制技能</td>
+</tr>
+<tr>
+<td><a href="unidexgrasp-paper-walkthrough.html">UniDexGrasp</a></td>
+<td>机器人状态＋物体精确位姿／速度＋完整物体点云＋目标抓姿</td>
+<td>机器人状态＋实时场景点云＋目标抓姿；公开实现中部分目标误差仍由仿真物体状态构造</td>
+<td>将状态与完整几何条件下的专家动作迁移到视觉策略</td>
+</tr>
+<tr>
+<td><a href="simtoolreal-paper-walkthrough.html">SimToolReal</a></td>
+<td>140 维数值观测：机器人状态、工具关键点、目标误差和抓握尺寸；另有 LSTM 记忆</td>
+<td>同一组 140 维字段；工具当前位姿由真实视觉估计，目标由示范序列提供</td>
+<td>没有额外 Student，训练后直接部署 Actor</td>
+</tr>
+<tr>
+<td><a href="adadextrack-paper-walkthrough.html">AdaDexTrack</a></td>
+<td>273 维：机器人／物体状态、当前参考误差、未来参考、物体几何 latent</td>
+<td>BC Student 仍读同一组 273 维；最终部署加上 Modulator，调整 Tracker 的参考与 latent，并修正动作</td>
+<td>将多个专用专家整合成通用 Tracker，再学习执行调整</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Teacher–Student 不要求二者的观测不同。</strong> AdaDexTrack 主要整合技能覆盖范围；HORA 改变 latent 的来源；UniDexGrasp 改变感知接口。也不能从“质量、摩擦没有进入 Actor”推断没有域随机化：环境参数可以随机变化，而不作为观测直接提供给策略。</p>
+<p>部署观测需要追溯到实际传感器或预处理数据。例如，UniDexGrasp 的 Student 虽然去掉了显式物体状态输入，代码中的相对目标仍依赖物体位姿；要部署到真机，还要解决这部分信息怎样估计，详见该篇观测表。</p>
 <h2 id="5">5. 训练图、梯度图和推理图</h2>
 <p>下面是一个通用的“两阶段动作蒸馏”示例，不代表所有论文都冻结同样的模块。</p>
 <pre><code class="language-text">阶段 A：teacher 学习
