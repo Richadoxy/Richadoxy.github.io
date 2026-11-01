@@ -255,7 +255,7 @@ Critic 的价值预测不是专家动作标签。它通过环境回报构造的�
 
 没有 Student 也不会自动保证 sim-to-real 成功。仍需对齐输入顺序、单位、坐标系、归一化和时间关系，并让训练覆盖合理的估计误差。感知侧的基础见 [F05：视觉状态估计与 FoundationPose](50_visual_state_estimation_and_foundationpose.md)。
 
-### 4.2 四篇论文：训练与部署究竟换了什么输入？
+### 4.2 五篇论文：训练与部署究竟换了什么输入？
 
 下面只比较**负责动作的策略输入**。Critic 的额外状态、监督标签与 Actor 的 observation 要分别记录。每篇精读都列出了字段、维度及信息来源。
 
@@ -265,8 +265,11 @@ Critic 的价值预测不是专家动作标签。它通过环境回报构造的�
 | [UniDexGrasp](47_unidexgrasp_paper_walkthrough.md) | 机器人状态＋物体精确位姿／速度＋完整物体点云＋目标抓姿 | 机器人状态＋实时场景点云＋目标抓姿；公开实现中部分目标误差仍由仿真物体状态构造 | 将状态与完整几何条件下的专家动作迁移到视觉策略 |
 | [SimToolReal](49_simtoolreal_paper_walkthrough.md) | 140 维数值观测：机器人状态、工具关键点、目标误差和抓握尺寸；另有 LSTM 记忆 | 同一组 140 维字段；工具当前位姿由真实视觉估计，目标由示范序列提供 | 没有额外 Student，训练后直接部署 Actor |
 | [AdaDexTrack](51_adadextrack_paper_walkthrough.md) | 273 维：机器人／物体状态、当前参考误差、未来参考、物体几何 latent | BC Student 仍读同一组 273 维；最终部署加上 Modulator，调整 Tracker 的参考与 latent，并修正动作 | 将多个专用专家整合成通用 Tracker，再学习执行调整 |
+| [ADEPT](52_adept_paper_walkthrough.md) | FMB 下游状态 Teacher：Kuka 392 维／Flexiv 437 维，包含本体、点云、目标与插孔信息 | Kuka：206 维数值＋双 RGB；Flexiv：196 维数值＋双 RGB＋五指触觉；不输入显式物体或插孔位姿 | 先将预训练行为迁移到下游状态 Actor，再将任务专家蒸馏为感知 Student |
 
 **Teacher–Student 不要求二者的观测不同。** AdaDexTrack 主要整合技能覆盖范围；HORA 改变 latent 的来源；UniDexGrasp 改变感知接口。也不能从“质量、摩擦没有进入 Actor”推断没有域随机化：环境参数可以随机变化，而不作为观测直接提供给策略。
+
+ADEPT 还说明 Teacher、Student 是阶段中的角色：下游 Actor 先模仿预训练 Actor，随后通过 PPO 学习新任务，再成为感知 Student 的 Teacher。冻结网络只是停止更新权重，它仍可根据变化的观测输出动作、采集训练数据。
 
 部署观测需要追溯到实际传感器或预处理数据。例如，UniDexGrasp 的 Student 虽然去掉了显式物体状态输入，代码中的相对目标仍依赖物体位姿；要部署到真机，还要解决这部分信息怎样估计，详见该篇观测表。
 

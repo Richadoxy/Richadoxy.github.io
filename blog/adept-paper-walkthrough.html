@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en" data-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="沿 Fig. 2 拆开 PPO 预训练、BC 迁移、Critic 预热、继续 RL 和感知 Student，逐阶段看清观测、网络与参数更新。" />
+    <title>ADEPT 精讲：沿 Fig. 2 理解预训练、后训练与感知蒸馏 | 董希越的学习之路</title>
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/blog.css" />
+    <script defer src="../assets/js/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="site-name" href="../index.html">Xiyue Dong</a>
+        <nav class="site-nav blog-top-nav" aria-label="博客导航">
+          <a href="index.html"><span data-lang="en">Blog</span><span data-lang="zh">学习之路</span></a>
+          <a href="../index.html"><span data-lang="en">Home</span><span data-lang="zh">个人主页</span></a>
+          <button class="language-toggle" type="button" aria-label="Switch language">
+            <span data-lang="en">中文</span><span data-lang="zh">EN</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="article-shell">
+      <aside class="article-sidebar">
+        <a class="blog-profile" href="../index.html">
+          <img src="../assets/images/profile-xiyue.jpg" alt="董希越" />
+          <span><strong><span data-lang="en">Xiyue Dong</span><span data-lang="zh">董希越</span></strong><small>Robotics · VLA</small></span>
+        </a>
+        <a class="back-to-series" href="index.html"><span data-lang="en">← Back to all posts</span><span data-lang="zh">← 返回知识链目录</span></a>
+        <details class="article-toc" open>
+          <summary><span data-lang="en">Contents</span><span data-lang="zh">本文目录</span></summary>
+          <div class="toc">
+<ul>
+<li><a href="#1-fig-2">1. 先对齐 Fig. 2：三个策略，四个大阶段</a></li>
+<li><a href="#2-1-ppo">2. 第 1 块：PPO 预训练通用操作策略</a></li>
+<li><a href="#3-2-abc-post-training">3. 第 2 块：a、b、c 三步完成 post-training</a><ul>
+<li><a href="#31-2abc-distillation">3.1 2a：BC Distillation，先把旧技能搬进新观测接口</a></li>
+<li><a href="#32-2bcritic-warm-up-critic">3.2 2b：Critic Warm-up，让新的 Critic 熟悉新奖励</a></li>
+<li><a href="#33-2cconservative-ppo">3.3 2c：Conservative PPO，小幅修改策略，学习插入</a></li>
+</ul>
+</li>
+<li><a href="#4-3-teacher-student">4. 第 3 块：把状态 Teacher 蒸馏成感知 Student</a><ul>
+<li><a href="#41-teacher-student">4.1 Teacher 给动作标签，Student 学习从感知产生动作</a></li>
+<li><a href="#42-student">4.2 Student 网络：图像特征与机器人状态融合，再用记忆决策</a></li>
+<li><a href="#43">4.3 辅助损失与两段感知课程</a></li>
+</ul>
+</li>
+<li><a href="#5-4-student">5. 第 4 块：部署最终 Student，网络权重固定</a></li>
+<li><a href="#6-observation">6. 训练与部署的 observation：字段、维数与来源</a><ul>
+<li><a href="#61">6.1 先看各阶段的接口总数</a></li>
+<li><a href="#62-teacher">6.2 下游状态 Teacher 具体看什么？</a></li>
+<li><a href="#63-student">6.3 感知 Student 的训练输入与部署输入</a></li>
+</ul>
+</li>
+<li><a href="#7">7. 实验如何支持这套训练流程？</a></li>
+<li><a href="#8">8. 怎样复述贡献，以及与前几篇的区别？</a></li>
+</ul>
+</div>
+
+        </details>
+      </aside>
+      <main class="article-main">
+        <article class="blog-article">
+          <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL09</p>
+          <h1>ADEPT 精讲：沿 Fig. 2 理解预训练、后训练与感知蒸馏</h1>
+          <p class="article-meta"><span data-lang="en">精读 · November 2026 · 14 min read</span><span data-lang="zh">精读 · 2026.11 · 约 14 分钟阅读</span></p>
+          <p class="article-deck">沿 Fig. 2 拆开 PPO 预训练、BC 迁移、Critic 预热、继续 RL 和感知 Student，逐阶段看清观测、网络与参数更新。</p>
+          <div class="article-content">
+            <blockquote>
+<p>阅读前提：知道 Actor 根据观测选择动作、Critic 估计未来回报即可。本文沿 Fig. 2，用“从桌面抓起零件、调整朝向、插入孔中”这一个例子，逐步说明每个阶段输入什么、怎样学习、更新谁，以及最终部署哪个网络。</p>
+<p>论文：Jayjun Lee 等，<em>ADEPT: Accelerating Dexterity via Pre-Training and Post-Training using Reinforcement Learning</em>。以本次提供的 31 页 PDF 为准；<a href="https://adept-dexterity.github.io/ADEPT.pdf">官方 PDF</a>、<a href="https://adept-dexterity.github.io/">项目页</a>。整理日期：2026-11-01。方法与维度按正文、附录及 Table 6／7 核对，不把论文中的 codebase 描述当作已经复核发布代码。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>遇到的疑问</th>
+<th>前置入口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Actor、Critic、advantage 与 PPO 怎样联系？</td>
+<td><a href="rl-basics-and-training-loop.html">RL02：RL 训练闭环</a></td>
+</tr>
+<tr>
+<td>Teacher–Student、BC 和 DAgger 分别是什么？</td>
+<td><a href="teacher-student-and-sim-to-real.html">RL03：训练角色与部署</a></td>
+</tr>
+<tr>
+<td>两阶段学习与直接部署有什么区别？</td>
+<td><a href="simtoolreal-paper-walkthrough.html">SimToolReal 精读</a>、<a href="adadextrack-paper-walkthrough.html">AdaDexTrack 精读</a></td>
+</tr>
+<tr>
+<td>消融与成功率应该怎样读？</td>
+<td><a href="rl-experiment-reading.html">RL05：RL 实验阅读</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-fig-2">1. 先对齐 Fig. 2：三个策略，四个大阶段</h2>
+<p><strong>ADEPT 先用 RL 学通用操作能力，再迁移到具体任务，最后把状态策略蒸馏成直接读取相机、机器人状态及可选触觉的感知策略。</strong></p>
+<p>以插入为例，机器人需要完成“接近 → 抓取 → 举起 → 调整朝向 → 搬运 → 对齐插入”。如果每个新任务都从随机动作开始，前面的抓取和搬运也要重新学习。ADEPT 希望复用这部分基础能力，并解决继续训练时已有行为迅速退化的问题。</p>
+<p>先认清图中的符号：</p>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>对应什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>π_pre</code></td>
+<td>预训练得到的通用 Actor</td>
+</tr>
+<tr>
+<td><code>π_post</code></td>
+<td>面向下游具体任务的 Actor</td>
+</tr>
+<tr>
+<td><code>π_student</code></td>
+<td>最后部署的感知 Actor</td>
+</tr>
+<tr>
+<td><code>V_pre</code>、<code>V_post</code></td>
+<td>对应任务的 Critic，预测未来累计回报</td>
+</tr>
+<tr>
+<td><code>o</code>、<code>r</code></td>
+<td>观测与环境奖励</td>
+</tr>
+<tr>
+<td><code>L_BC</code>、<code>L_aux</code></td>
+<td>动作模仿损失与辅助预测损失</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="按 Fig. 2 重组的 ADEPT 训练阶段，标出监督来源、冻结与更新关系" src="assets/figures/adept-training-stages.svg" /></p>
+<p><a href="assets/figures/adept-training-stages.svg">放大训练图</a>。三个策略之间的箭头表示<strong>训练中的知识迁移</strong>。真机执行时只运行最终 Student 与底层控制系统，并不把三个策略依次串起来执行。</p>
+<table>
+<thead>
+<tr>
+<th>Fig. 2 中的位置</th>
+<th>这一阶段要得到什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1：Pre-training</td>
+<td>会抓取、搬运、手内重定向的通用策略</td>
+</tr>
+<tr>
+<td>2：Post-training</td>
+<td>保留基础技能，并学会具体的插入任务</td>
+</tr>
+<tr>
+<td>3：Teacher–Student distillation</td>
+<td>用图像等可部署信息实现相应动作能力</td>
+</tr>
+<tr>
+<td>4：Real-world deployment</td>
+<td>固定网络权重，在真机上闭环执行</td>
+</tr>
+</tbody>
+</table>
+<p>前面三个阶段都在仿真中完成。下面先沿图中的 Kuka–Allegro 版本讲：7 个机械臂关节＋16 个手指关节，共 23 个自由度。<a href="https://adept-dexterity.github.io/ADEPT.pdf#page=4">原文 Fig. 2、§3</a></p>
+<h2 id="2-1-ppo">2. 第 1 块：PPO 预训练通用操作策略</h2>
+<p>这里的 <strong>reposing</strong> 可以理解为：把物体从当前位置和朝向，调整到指定的位置和朝向。它可以包含接近、抓取、举起、手内旋转和搬运。</p>
+<p>每回合从 16 种简单几何物体中采样，再随机化尺寸等条件，并指定目标位姿。例如，物体横躺在桌上，目标要求把它举起、转正、搬到指定位置。</p>
+<pre><code class="language-text">机器人状态、物体信息、目标 → Actor → 23 维动作 → 仿真执行
+                                     ↑                  ↓
+                               PPO 更新 ← 奖励、下一状态、Critic 估值
+</code></pre>
+<p>Actor 通过交互寻找有效动作。奖励鼓励手接近物体、建立相应接触，并让物体接近目标位姿；Critic 学习预测未来回报，训练算法再据此构造 advantage，更新 Actor。</p>
+<p>这一步采用 <strong>PPO＋非对称 Actor–Critic</strong>：Actor 读取状态与点云等输入，Critic 还能使用较完整、较干净的仿真信息。论文说明预训练使用共享骨干，但没有像感知 Student 那样完整列出逐层宽度，因此不补猜 Teacher 的 MLP、LSTM 或点云编码器配置。</p>
+<p>训练还使用 ADR，即随着成功率提升逐步增加任务难度和随机化强度；PBT 则通过并行策略的比较与调整搜索训练超参数。它们服务于学习过程，不是部署时新增的网络。</p>
+<p><strong>这一块结束后，<code>π_pre</code> 已经有可复用的基础技能，但仍需要针对插入继续学习。</strong> 预训练到下游任务的迁移不是“所有新任务都已经零样本完成”。</p>
+<h2 id="3-2-abc-post-training">3. 第 2 块：a、b、c 三步完成 post-training</h2>
+<h3 id="31-2abc-distillation">3.1 2a：BC Distillation，先把旧技能搬进新观测接口</h3>
+<p>插入任务的 observation 与预训练不同：增加插孔位姿、物体与插孔接触等信息，同时移除一些预训练字段。因此，作者先建立适配新接口的 <code>π_post</code>，让它模仿 <code>π_pre</code>。</p>
+<pre><code class="language-text">同一个仿真状态
+    ├─ 旧观测 → 冻结的 π_pre  → 老师的动作分布
+    └─ 新观测 → 待训练 π_post → 学生的动作分布
+                                  ↓
+                     比较两个分布，只更新 π_post
+</code></pre>
+<p><strong>BC，即行为克隆</strong>，用老师的动作作为监督。这里匹配动作分布的均值与标准差等信息；<code>π_pre</code> 不随损失更新，Critic 此时也不参与学习。</p>
+<p>数据在仿真交互中采集。附录 D 说明执行时会混用 Teacher 与 Student 的动作，不能将其概括成只读取一份固定离线数据。</p>
+<p>尤其要注意：<strong>这一步先模仿旧策略能够完成的搬运、重定向目标。</strong> 论文在较容易的 ADR 20 目标上做这段迁移，没有要求旧策略提供它自己不会的成功插入动作。</p>
+<p>2a 结束后，新 Actor 适应了新的观测接口，并继承已有行为；插入能力留给后续 RL 学习。</p>
+<h3 id="32-2bcritic-warm-up-critic">3.2 2b：Critic Warm-up，让新的 Critic 熟悉新奖励</h3>
+<p>作者初始化一个新的 <code>V_post</code>，暂时冻结 <code>π_post</code>。</p>
+<p>原因是任务的评价标准改变了：原任务关注物体到达目标位姿，插入任务还要求对齐、接触并完成插入。新的 Critic 需要学习这个奖励下的累计回报，才能为后续策略更新提供更合适的估值。</p>
+<pre><code class="language-text">固定 π_post 的权重
+        ↓
+在插入任务中执行，采集状态、动作和新奖励
+        ↓
+构造回报目标，只更新 V_post
+</code></pre>
+<p>可以理解为：<strong>先让评分员熟悉新的评分标准，再让 Actor 根据评分改变行为。</strong></p>
+<p>冻结 Actor 只表示停止更新网络权重。它仍然根据不同观测产生不同动作，机器人继续交互。此时目标已经切换到最终插入位置，而非 2a 的较容易搬运目标。</p>
+<p>2b 结束后，Actor 的行为基本保持不变，新的 Critic 已经开始适应下游任务。<a href="https://adept-dexterity.github.io/ADEPT.pdf#page=25">正文 §3.3、附录 D</a></p>
+<h3 id="33-2cconservative-ppo">3.3 2c：Conservative PPO，小幅修改策略，学习插入</h3>
+<p>现在解冻 <code>π_post</code>，在插入奖励下同时更新 Actor 与 Critic。Critic 学估值，训练算法计算 advantage，Actor 调整动作。</p>
+<p>关键安排是把 Actor 学习率从 <code>1e-3</code> 降到 <code>1e-5</code>，并继续衰减，减小每次参数变化，避免新任务训练迅速破坏已有的抓取和搬运行为。已有能力被新训练破坏，称为<strong>灾难性遗忘</strong>。</p>
+<p>论文部署方案还将 PPO clip 从 0.20 收紧到 0.05。clip 约束 PPO 目标中的概率比更新；具体机制见 <a href="rl-basics-and-training-loop.html">RL02</a>。消融显示降低学习率更关键，收紧 clip 本身没有显示必要性，详见第 7 节。</p>
+<p>网络上，后训练改用独立的 Actor、Critic 骨干，让价值网络适应新奖励时，减少对 Actor 特征的直接干扰。这里仍然是 PPO，没有另训练一个类似 AdaDexTrack 的外挂 Modulator。</p>
+<p><strong>2c 结束后，<code>π_post</code> 成为具体任务的状态策略。</strong> 它在 2a 是向旧策略学习的学生，到下一阶段又成为感知 Student 的老师。Teacher、Student 是阶段中的角色，不是固定的网络类型。</p>
+<h2 id="4-3-teacher-student">4. 第 3 块：把状态 Teacher 蒸馏成感知 Student</h2>
+<h3 id="41-teacher-student">4.1 Teacher 给动作标签，Student 学习从感知产生动作</h3>
+<table>
+<thead>
+<tr>
+<th>网络</th>
+<th>输入</th>
+<th>这一阶段的职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>冻结的 <code>π_post</code></td>
+<td>仿真状态、物体点云、目标和插孔相关信息</td>
+<td>给出动作分布标签</td>
+</tr>
+<tr>
+<td>待训练的 <code>π_student</code></td>
+<td>双相机 RGB、机器人本体状态、控制器状态；Sharpa 另加触觉</td>
+<td>预测相应的动作</td>
+</tr>
+</tbody>
+</table>
+<p>Fig. 2 的 <code>o_img</code> 是感知 Student 整组输入的简称，<strong>并不表示只有图像</strong>。</p>
+<p>作者用 DAgger 采集数据：让 Student 自己执行，在它实际访问的状态上查询 Teacher。例如，Student 把零件抓歪了，就在这个状态询问 Teacher 下一步怎样动，再学习相应动作。</p>
+<p>这样，训练数据包含 Student 自己执行时容易遇到的情况。动作监督仍来自 Teacher，这一步属于交互式模仿学习；<strong>最终 Student 没有在这一步再通过 PPO 优化任务奖励。</strong></p>
+<h3 id="42-student">4.2 Student 网络：图像特征与机器人状态融合，再用记忆决策</h3>
+<p><img alt="ADEPT 感知 Student 的视觉、可选触觉、状态融合与动作输出，以及训练辅助头" src="assets/figures/adept-student-network.svg" /></p>
+<p><a href="assets/figures/adept-student-network.svg">放大 Student 网络图</a>。附录 H 给出以下结构：</p>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>输入与输出</th>
+<th>直观作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>共享 ResNet</td>
+<td>两路 RGB 分别提取图像特征</td>
+<td>从图像中提取物体与场景信息</td>
+</tr>
+<tr>
+<td>Cross-attention 融合</td>
+<td>两个视角 → 256 维视觉表示</td>
+<td>让不同视角的特征相互参考</td>
+</tr>
+<tr>
+<td>可选触觉分支</td>
+<td>五指触觉 → 160 维表示</td>
+<td>补充接触信息，仅 Sharpa 使用</td>
+</tr>
+<tr>
+<td>特征融合与 MLP</td>
+<td>视觉、可选触觉、本体表示与控制器状态 → <code>[512, 512]</code> MLP</td>
+<td>综合不同来源的信息</td>
+</tr>
+<tr>
+<td>LSTM</td>
+<td>1024 维记忆</td>
+<td>结合近期历史，处理单帧信息不足</td>
+</tr>
+<tr>
+<td>动作头</td>
+<td>Kuka 输出 23 维，Sharpa 输出 29 维动作均值</td>
+<td>决定关节动作，保留相应动作分布参数化</td>
+</tr>
+</tbody>
+</table>
+<p>这里的顺序是 <strong>MLP → LSTM → 动作头</strong>。这些明确层宽属于 Student，不能直接套到状态 Teacher 身上。</p>
+<p>触觉分支将每指 TacMap 深度图与二值接触图叠成两通道，经共享 CNN 得到每指 32 维特征。再用指尖位置做 FiLM 调制，即根据接触所在的空间位置对特征进行缩放、偏移；五指合计 160 维。真实触觉输出需要转换成相同表示，并非直接将触觉相机原始 RGB 输入策略。<a href="https://adept-dexterity.github.io/ADEPT.pdf#page=28">附录 H</a></p>
+<h3 id="43">4.3 辅助损失与两段感知课程</h3>
+<p>单靠动作模仿，视觉网络可能没有学清楚零件朝向，而插入对朝向很敏感。作者在视觉特征上增加一个辅助头，预测物体包围盒的 <strong>8 个三维角点</strong>，用仿真真值监督。</p>
+<p>可以分别理解两项损失：</p>
+<ul>
+<li><strong>动作模仿损失：</strong>教 Student 在当前情况下怎样动。</li>
+<li><strong>角点辅助损失：</strong>帮助视觉特征表达物体在哪里、朝向哪里。</li>
+</ul>
+<p>8 个角点真值是训练标签，不是部署 observation。Student 执行时无需 FoundationPose 提供外部位姿。</p>
+<p>Fig. 2 将这个阶段画成一块，实际感知训练还有两段课程：先跟预训练 Teacher 学较容易的抓起、转正任务，再从该 Student 检查点继续训练，跟下游 Teacher 学插入。<strong>两段都包含动作模仿和角点辅助监督</strong>，并非第一段只学视觉、第二段只学动作。<a href="https://adept-dexterity.github.io/ADEPT.pdf#page=5">§3.4、附录 G</a></p>
+<h2 id="5-4-student">5. 第 4 块：部署最终 Student，网络权重固定</h2>
+<p>真机读取双相机、机器人状态及相关控制状态，Student 前向输出动作，再交给底层控制系统执行。Sharpa 版本另外读取五指触觉。</p>
+<p>此时不需要 <code>π_pre</code>、状态 Teacher 或 Critic 参与动作生成。Student 权重固定，LSTM 记忆随执行更新。</p>
+<p><strong>真机 zero-shot 指仿真训练完成后无需真机微调。</strong> 下游任务在仿真中的专门训练仍然存在；不同机器人本体、不同下游任务分别训练策略。一份通用预训练起点可以派生多个任务策略，并不等于一个感知 Student 已经覆盖所有任务和机器人。</p>
+<h2 id="6-observation">6. 训练与部署的 observation：字段、维数与来源</h2>
+<h3 id="61">6.1 先看各阶段的接口总数</h3>
+<p>以下对应论文 Table 6／7 的 FMB 配置。数值维度不包含图像张量或 LSTM 内部记忆；一批观测可写成 <code>[B, D]</code>，其中 <code>B</code> 为环境数。</p>
+<table>
+<thead>
+<tr>
+<th>网络／阶段</th>
+<th>Kuka–Allegro，23 DoF</th>
+<th>Flexiv–Sharpa，29 DoF</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>预训练 Actor</td>
+<td>391</td>
+<td>436</td>
+</tr>
+<tr>
+<td>预训练 Critic</td>
+<td>438</td>
+<td>477</td>
+</tr>
+<tr>
+<td>后训练 Actor／最终状态 Teacher</td>
+<td>392</td>
+<td>437</td>
+</tr>
+<tr>
+<td>后训练 Critic</td>
+<td>280</td>
+<td>487</td>
+</tr>
+<tr>
+<td>感知 Student</td>
+<td><strong>206＋两张 RGB</strong></td>
+<td><strong>196＋两张 RGB＋五张触觉图</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Critic 使用干净的机器人状态和额外仿真信息。Kuka 后训练 Critic 去掉了高维点云，保留物体完整状态等信息，因此维数更小；维数大小不能用来判断观测是否更充分。</p>
+<h3 id="62-teacher">6.2 下游状态 Teacher 具体看什么？</h3>
+<table>
+<thead>
+<tr>
+<th>输入字段</th>
+<th>Kuka Teacher</th>
+<th>Flexiv Teacher</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>机器人关节与手部运动状态</td>
+<td>76</td>
+<td>94</td>
+</tr>
+<tr>
+<td>动作记录</td>
+<td>23</td>
+<td>29</td>
+</tr>
+<tr>
+<td>Fabric 状态：<code>q、qd、qdd</code></td>
+<td>69</td>
+<td>87</td>
+</tr>
+<tr>
+<td>手部接触信息</td>
+<td>15</td>
+<td>18</td>
+</tr>
+<tr>
+<td>物体点云：64 个三维点</td>
+<td>192</td>
+<td>192</td>
+</tr>
+<tr>
+<td>物体目标位置＋四元数</td>
+<td>7</td>
+<td>7</td>
+</tr>
+<tr>
+<td>插孔／容器位姿</td>
+<td>7</td>
+<td>7</td>
+</tr>
+<tr>
+<td>物体与插孔接触力</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr>
+<td><strong>合计</strong></td>
+<td><strong>392</strong></td>
+<td><strong>437</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Kuka 的 76 维为关节位置 23、关节速度 23、5 个手部部位的位置 15 与线速度 15。这里是 5 个部位，并非五根手指。Flexiv 的 94 维在 Table 7 合写为 29 个关节及 6 个运动学部位的本体状态。</p>
+<p>预训练 Actor 没有插孔相关的 10 维输入，但另外读取当前物体位置与朝向 7 维、物体索引字段 1 维、尺度字段 1 维，所以总数为 391／436。下游 Teacher 没有单列当前物体 pose 字段，但仍读取物体点云，不能据此认为它没有物体空间信息。</p>
+<h3 id="63-student">6.3 感知 Student 的训练输入与部署输入</h3>
+<table>
+<thead>
+<tr>
+<th>输入字段</th>
+<th>Kuka Student</th>
+<th>Flexiv Student</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>机器人本体运动状态</td>
+<td>76</td>
+<td>94</td>
+</tr>
+<tr>
+<td>动作记录</td>
+<td>23</td>
+<td>不使用</td>
+</tr>
+<tr>
+<td>Fabric 状态：<code>q、qd、qdd</code></td>
+<td>69</td>
+<td>87</td>
+</tr>
+<tr>
+<td><code>nominal delta</code></td>
+<td>38</td>
+<td>不使用</td>
+</tr>
+<tr>
+<td>五个触觉指尖的三维位置</td>
+<td>不使用</td>
+<td>15</td>
+</tr>
+<tr>
+<td><strong>数值部分合计</strong></td>
+<td><strong>206</strong></td>
+<td><strong>196</strong></td>
+</tr>
+<tr>
+<td>RGB</td>
+<td>两张图像</td>
+<td>两张图像</td>
+</tr>
+<tr>
+<td>触觉</td>
+<td>不使用</td>
+<td>五个指尖的触觉图</td>
+</tr>
+</tbody>
+</table>
+<p><code>nominal delta</code> 是原文字段名，标为关节与手部位置相关的 <code>23＋15＝38</code> 维偏差。PDF 没有展开参考基准与计算式，这里保留原名，不猜测它等于物体目标误差或其他控制误差。</p>
+<p>Student 不再显式读取物体点云、物体目标位姿、插孔位姿与物体—插孔接触力。图像经编码后再与其他特征融合，<code>206＋图像</code> 不能直接当作编码后 MLP 的输入长度。</p>
+<table>
+<thead>
+<tr>
+<th>信息</th>
+<th>仿真训练来源</th>
+<th>真机部署来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>机器人本体状态</td>
+<td>仿真状态，加入观测噪声</td>
+<td>关节读数与正运动学</td>
+</tr>
+<tr>
+<td>控制器状态</td>
+<td>控制软件计算</td>
+<td>相应控制软件计算</td>
+</tr>
+<tr>
+<td>RGB</td>
+<td>仿真渲染与视觉随机化</td>
+<td>双相机图像</td>
+</tr>
+<tr>
+<td>TacMap 触觉</td>
+<td>仿真接触几何构造</td>
+<td>真实触觉输出校准并转换</td>
+</tr>
+<tr>
+<td>角点真值</td>
+<td>辅助损失的监督标签</td>
+<td>不作为部署输入提供</td>
+</tr>
+</tbody>
+</table>
+<p>字段格式、单位、坐标系、归一化和时间关系都需要对齐。论文按图像张量列出输入，触觉分辨率没有在该表具体展开，不补猜统一的 <code>H×W</code> 数值。<a href="https://adept-dexterity.github.io/ADEPT.pdf#page=19">Table 6／7</a></p>
+<h2 id="7">7. 实验如何支持这套训练流程？</h2>
+<p>Table 3 从同一个预训练检查点出发，每种配置运行 5 个独立种子。ADR 50 是最终课程等级；下表时间只统计达到该等级的种子，Train SR 是训练瞬时成功率，不等同于完整回合评估成功率。</p>
+<table>
+<thead>
+<tr>
+<th>后训练配置</th>
+<th>达到 ADR 50 的种子</th>
+<th>Train SR</th>
+<th>到 ADR 50 的平均时间</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>完整方案</td>
+<td>5/5</td>
+<td>46.0%</td>
+<td>19.9 小时</td>
+</tr>
+<tr>
+<td>去掉 BC</td>
+<td>4/5</td>
+<td>38.5%</td>
+<td>35.2 小时</td>
+</tr>
+<tr>
+<td>去掉 Critic 预热</td>
+<td>4/5</td>
+<td>28.4%</td>
+<td>20.2 小时</td>
+</tr>
+<tr>
+<td>保留 BC／预热，但用高 Actor 学习率 <code>1e-3</code></td>
+<td>0/5</td>
+<td>0%</td>
+<td>崩溃</td>
+</tr>
+<tr>
+<td>保持低学习率，clip 放宽到 0.20</td>
+<td>5/5</td>
+<td>46.8%</td>
+<td>17.6 小时</td>
+</tr>
+</tbody>
+</table>
+<p>这支持：低 Actor 学习率在所测设置中是防止崩溃的关键；BC 与预热改善效率、效果和稳定性。它不支持“每个组件都不可缺”或“越小的 clip 越好”。预训练本身也有成本：论文例子为 8B 环境步预训练，加约 3B 下游训练；收益来自复用预训练起点，不能只计算后面的 3B 就宣称总成本更低。<a href="https://adept-dexterity.github.io/ADEPT.pdf#page=8">Table 3、§4.1</a></p>
+<p>Table 4 的真机结果按最终完整任务成功次数统计，每种条件 10 次：</p>
+<table>
+<thead>
+<tr>
+<th>机器人与输入</th>
+<th>任务</th>
+<th>最终成功</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kuka，视觉</td>
+<td>星形零件插入</td>
+<td>5/10</td>
+</tr>
+<tr>
+<td>Kuka，视觉</td>
+<td>方形／圆形组合零件插入</td>
+<td>3/10</td>
+</tr>
+<tr>
+<td>Kuka，视觉</td>
+<td>盘子放入碗碟架</td>
+<td>6/10</td>
+</tr>
+<tr>
+<td>Flexiv，视觉</td>
+<td>方形／圆形组合零件插入</td>
+<td>3/10</td>
+</tr>
+<tr>
+<td>Flexiv，视觉＋触觉</td>
+<td>同一类插入任务</td>
+<td>8/10</td>
+</tr>
+</tbody>
+</table>
+<p>这些结果支持真实感知部署与触觉反馈的价值，样本规模仍有限。论文还报告单阶段感知蒸馏在两种 Kuka 零件上均为 0/10，对照支持两段感知课程的作用。遮挡下的朝向识别与接触稳定性仍是限制。<a href="https://adept-dexterity.github.io/ADEPT.pdf#page=10">§4.2、Table 4</a></p>
+<h2 id="8">8. 怎样复述贡献，以及与前几篇的区别？</h2>
+<p>这篇的学习主线可以连成一条论证：<strong>每个新任务都从零学习基础操作成本高 → 通用 reposing 提供可复用起点 → 直接微调容易遗忘 → 通过观测接口迁移、Critic 预热和小幅 PPO 更新保留技能 → 再通过感知课程得到可部署策略。</strong></p>
+<p>创新主要体现在如何组织预训练能力、下游学习和感知迁移。PPO、BC、DAgger、ResNet，以及借鉴 TacMap／SaTA 的触觉表示，都应与本文具体设计区分。</p>
+<table>
+<thead>
+<tr>
+<th>论文</th>
+<th>可复用的能力怎样进入新场景？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="hora-paper-walkthrough.html">HORA</a></td>
+<td>保留控制策略，用历史适应模块替代特权 latent 的来源</td>
+</tr>
+<tr>
+<td><a href="unidexgrasp-paper-walkthrough.html">UniDexGrasp</a></td>
+<td>生成目标抓姿，用目标条件策略执行，再迁移到视觉输入</td>
+</tr>
+<tr>
+<td><a href="simtoolreal-paper-walkthrough.html">SimToolReal</a></td>
+<td>同一个目标控制器接收新工具几何与目标序列</td>
+</tr>
+<tr>
+<td><a href="adadextrack-paper-walkthrough.html">AdaDexTrack</a></td>
+<td>多专家蒸馏为通用 Tracker，再用调制器调整执行</td>
+</tr>
+<tr>
+<td>ADEPT</td>
+<td>复用预训练起点，为具体任务继续训练，再蒸馏为感知策略</td>
+</tr>
+</tbody>
+</table>
+<p>读 Fig. 2 时，最后检查每一小步的更新对象：</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>学习信号来自哪里？</th>
+<th>更新谁？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1：预训练</td>
+<td>通用任务奖励＋PPO</td>
+<td>预训练 Actor、Critic</td>
+</tr>
+<tr>
+<td>2a：BC</td>
+<td>预训练 Actor 的动作标签</td>
+<td>下游 Actor</td>
+</tr>
+<tr>
+<td>2b：预热</td>
+<td>新任务下的回报目标</td>
+<td>新 Critic</td>
+</tr>
+<tr>
+<td>2c：继续 RL</td>
+<td>新任务奖励＋PPO</td>
+<td>下游 Actor、Critic</td>
+</tr>
+<tr>
+<td>3：感知蒸馏</td>
+<td>Teacher 动作＋角点真值</td>
+<td>感知 Student</td>
+</tr>
+<tr>
+<td>4：真机部署</td>
+<td>实时观测用于前向计算</td>
+<td>不更新网络权重</td>
+</tr>
+</tbody>
+</table>
+<p>图中的锁标明当前步骤固定谁的权重；被冻结的网络仍然可以前向运行。把“谁提供信息、谁提供监督、谁被更新”分开，便能同时理解 Actor–Critic、Teacher–Student 和 Fig. 2 的各个阶段。</p>
+          </div>
+          <nav class="post-pagination" aria-label="上一篇和下一篇">
+            <a href="adadextrack-paper-walkthrough.html">← RL08 · AdaDexTrack 精读：先学会跟踪，再根据执行状态调整</a>
+            <span></span>
+          </nav>
+        </article>
+      </main>
+    </div>
+    <footer class="blog-footer">© 2026 Xiyue Dong · Learning Journey</footer>
+  </body>
+</html>

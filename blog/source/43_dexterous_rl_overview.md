@@ -1,8 +1,8 @@
 # 灵巧手强化学习：研究范式与学习地图
 
-> 学习路线更新：2026-11-01；研究时间线沿用 2026-10-27 的文献核查，补充 SimToolReal v2、AdaDexTrack v1 精读、四篇论文的训练／部署观测对照及视觉状态估计前置知识。本文按任务、监督来源、学习算法、训练框架和部署接口组织研究地图；代表论文不按引用量排名，近期预印本单独标注。对“多数论文采用什么”只作路线分析，不给出未经统计的比例。
+> 学习路线更新：2026-11-01；研究时间线沿用 2026-10-27 的文献核查，补充 SimToolReal v2、AdaDexTrack v1、ADEPT 精读、五篇论文的训练／部署观测对照及视觉状态估计前置知识。本文按任务、监督来源、学习算法、训练框架和部署接口组织研究地图；代表论文不按引用量排名，近期预印本单独标注。对“多数论文采用什么”只作路线分析，不给出未经统计的比例。
 
-> 基础路线：本文 RL01 → [Actor–Critic、PPO 与目标条件策略](44_rl_basics_and_training_loop.md) RL02 → [Teacher–Student、DAgger 与部署](45_teacher_student_and_sim_to_real.md) RL03 → [RL 实验阅读](48_rl_experiment_reading.md) RL05。论文路线：[HORA 精讲](46_hora_paper_walkthrough.md) RL04 → [UniDexGrasp 精读](47_unidexgrasp_paper_walkthrough.md) RL06 → [SimToolReal 精读](49_simtoolreal_paper_walkthrough.md) RL07 → [AdaDexTrack 精读](51_adadextrack_paper_walkthrough.md) RL08。已有 [VLA 统一研究范式](27_vla_overview.md) 与 [模仿学习基础](23_imitation_learning_basics.md) 提供多模态策略和示范学习背景；文章编号保留原有顺序，可按知识依赖选择阅读。
+> 基础路线：本文 RL01 → [Actor–Critic、PPO 与目标条件策略](44_rl_basics_and_training_loop.md) RL02 → [Teacher–Student、DAgger 与部署](45_teacher_student_and_sim_to_real.md) RL03 → [RL 实验阅读](48_rl_experiment_reading.md) RL05。论文路线：[HORA 精讲](46_hora_paper_walkthrough.md) RL04 → [UniDexGrasp 精读](47_unidexgrasp_paper_walkthrough.md) RL06 → [SimToolReal 精读](49_simtoolreal_paper_walkthrough.md) RL07 → [AdaDexTrack 精读](51_adadextrack_paper_walkthrough.md) RL08 → [ADEPT 精讲](52_adept_paper_walkthrough.md) RL09。已有 [VLA 统一研究范式](27_vla_overview.md) 与 [模仿学习基础](23_imitation_learning_basics.md) 提供多模态策略和示范学习背景；文章编号保留原有顺序，可按知识依赖选择阅读。
 
 ## 0. 知识树：先理解一次更新，再理解一篇论文
 
@@ -32,7 +32,8 @@ RL + 灵巧手
    ├─ HORA（RL04）：特权策略 → 历史适应模块 → 真机控制
    ├─ UniDexGrasp（RL06）：抓姿生成 → 目标条件 Teacher → 视觉 Student
    ├─ SimToolReal（RL07）：程序工具与随机目标 → 递归策略 → 未见工具轨迹跟踪
-   └─ AdaDexTrack（RL08）：参考状态 → PPO 专家 → BC 通用 Tracker → RL 调制器
+   ├─ AdaDexTrack（RL08）：参考状态 → PPO 专家 → BC 通用 Tracker → RL 调制器
+   └─ ADEPT（RL09）：通用 RL 预训练 → 任务后训练 → 感知 Student → 真机
 ~~~
 
 这棵树对应三组需要分开的边界：**网络结构与训练算法，实际回报与价值预测，通用框架与论文实例**。同样一个 MLP 可以用监督学习或 PPO 训练；同样一个 PPO 可以训练直接部署的策略，也可以训练后续提供监督的 teacher。
@@ -47,6 +48,7 @@ RL + 灵巧手
 | 生成与控制组合 | [UniDexGrasp 精读](47_unidexgrasp_paper_walkthrough.md) | 区分抓姿分布、样本优化、PPO 与 DAgger，用 Fig. 2/3 和实验验证贡献 |
 | 跨工具目标控制 | [SimToolReal 精读](49_simtoolreal_paper_walkthrough.md) | 先学通用控制，再用视频指定任务；分清 RL 网络、140 维观测、真实感知与泛化范围 |
 | 多专家跟踪与执行调整 | [AdaDexTrack 精读](51_adadextrack_paper_walkthrough.md) | 分清参考状态与动作标签，理解 273 维观测、专家整合、三种调制和消融证据 |
+| 预训练与感知迁移 | [ADEPT 精讲](52_adept_paper_walkthrough.md) | 沿 Fig. 2 分清 BC 迁移、Critic 预热、PPO 后训练与感知蒸馏，每一步明确谁被冻结、谁在学习 |
 
 目标奖励、参考跟踪和示范辅助可以与训练框架组合。例如：
 
@@ -193,6 +195,7 @@ Teacher–student 的动作、潜变量、梯度与部署分工，放在 [RL03](
 | --- | --- |
 | [AdaDexTrack，CVPR 2026](https://janebek.github.io/AdaDexTrack/) | 在通用 tracker 周围加入 RL 调制器，反馈修正参考、物体表示和执行目标；[v1 精读](51_adadextrack_paper_walkthrough.md) |
 | [SimToolReal，RSS 2026](https://www.roboticsproceedings.org/rss22/p151.html) | 用程序生成的工具类物体训练统一目标位姿策略，减少逐工具和逐任务训练；[v2 精读](49_simtoolreal_paper_walkthrough.md) |
+| [ADEPT，CoRL 2026](https://adept-dexterity.github.io/) | 通用 reposing 预训练、稳定的任务后训练，再把状态专家蒸馏为感知策略；[Fig. 2 精讲](52_adept_paper_walkthrough.md) |
 | [DexMimic，2026-10 预印本](https://arxiv.org/abs/2610.19089) | 多参考联合训练与 value 引导的 reset 分配 |
 | [Towards High-DoF Dexterous Manipulation through VLA Post-Training，2026-09 预印本](https://arxiv.org/abs/2609.19666) | 动作编码、SFT、DAgger 与真机 latent residual RL 的组合 |
 

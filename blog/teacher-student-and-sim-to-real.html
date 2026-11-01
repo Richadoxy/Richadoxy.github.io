@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="分清 Actor–Critic 与 Teacher–Student，理解动作与 latent 蒸馏、DAgger，并对照四篇论文的训练和部署观测。" />
+    <meta name="description" content="分清 Actor–Critic 与 Teacher–Student，理解动作与 latent 蒸馏、DAgger，并对照五篇论文的训练和部署观测。" />
     <title>Teacher–Student：策略蒸馏、特权信息与部署 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -56,7 +56,7 @@
 </li>
 <li><a href="#4-actorcritic-teacherstudent">4. Actor–Critic 与 Teacher–Student 的分工</a><ul>
 <li><a href="#41-student">4.1 没有 Student 时，真实观测也可以由外部感知提供</a></li>
-<li><a href="#42">4.2 四篇论文：训练与部署究竟换了什么输入？</a></li>
+<li><a href="#42">4.2 五篇论文：训练与部署究竟换了什么输入？</a></li>
 </ul>
 </li>
 <li><a href="#5">5. 训练图、梯度图和推理图</a></li>
@@ -85,7 +85,7 @@
           <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL03</p>
           <h1>Teacher–Student：策略蒸馏、特权信息与部署</h1>
           <p class="article-meta"><span data-lang="en">进阶 · October 2026 · 21 min read</span><span data-lang="zh">进阶 · 2026.10 · 约 21 分钟阅读</span></p>
-          <p class="article-deck">分清 Actor–Critic 与 Teacher–Student，理解动作与 latent 蒸馏、DAgger，并对照四篇论文的训练和部署观测。</p>
+          <p class="article-deck">分清 Actor–Critic 与 Teacher–Student，理解动作与 latent 蒸馏、DAgger，并对照五篇论文的训练和部署观测。</p>
           <div class="article-content">
             <blockquote>
 <p>阅读位置：<a href="dexterous-rl-overview.html">灵巧手 RL 研究地图</a> → <a href="rl-basics-and-training-loop.html">RL 通识与 PPO 训练闭环</a> → 本文 → <a href="hora-paper-walkthrough.html">HORA 精讲</a>。RL02 说明单个 actor–critic 怎样从交互中学习；本文说明不同模型、输入与训练阶段之间怎样传递知识，RL04 再代入 HORA 的具体网络和实验。</p>
@@ -460,7 +460,7 @@ for k in range(num_rounds):
 </ul>
 <p>“物体位姿”并非天然属于特权信息。只在仿真中可得的精确位姿可以是特权输入；通过真实相机估计的位姿则可以作为部署观测，但会带误差和延迟。两者字段相同，不代表信息质量相同。</p>
 <p>没有 Student 也不会自动保证 sim-to-real 成功。仍需对齐输入顺序、单位、坐标系、归一化和时间关系，并让训练覆盖合理的估计误差。感知侧的基础见 <a href="visual-state-estimation-and-foundationpose.html">F05：视觉状态估计与 FoundationPose</a>。</p>
-<h3 id="42">4.2 四篇论文：训练与部署究竟换了什么输入？</h3>
+<h3 id="42">4.2 五篇论文：训练与部署究竟换了什么输入？</h3>
 <p>下面只比较<strong>负责动作的策略输入</strong>。Critic 的额外状态、监督标签与 Actor 的 observation 要分别记录。每篇精读都列出了字段、维度及信息来源。</p>
 <table>
 <thead>
@@ -496,9 +496,16 @@ for k in range(num_rounds):
 <td>BC Student 仍读同一组 273 维；最终部署加上 Modulator，调整 Tracker 的参考与 latent，并修正动作</td>
 <td>将多个专用专家整合成通用 Tracker，再学习执行调整</td>
 </tr>
+<tr>
+<td><a href="adept-paper-walkthrough.html">ADEPT</a></td>
+<td>FMB 下游状态 Teacher：Kuka 392 维／Flexiv 437 维，包含本体、点云、目标与插孔信息</td>
+<td>Kuka：206 维数值＋双 RGB；Flexiv：196 维数值＋双 RGB＋五指触觉；不输入显式物体或插孔位姿</td>
+<td>先将预训练行为迁移到下游状态 Actor，再将任务专家蒸馏为感知 Student</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Teacher–Student 不要求二者的观测不同。</strong> AdaDexTrack 主要整合技能覆盖范围；HORA 改变 latent 的来源；UniDexGrasp 改变感知接口。也不能从“质量、摩擦没有进入 Actor”推断没有域随机化：环境参数可以随机变化，而不作为观测直接提供给策略。</p>
+<p>ADEPT 还说明 Teacher、Student 是阶段中的角色：下游 Actor 先模仿预训练 Actor，随后通过 PPO 学习新任务，再成为感知 Student 的 Teacher。冻结网络只是停止更新权重，它仍可根据变化的观测输出动作、采集训练数据。</p>
 <p>部署观测需要追溯到实际传感器或预处理数据。例如，UniDexGrasp 的 Student 虽然去掉了显式物体状态输入，代码中的相对目标仍依赖物体位姿；要部署到真机，还要解决这部分信息怎样估计，详见该篇观测表。</p>
 <h2 id="5">5. 训练图、梯度图和推理图</h2>
 <p>下面是一个通用的“两阶段动作蒸馏”示例，不代表所有论文都冻结同样的模块。</p>

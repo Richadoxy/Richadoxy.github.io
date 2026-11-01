@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1430" viewBox="0 0 1400 1430" role="img" aria-labelledby="title desc">
+<title id="title">ADEPT：沿 Fig. 2 看谁学习、谁被冻结</title>
+<desc id="desc">通用任务先用 PPO 训练预训练 Actor 与 Critic。后训练依次进行 Actor 行为克隆、冻结 Actor 的新 Critic 预热，以及小学习率 PPO。状态 Teacher 再监督感知 Student，部署时仅保留感知 Student 和底层控制。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker></defs>
+<style>text{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif;fill:#172033}.bold{font-weight:700}</style>
+<rect width="1400" height="1430" fill="white"/>
+<text x="40" y="55" font-size="32" text-anchor="start" class="bold">ADEPT：沿 Fig. 2 看谁学习、谁被冻结</text>
+<text x="40" y="96" font-size="21" text-anchor="start">以 Kuka–Allegro 插入任务为例；箭头表示训练中的知识迁移与阶段顺序。</text>
+<rect x="24" y="130" width="1352" height="250" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="168" font-size="25" text-anchor="start" class="bold">① Pre-training：先获得抓取、转正和搬运能力</text>
+<rect x="55" y="210" width="375" height="110" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="242.5" y="256.55" font-size="23" text-anchor="middle" class="bold">随机物体＋目标位姿</text>
+<text x="242.5" y="289.55" font-size="23" text-anchor="middle">仿真交互产生奖励</text>
+<rect x="510" y="210" width="375" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="697.5" y="256.7" font-size="22" text-anchor="middle" class="bold">PPO：非对称 Actor–Critic</text>
+<text x="697.5" y="288.7" font-size="22" text-anchor="middle">更新 Actor 与 Critic</text>
+<rect x="965" y="210" width="380" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="1155.0" y="256.55" font-size="23" text-anchor="middle" class="bold">预训练策略 π_pre</text>
+<text x="1155.0" y="289.55" font-size="23" text-anchor="middle">提供可复用的操作行为</text>
+<path d="M430 265 L510 265" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M885 265 L965 265" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="355" font-size="22" text-anchor="start">阶段结束：已有基础操作能力；具体的精确插入还需要后训练。</text>
+<rect x="24" y="405" width="1352" height="355" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="443" font-size="25" text-anchor="start" class="bold">② Post-training：先迁移行为，再适应新奖励，最后学习插入</text>
+<rect x="55" y="490" width="375" height="150" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="242.5" y="540.7" font-size="22" text-anchor="middle" class="bold">a. BC：新观测接口</text>
+<text x="242.5" y="572.7" font-size="22" text-anchor="middle">冻结 π_pre，提供动作标签</text>
+<text x="242.5" y="604.7" font-size="22" text-anchor="middle">只训练 π_post</text>
+<rect x="510" y="490" width="375" height="150" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="697.5" y="540.7" font-size="22" text-anchor="middle" class="bold">b. Critic warm-up</text>
+<text x="697.5" y="572.7" font-size="22" text-anchor="middle">冻结 π_post，继续采集轨迹</text>
+<text x="697.5" y="604.7" font-size="22" text-anchor="middle">按新奖励训练新的 V_post</text>
+<rect x="965" y="490" width="380" height="150" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="1155.0" y="540.7" font-size="22" text-anchor="middle" class="bold">c. Conservative PPO</text>
+<text x="1155.0" y="572.7" font-size="22" text-anchor="middle">Actor 使用较低学习率</text>
+<text x="1155.0" y="604.7" font-size="22" text-anchor="middle">更新 π_post 与 V_post</text>
+<path d="M430 565 L510 565" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M885 565 L965 565" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="689" font-size="22" text-anchor="start">a 先继承能完成的搬运／重定向；b 与 c 使用最终插入目标。</text>
+<text x="55" y="735" font-size="22" text-anchor="start">π_post 的角色变化：先向旧策略学习，再经 RL 学会具体任务，随后成为感知 Teacher。</text>
+<rect x="24" y="785" width="1352" height="315" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="823" font-size="25" text-anchor="start" class="bold">③ Teacher–Student：把状态策略迁移为感知策略</text>
+<rect x="55" y="865" width="375" height="120" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="242.5" y="900.7" font-size="22" text-anchor="middle" class="bold">固定状态 Teacher</text>
+<text x="242.5" y="932.7" font-size="22" text-anchor="middle">π_post 读取仿真状态</text>
+<text x="242.5" y="964.7" font-size="22" text-anchor="middle">提供动作分布标签</text>
+<rect x="510" y="865" width="375" height="120" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="697.5" y="901.35" font-size="21" text-anchor="middle" class="bold">DAgger＋监督学习</text>
+<text x="697.5" y="932.35" font-size="21" text-anchor="middle">Student 执行，Teacher 标注</text>
+<text x="697.5" y="963.35" font-size="21" text-anchor="middle">动作模仿＋8 角点辅助损失</text>
+<rect x="965" y="865" width="380" height="120" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="1155.0" y="900.7" font-size="22" text-anchor="middle" class="bold">更新感知 Student</text>
+<text x="1155.0" y="932.7" font-size="22" text-anchor="middle">双 RGB＋机器人数值状态</text>
+<text x="1155.0" y="964.7" font-size="22" text-anchor="middle">学习从真实可得输入行动</text>
+<path d="M430 925 L510 925" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M885 925 L965 925" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="1034" font-size="22" text-anchor="start">感知课程：Student 先跟预训练 Teacher 学较易任务，再跟下游 Teacher 学插入。</text>
+<text x="55" y="1076" font-size="21" text-anchor="start">两段都有动作与角点监督；物体角点真值是训练标签，不是部署观测。</text>
+<rect x="24" y="1125" width="1352" height="275" rx="16" fill="#fbfcfe" stroke="#e2e8f0" stroke-width="2"/>
+<text x="50" y="1163" font-size="25" text-anchor="start" class="bold">④ Real-world deployment：最终 Student 前向控制真机</text>
+<rect x="55" y="1205" width="375" height="110" rx="12" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="242.5" y="1251.7" font-size="22" text-anchor="middle" class="bold">真实相机与机器人读数</text>
+<text x="242.5" y="1283.7" font-size="22" text-anchor="middle">加上控制器内部数值状态</text>
+<rect x="510" y="1205" width="375" height="110" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="697.5" y="1251.7" font-size="22" text-anchor="middle" class="bold">固定感知 Student</text>
+<text x="697.5" y="1283.7" font-size="22" text-anchor="middle">权重不更新，记忆持续更新</text>
+<rect x="965" y="1205" width="380" height="110" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="1155.0" y="1251.7" font-size="22" text-anchor="middle" class="bold">23 维关节动作</text>
+<text x="1155.0" y="1283.7" font-size="22" text-anchor="middle">底层控制 → 真实机器人</text>
+<path d="M430 1260 L510 1260" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M885 1260 L965 1260" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="55" y="1365" font-size="22" text-anchor="start">训练时迁移知识；真机运行最终 Student，不将三个策略串联执行。</text>
+</svg>
