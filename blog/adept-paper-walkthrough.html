@@ -66,7 +66,7 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 7: Reinforcement Learning and Dexterity</span><span data-lang="zh">第七卷：强化学习与灵巧操作</span> · RL09</p>
           <h1>ADEPT 精讲：沿 Fig. 2 理解预训练、后训练与感知蒸馏</h1>
-          <p class="article-meta"><span data-lang="en">精读 · November 2026 · 14 min read</span><span data-lang="zh">精读 · 2026.11 · 约 14 分钟阅读</span></p>
+          <p class="article-meta"><span data-lang="en">精读 · November 2026 · 15 min read</span><span data-lang="zh">精读 · 2026.11 · 约 15 分钟阅读</span></p>
           <p class="article-deck">沿 Fig. 2 拆开 PPO 预训练、BC 迁移、Critic 预热、继续 RL 和感知 Student，逐阶段看清观测、网络与参数更新。</p>
           <div class="article-content">
             <blockquote>
@@ -233,7 +233,9 @@
 </table>
 <p>Fig. 2 的 <code>o_img</code> 是感知 Student 整组输入的简称，<strong>并不表示只有图像</strong>。</p>
 <p>作者用 DAgger 采集数据：让 Student 自己执行，在它实际访问的状态上查询 Teacher。例如，Student 把零件抓歪了，就在这个状态询问 Teacher 下一步怎样动，再学习相应动作。</p>
-<p>这样，训练数据包含 Student 自己执行时容易遇到的情况。动作监督仍来自 Teacher，这一步属于交互式模仿学习；<strong>最终 Student 没有在这一步再通过 PPO 优化任务奖励。</strong></p>
+<p>这里的 Teacher 标签必须对应“当前抓歪了的状态”。它与 Student 面对同一个仿真状态，只是输入接口不同：Teacher 使用状态信息，Student 使用相机、机器人状态及可选触觉。Teacher 可以只给标签，不必接管实际执行，也不能直接拿原始成功轨迹中同一时间步的动作来监督。</p>
+<p>可以先读 <a href="teacher-student-and-sim-to-real.html">RL03 第 3 节的 DAgger 五步流程</a>，再把其中的“执行者、标注者、更新对象”对应到这里。具体初始化、缓存和更新频率要以论文及实现为准；本文的两段感知课程在 §4.3 单独说明。</p>
+<p>这样，训练数据包含 Student 自己执行时容易遇到的情况。动作监督仍来自 Teacher，这一步属于交互式模仿学习；<strong>最终 Student 没有在这一步再通过 PPO 优化任务奖励。</strong> 环境负责产生训练样本，监督损失反向更新 Student 的可训练参数；冻结的 Teacher 参与前向标注，仿真器不需要参与反向传播。<a href="https://adept-dexterity.github.io/ADEPT.pdf#page=5">§3.4、附录 G</a></p>
 <h3 id="42-student">4.2 Student 网络：图像特征与机器人状态融合，再用记忆决策</h3>
 <p><img alt="ADEPT 感知 Student 的视觉、可选触觉、状态融合与动作输出，以及训练辅助头" src="assets/figures/adept-student-network.svg" /></p>
 <p><a href="assets/figures/adept-student-network.svg">放大 Student 网络图</a>。附录 H 给出以下结构：</p>

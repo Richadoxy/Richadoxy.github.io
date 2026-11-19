@@ -162,20 +162,35 @@ z_t=E_\eta(p_t),\qquad
 
 ## 3. BC 与 DAgger：监督数据覆盖的状态
 
-直接 BC 常在 teacher 访问的状态上学习。部署时 student 的小误差会改变下一步观测，逐渐进入训练集没覆盖的区域。
+**DAgger（Dataset Aggregation，数据集聚合）让 student 自己执行策略，再请 teacher 为它实际遇到的状态提供动作标签，并不断把这些数据加入训练集。** 它可以沿用 BC 的监督学习更新，关键改变是训练数据怎样收集。
 
-DAgger 的核心是让训练数据逐步覆盖学习者自身造成的状态：
+先用一个假设的抓杯子任务理解它为什么有用。Teacher 的示范通常是“手指对准 → 稳定接触 → 抬起”；student 模仿时却可能先把杯子推歪，随后遇到示范里很少出现的接触状态。即使它在专家数据上的动作误差很小，独立执行时也可能连续失败：前一步动作改变了下一步观测，误差会沿闭环累积。
 
-~~~text
-1. 用 student 或 teacher/student 混合策略执行
-2. 在访问到的状态上查询 teacher 的动作标签
-3. 将这些样本加入聚合数据集
-4. 更新 student，继续收集
-~~~
+DAgger 会在“杯子已经被 student 推歪”的当前状态查询 teacher，例如让它示范怎样调整手腕、重新建立接触。**标签是 teacher 面对当前状态会采取的动作，不能直接取原来成功轨迹中同一时间步的动作。** 这让训练逐步覆盖 student 自己造成的偏差。
 
-动作监督仍来自 teacher，而不是直接最大化环境 reward，所以 DAgger 属于交互式模仿学习。它需要能够在学习者访问的状态上查询有效专家。[DAgger 原论文](https://proceedings.mlr.press/v15/ross11a.html)
+接着看 teacher–student 动作蒸馏，从初始化到一轮轮训练，可以按五步理解。这里 \(s_t\) 是环境状态，\(o_t^S\) 和 \(o_t^T\) 分别是 student 与 teacher 从该状态获得的输入；若策略需要历史或任务条件，也应将它们包含在对应输入中。
+
+1. **初始化 student。** 常见做法是先收集一些 teacher 示范，用 BC 得到一个初始策略。
+2. **让 student 与环境交互。** 在当前状态 \(s_t\)，student 根据自己的观测 \(o_t^S\) 输出动作 \(a_t^S\)。
+3. **请 teacher 给当前状态标注。** Teacher 根据自己的观测 \(o_t^T\)，输出专家动作 \(a_t^T\)。即使环境执行的是 student 动作，也保存样本 \((o_t^S,a_t^T)\)。
+4. **聚合数据并训练。** 将本轮样本加入历史数据集，从中采样更新 student。
+5. **用更新后的 student 再收集数据。** 它的行为变了，会访问新的状态，因此继续标注、聚合和训练。
+
+第一步用于建立初始策略，后续反复执行第 2–5 步。BC 预训练是一种常见起点，不是原始算法要求的唯一初始化方式；原算法也允许早期混合 teacher 与 student 执行。[原论文 Algorithm 3.1](https://proceedings.mlr.press/v15/ross11a/ross11a.pdf#page=4)
+
+**teacher 标注不等于 teacher 接管。** 在第 3 步，它的动作可以只作为训练标签；如果环境始终执行 teacher 动作，收集到的仍主要是 teacher 的状态分布。两个策略的输入可以不同，但动作标签必须与 student 的同一时刻观测配对。
 
 在仿真中，同一时刻的完整状态和传感器观测可以配对：teacher 读真值，student 读渲染图像或触觉，监督对应同一次物理状态。真机上若无法获得 teacher 需要的隐藏状态，就不能假定这个查询接口仍然可用。
+
+**环境交互负责产生样本，反向传播负责拟合标签。** 在常见的冻结 teacher 蒸馏中，三者分工如下：
+
+| 对象 | 采集时做什么 | Student 监督更新时发生什么 |
+| --- | --- | --- |
+| Teacher | 根据当前状态提供动作标签 | 标签固定，teacher 参数不更新 |
+| Student | 根据自己的输入产生执行动作 | 对保存的输入重新前向，loss 更新其可训练参数 |
+| 仿真器 | 执行动作，产生下一状态和观测 | 不参与这条监督损失的反向传播 |
+
+因此，“先用 PPO 训练 teacher，再用 DAgger 训练 student”包含两种学习过程。普通 DAgger 的动作监督来自 teacher，不需要通过 reward、advantage 或 critic 构造 student 的动作损失，也不要求仿真器可微。实践中可以先收集一批样本，再做若干次监督更新，不必每走一步就更新一次。[DAgger 实现中的采集与 BC 更新](https://imitation.readthedocs.io/en/latest/algorithms/dagger.html)
 
 ### 3.1 MSE 规定比较什么，DAgger 规定在哪里取得标签
 
@@ -211,6 +226,8 @@ for k in range(num_rounds):
 
 聚合数据可以让后续训练继续覆盖过去版本 student 访问过的状态。实际系统可能采用有限缓冲区或其他采样近似，阅读时应记录其实现，而不是仅凭算法名称假定无限保存全部历史。[原始 DAgger 算法](https://proceedings.mlr.press/v15/ross11a/ross11a.pdf)
 
+动作 loss 衡量的是样本上的模仿误差，任务成功还取决于闭环行为。评测时应让 student 独立执行，观察成功率以及偏离后的恢复能力；teacher 能否在偏差状态上提供有效标签、student 的观测是否足够，见本文第 7 节。
+
 ### 3.2 Latent 监督与交互式采集可以组合
 
 将动作标签换成特权 Encoder 的 latent 标签，改变的是监督对象；让学习者执行还是让专家执行，改变的是状态分布。二者是独立的设计轴：
@@ -223,6 +240,22 @@ for k in range(num_rounds):
 因此，latent MSE 既不自动等于 DAgger，也不排斥借用数据聚合思想。原始 DAgger 讨论的是专家行为监督；对 latent 学习使用类似收集框架时，应说明扩展了什么，不能把原算法的保证不加条件地迁移过来。
 
 [HORA v0.0.1 的适应代码](https://github.com/HaozhiQi/hora/blob/v0.0.1/hora/algo/padapt/padapt.py) 用估计 latent 的控制器交互，再以特权 latent 做监督，没有采用原始 DAgger 的跨轮数据集聚合循环。更准确的描述是 **on-policy latent supervision，即在当前适应策略访问的状态上学习 latent**；其中 on-policy 描述采样分布，不表示这一步在使用 PPO。UniDexGrasp 的动作蒸馏实例见 [对应精读](47_unidexgrasp_paper_walkthrough.md)。
+
+### 3.3 DAgger 的应用不局限于 RL teacher
+
+只要能够为学习者实际访问的状态提供有效监督，就可以考虑这种交互式采集思路。专家可以是人，也可以是计算昂贵的规划算法；输出还可以从单步动作扩展为轨迹。
+
+| 应用 | 谁提供监督 | 数据如何补充 |
+| --- | --- | --- |
+| 人类遥操作与纠正 | 人类操作者 | 策略自主尝试后，由人类示范问题状态下的操作或恢复 |
+| 规划器蒸馏 | 搜索算法或运动规划器 | 为学习者访问的状态重新规划，再训练快速预测模型 |
+| 序列预测 | 能为当前预测上下文提供标签的专家 | 在学习者先前预测形成的上下文中继续标注 |
+
+[HG-DAgger（§II）](https://arxiv.org/html/1810.02890v2) 让人类决定何时接管，在接管期间连续控制并收集纠正轨迹，再加入数据集训练；论文在模拟和真实驾驶任务中验证了这种安排。它是针对人类交互设计的变体，不应把所有带人工接管的系统都直接等同于原始 DAgger。
+
+[Learning High-Speed Flight in the Wild（§4.1–4.3）](https://arxiv.org/html/2110.05113v1) 使用能够看到完整环境信息的规划器作为专家，让 student 根据机载观测预测飞行轨迹，并通过 DAgger 补充其访问状态的数据。这里的监督包含轨迹，展示了这种采集方式怎样用于规划器到快速策略的迁移。
+
+[DAgger 原论文（§5.3）](https://proceedings.mlr.press/v15/ross11a/ross11a.pdf#page=8) 还研究了 OCR 序列标注：前面的预测会成为后续决策的上下文，也会产生训练输入与自主预测输入不同的问题。是否能在偏离正确前缀后继续给出有效标签，需要按具体序列任务判断。
 
 ## 4. Actor–Critic 与 Teacher–Student 的分工
 

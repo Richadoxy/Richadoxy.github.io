@@ -16,8 +16,8 @@ Then open `http://localhost:8000`.
 
 - Google Scholar profile
 - CV file
-- Paper, code, video, and project-page links
-- Project demos and research notes
+- Paper links for Drift-JEPA and TS-WAM
+- Additional code, video, and project-page links when available
 
 Search for `placeholder`, `pending`, `TBD`, or `待补充` in `index.html` to find the main unfinished fields.
 

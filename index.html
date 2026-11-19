@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Xiyue Dong is a PhD student in Robotics at HKUST(GZ), working on dexterous manipulation and vision-language-action models."
+      content="Xiyue Dong is a PhD student in Robotics at HKUST(GZ), researching dexterous manipulation through vision-language-action models (VLA) and reinforcement learning (RL)."
     />
-    <meta name="theme-color" content="#f7f8fa" />
+    <meta name="theme-color" content="#f4f7f8" />
     <title>Xiyue Dong | Robotics</title>
     <link rel="icon" href="assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="assets/css/main.css" />
+    <link rel="stylesheet" href="assets/css/home.css" />
     <script defer src="assets/js/main.js"></script>
   </head>
   <body>
@@ -40,7 +41,7 @@
     <div class="page-shell">
       <aside class="profile-card" aria-label="Profile">
         <div class="avatar-placeholder">
-          <img src="assets/images/profile-xiyue.jpg" alt="Xiyue Dong" />
+          <img src="assets/images/profile-xiyue.jpg" alt="Xiyue Dong" width="600" height="600" fetchpriority="high" />
         </div>
 
         <div class="profile-copy">
@@ -63,121 +64,181 @@
 
         <div class="profile-links" aria-label="Profile links">
           <a href="https://github.com/Richadoxy" target="_blank" rel="me noreferrer">GitHub</a>
+          <a href="mailto:xdong851@connect.hkust-gz.edu.cn"><span data-lang="en">Email</span><span data-lang="zh">联系我</span></a>
         </div>
       </aside>
 
       <main id="main-content">
         <section class="hero section" id="about">
+          <p class="eyebrow"><span data-lang="en">Robotics · Learning · Real-world systems</span><span data-lang="zh">机器人 · 学习 · 真实世界</span></p>
+          <h2 class="hero-title"><span data-lang="en">Dexterous manipulation.<br /><em>From learning to action.</em></span><span data-lang="zh">让机器人<br /><em>学会灵巧操作。</em></span></h2>
           <div data-lang="en">
-            <blockquote class="research-statement">
-              <p>
-                I have a long-standing interest in robotics. My goal is to build a general pipeline or benchmark
-                for translating robot learning algorithms into real-world systems, covering the full workflow from
-                teleoperation and data collection to model training, deployment, and evaluation.
-              </p>
-            </blockquote>
             <p class="hero-lead">
               I am a PhD student at the Hong Kong University of Science and Technology
               (Guangzhou), advised by
               <a href="https://facultyprofiles.hkust-gz.edu.cn/faculty-personal-page?id=97" target="_blank" rel="noreferrer">Prof. Renjing Xu</a>.
-              My current interests center on dexterous manipulation and vision-language-action models.
+              My research focuses on <strong>dexterous manipulation</strong>, including vision-language-action
+              models (VLA) and reinforcement learning (RL).
             </p>
             <p>
               Before my PhD, I worked on robot software integration and algorithm infrastructure at
               the Hong Kong Centre for Logistics Robotics. I received my master's degree from The
               Chinese University of Hong Kong, where I worked with Prof. Yunhui Liu's group.
             </p>
+            <blockquote class="research-statement">
+              <p>
+                My goal is to build a general pipeline or benchmark for bringing robot learning into
+                real-world systems—from teleoperation and data collection to training, deployment, and evaluation.
+              </p>
+            </blockquote>
           </div>
 
           <div data-lang="zh">
-            <blockquote class="research-statement">
-              <p>
-                我长期专注于机器人领域的研究，希望搭建一套面向通用机器人算法落地的 pipeline 或 benchmark，
-                覆盖从遥操作与数据采集、模型训练到部署落地与评测的完整流程。
-              </p>
-            </blockquote>
             <p class="hero-lead">
-              我目前在香港科技大学（广州）攻读博士（2026 年 9 月入学），导师是
+              我目前在香港科技大学（广州）攻读博士，导师是
               <a href="https://facultyprofiles.hkust-gz.edu.cn/faculty-personal-page?id=97" target="_blank" rel="noreferrer">许人镜教授</a>。
-              目前主要研究灵巧操作与视觉—语言—动作模型（VLA）。
+              目前主要研究<strong>灵巧操作</strong>，包括视觉—语言—动作模型（VLA）和强化学习（RL）。
             </p>
             <p>
               在攻读博士前，我曾在香港物流机器人研究中心从事机器人软件系统集成和算法基础设施建设。
               硕士毕业于香港中文大学，曾在刘云辉教授团队开展研究。
             </p>
+            <blockquote class="research-statement">
+              <p>
+                我希望搭建一套面向通用机器人算法落地的 pipeline 或 benchmark，
+                覆盖从遥操作与数据采集、模型训练到部署落地与评测的完整流程。
+              </p>
+            </blockquote>
           </div>
 
+          <ul class="research-topics" aria-label="Research interests">
+            <li><span data-lang="en">Dexterous manipulation</span><span data-lang="zh">灵巧操作</span></li>
+            <li>VLA</li>
+            <li><span data-lang="en">Reinforcement learning</span><span data-lang="zh">强化学习</span></li>
+          </ul>
           <div class="hero-links">
-            <a href="#publications"><span data-lang="en">Publications</span><span data-lang="zh">论文列表</span></a>
-            <span aria-hidden="true">·</span>
-            <a href="https://github.com/Richadoxy" target="_blank" rel="me noreferrer">GitHub</a>
+            <a class="button-primary" href="#publications"><span data-lang="en">Explore publications</span><span data-lang="zh">查看论文</span></a>
+            <a class="button-secondary" href="blog/index.html"><span data-lang="en">Learning journey</span><span data-lang="zh">学习之路</span></a>
           </div>
         </section>
 
         <section class="section" id="publications">
           <div class="section-heading">
             <div>
-              <p class="eyebrow"><span data-lang="en">Selected work</span><span data-lang="zh">代表工作</span></p>
-              <h2><span data-lang="en">Publications</span><span data-lang="zh">论文</span></h2>
+              <p class="eyebrow"><span data-lang="en">Research &amp; publications</span><span data-lang="zh">研究成果</span></p>
+              <h2><span data-lang="en">Selected publications</span><span data-lang="zh">论文列表</span></h2>
             </div>
-            <p><span data-lang="en">Paper and project links will be added when available.</span><span data-lang="zh">论文与项目链接可在确认后补充。</span></p>
+            <p><span data-lang="en">My name is highlighted in bold.</span><span data-lang="zh">我的姓名以粗体标注。</span></p>
           </div>
-
-          <div class="publication-list">
-            <article class="publication-card">
-              <div class="publication-visual publication-visual-blue" aria-hidden="true">
-                <span>ICRA</span><strong>2026</strong>
-              </div>
-              <div class="publication-content">
-                <span class="venue">ICRA 2026</span>
-                <h3>LLM-Guided Semantic Stereo Adaptive Visual Servoing for Precise Peg-in-Hole</h3>
-                <p class="authors"><strong>Xiyue Dong</strong>, Guangli Sun, Jinfei Hu, et al.</p>
-                <p class="publication-summary">
-                  <span data-lang="en">Semantic stereo visual servoing for precise robotic peg-in-hole assembly.</span>
-                  <span data-lang="zh">面向高精度机器人轴孔装配的语义双目自适应视觉伺服。</span>
-                </p>
-                <div class="publication-links">
-                  <span class="tag tag-muted"><span data-lang="en">Link pending</span><span data-lang="zh">链接待补充</span></span>
+          <div class="publication-group" aria-labelledby="recent-heading">
+            <h3 class="publication-group-title" id="recent-heading"><span data-lang="en">Recent research</span><span data-lang="zh">近期研究</span></h3>
+            <div class="publication-list">
+              <article class="publication-card publication-featured">
+                <div class="publication-content">
+                  <span class="venue">arXiv · 2026</span>
+                  <h4><a href="https://arxiv.org/abs/2611.20273" target="_blank" rel="noreferrer">DexFormer 2.0: Towards a Cross-Embodiment Foundation Policy for Dexterous Grasping</a></h4>
+                  <p class="authors">Lixin Xu, Ke Zhang, Xinyu Liu, Jie Tan, Senming Tan, Jiaju Yin, Yating Feng, Xiaoyi Lin, <strong>Xiyue Dong</strong>, Renjing Xu</p>
+                  <p class="publication-summary">
+                    <span data-lang="en">A shared reinforcement learning policy for dexterous grasping across different robot arms and hands.</span>
+                    <span data-lang="zh">面向不同机械臂与灵巧手组合的跨本体灵巧抓取强化学习策略。</span>
+                  </p>
+                  <div class="publication-links">
+                    <a class="paper-link" href="https://arxiv.org/abs/2611.20273" target="_blank" rel="noreferrer">arXiv</a>
+                    <a class="paper-link" href="https://arxiv.org/pdf/2611.20273" target="_blank" rel="noreferrer">PDF</a>
+                  </div>
                 </div>
-              </div>
-            </article>
-
-            <article class="publication-card">
-              <div class="publication-visual publication-visual-green" aria-hidden="true">
-                <span>IROS</span><strong>2025</strong>
-              </div>
-              <div class="publication-content">
-                <span class="venue">IROS 2025</span>
-                <h3>Data-driven Visual Servoing of Flexible Continuum Robotics in Constrained Environments</h3>
-                <p class="authors">Wei Chen, Haiwen Wu, <strong>Xiyue Dong</strong>, et al.</p>
-                <p class="publication-summary">
-                  <span data-lang="en">Data-driven visual servoing for flexible continuum robots operating in constrained spaces.</span>
-                  <span data-lang="zh">面向受限环境中柔性连续体机器人的数据驱动视觉伺服。</span>
-                </p>
-                <div class="publication-links">
-                  <span class="tag tag-muted"><span data-lang="en">Link pending</span><span data-lang="zh">链接待补充</span></span>
+              </article>
+              <article class="publication-card">
+                <div class="publication-content">
+                  <span class="venue">World models</span>
+                  <h4>Drift-JEPA: Drift-Aware Joint-Embedding Predictive World Models for Long-Horizon Visual Planning</h4>
+                  <p class="authors">Menghao Yin, Jiaju Yin, Ke Zhang, Kangye Ji, Zhenhui Zhang, Taoguang Dai, <strong>Xiyue Dong</strong>, Renjing Xu</p>
+                  <p class="publication-summary">
+                    <span data-lang="en">Drift-aware predictive world models for long-horizon visual planning.</span>
+                    <span data-lang="zh">面向长时域视觉规划的漂移感知联合嵌入预测世界模型。</span>
+                  </p>
+                  <div class="publication-links">
+                    <span class="link-pending"><span data-lang="en">Link forthcoming</span><span data-lang="zh">链接待补充</span></span>
+                  </div>
                 </div>
-              </div>
-            </article>
-
-            <article class="publication-card">
-              <div class="publication-visual publication-visual-orange" aria-hidden="true">
-                <span>ROBIO</span><strong>2024</strong>
-              </div>
-              <div class="publication-content">
-                <span class="venue">ROBIO 2024</span>
-                <h3>A Robotic Skin Using Low-density FBGs for Human-robot Interaction</h3>
-                <p class="authors"><strong>Xiyue Dong</strong>, C. K. Lam, Wei Chen, et al.</p>
-                <p class="publication-summary">
-                  <span data-lang="en">A low-density fiber Bragg grating sensing skin designed for physical human–robot interaction.</span>
-                  <span data-lang="zh">面向人机交互的低密度光纤布拉格光栅机器人皮肤。</span>
-                </p>
-                <div class="publication-links">
-                  <span class="tag">pp. 129–134</span>
-                  <span class="tag tag-muted"><span data-lang="en">Link pending</span><span data-lang="zh">链接待补充</span></span>
+              </article>
+              <article class="publication-card">
+                <div class="publication-content">
+                  <span class="venue">Vision-language-action</span>
+                  <h4>TS-WAM: Temporal Latent Actions and World-Action Coupling for Vision-Language Robot Control</h4>
+                  <p class="authors">Menghao Yin, Jiaju Yin, <strong>Xiyue Dong</strong>, Lixin Xu, Zhenhui Zhang, Ke Zhang, Yating Feng, Renjing Xu</p>
+                  <p class="publication-summary">
+                    <span data-lang="en">Temporal latent actions and world-action coupling for vision-language robot control.</span>
+                    <span data-lang="zh">通过时序隐动作与世界—动作耦合实现视觉语言机器人控制。</span>
+                  </p>
+                  <div class="publication-links">
+                    <span class="link-pending"><span data-lang="en">Link forthcoming</span><span data-lang="zh">链接待补充</span></span>
+                  </div>
                 </div>
-              </div>
-            </article>
+              </article>
+            </div>
+          </div>
+          <div class="publication-group" aria-labelledby="conference-heading">
+            <h3 class="publication-group-title" id="conference-heading"><span data-lang="en">Conference publications</span><span data-lang="zh">会议论文</span></h3>
+            <div class="publication-list">
+              <article class="publication-card">
+                <div class="publication-content">
+                  <span class="venue">ICRA 2026</span>
+                  <h4><a href="https://xplorestaging.ieee.org/document/11697080/" target="_blank" rel="noreferrer">LLM-Guided Semantic Stereo Adaptive Visual Servoing for Precise Peg-in-Hole</a></h4>
+                  <p class="authors"><strong>Xiyue Dong</strong>, Guangli Sun, Jinfei Hu, et al.</p>
+                  <p class="publication-summary">
+                    <span data-lang="en">Semantic stereo visual servoing for precise robotic peg-in-hole assembly.</span>
+                    <span data-lang="zh">面向高精度机器人轴孔装配的语义双目自适应视觉伺服。</span>
+                  </p>
+                  <div class="publication-links">
+                    <a class="paper-link" href="https://xplorestaging.ieee.org/document/11697080/" target="_blank" rel="noreferrer">IEEE Xplore</a>
+                  </div>
+                </div>
+              </article>
+              <article class="publication-card">
+                <div class="publication-content">
+                  <span class="venue">AIM 2026</span>
+                  <h4><a href="https://ieeexplore.ieee.org/abstract/document/11658119" target="_blank" rel="noreferrer">Decoupled Dynamics Identification of Serial Robots Neglecting Off-diagonal Inertia Parameters</a></h4>
+                  <p class="authors">Jinfei Hu, Siyuan Yang, <strong>Xiyue Dong</strong>, Wei Chen, Yunhui Liu</p>
+                  <p class="publication-summary">
+                    <span data-lang="en">Decoupled dynamics identification for serial robots with off-diagonal inertia parameters omitted.</span>
+                    <span data-lang="zh">忽略非对角惯性参数的串联机器人解耦动力学辨识。</span>
+                  </p>
+                  <div class="publication-links">
+                    <a class="paper-link" href="https://ieeexplore.ieee.org/abstract/document/11658119" target="_blank" rel="noreferrer">IEEE Xplore</a>
+                  </div>
+                </div>
+              </article>
+              <article class="publication-card">
+                <div class="publication-content">
+                  <span class="venue">IROS 2025</span>
+                  <h4><a href="https://ieeexplore.ieee.org/document/11246163" target="_blank" rel="noreferrer">Data-driven Visual Servoing of Flexible Continuum Robots in Constrained Environments</a></h4>
+                  <p class="authors">Wei Chen, Haiwen Wu, <strong>Xiyue Dong</strong>, Bohan Yang, Yun-Hui Liu</p>
+                  <p class="publication-summary">
+                    <span data-lang="en">Data-driven visual servoing for flexible continuum robots operating in constrained spaces.</span>
+                    <span data-lang="zh">面向受限环境中柔性连续体机器人的数据驱动视觉伺服。</span>
+                  </p>
+                  <div class="publication-links">
+                    <a class="paper-link" href="https://ieeexplore.ieee.org/document/11246163" target="_blank" rel="noreferrer">IEEE Xplore</a>
+                  </div>
+                </div>
+              </article>
+              <article class="publication-card">
+                <div class="publication-content">
+                  <span class="venue">ROBIO 2024</span>
+                  <h4><a href="https://ieeexplore.ieee.org/abstract/document/10907681" target="_blank" rel="noreferrer">A Robotic Skin Using Low-density FBGs for Human-robot Interaction</a></h4>
+                  <p class="authors"><strong>Xiyue Dong</strong>, Chin-Kiu Lam, Wei Chen, Bohan Yang, Yun-Hui Liu</p>
+                  <p class="publication-summary">
+                    <span data-lang="en">A low-density fiber Bragg grating sensing skin for physical human–robot interaction.</span>
+                    <span data-lang="zh">面向人机交互的低密度光纤布拉格光栅机器人皮肤。</span>
+                  </p>
+                  <div class="publication-links">
+                    <a class="paper-link" href="https://ieeexplore.ieee.org/abstract/document/10907681" target="_blank" rel="noreferrer">IEEE Xplore</a>
+                    <span class="paper-pages">pp. 129–134</span>
+                  </div>
+                </div>
+              </article>
+            </div>
           </div>
         </section>
 
@@ -239,7 +300,7 @@
                 <span data-lang="en">Connect representations and behavior cloning to DP/ACT, then trace PI0.5 through FAST action tokens, KI gradients, and practical fine-tuning.</span>
                 <span data-lang="zh">从表示与 Behavior Cloning 进入 DP / ACT，再沿 PI0.5 理解 FAST 动作编码、KI 梯度隔离与实际微调。</span>
               </p>
-              <a href="blog/index.html#foundations"><span data-lang="en">Start with foundations →</span><span data-lang="zh">从基础概念开始 →</span></a>
+              <a href="blog/index.html#foundations"><span data-lang="en">Start with foundations</span><span data-lang="zh">从基础概念开始</span></a>
             </article>
             <article>
               <span>ENG · RUN · TOUCH</span>
@@ -248,10 +309,10 @@
                 <span data-lang="en">Follow data through training and runtime, then connect tactile inputs, object memory, contact-aware policies, and closed-loop experiments.</span>
                 <span data-lang="zh">沿数据、训练与部署链实践，再把触觉输入、对象记忆、接触控制和闭环实验串成完整研究过程。</span>
               </p>
-              <a href="blog/index.html#engineering"><span data-lang="en">Explore applied paths →</span><span data-lang="zh">进入实践分支 →</span></a>
+              <a href="blog/index.html#engineering"><span data-lang="en">Explore applied paths</span><span data-lang="zh">进入实践分支</span></a>
             </article>
           </div>
-          <p class="journey-all"><a href="blog/index.html"><span data-lang="en">Browse all learning paths</span><span data-lang="zh">查看完整知识目录</span> →</a> · <a href="blog/fast-ki-pi-training.html"><span data-lang="en">FAST, KI, and PI0.5 training</span><span data-lang="zh">FAST、KI 与 PI0.5 训练专题</span> →</a> · <a href="blog/index.html#reinforcement"><span data-lang="en">RL and dexterous manipulation</span><span data-lang="zh">强化学习与灵巧操作</span> →</a></p>
+          <p class="journey-all"><a href="blog/index.html"><span data-lang="en">Browse all learning paths</span><span data-lang="zh">查看完整知识目录</span></a> · <a href="blog/fast-ki-pi-training.html"><span data-lang="en">FAST, KI, and PI0.5 training</span><span data-lang="zh">FAST、KI 与 PI0.5 训练专题</span></a> · <a href="blog/index.html#reinforcement"><span data-lang="en">RL and dexterous manipulation</span><span data-lang="zh">强化学习与灵巧操作</span></a></p>
         </section>
 
         <section class="section" id="misc">
@@ -282,7 +343,7 @@
 
         <footer class="site-footer">
           <p>© 2026 Xiyue Dong</p>
-          <p><span data-lang="en">Built for GitHub Pages · Last updated October 2026</span><span data-lang="zh">适配 GitHub Pages · 最后更新于 2026 年 10 月</span></p>
+          <p><span data-lang="en">Last updated November 2026</span><span data-lang="zh">最后更新于 2026 年 11 月</span></p>
         </footer>
       </main>
     </div>

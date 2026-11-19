@@ -134,6 +134,7 @@
 <h2 id="1">1. 从动作标签到交互结果</h2>
 <p>行为克隆用专家提供的观测—动作配对训练策略。使用 flow matching 的动作模型，也可以从示范动作和采样噪声构造速度场目标；目标的正负号取决于插值路径与时间方向。两者都能从数据构造明确的动作学习目标，背景见 <a href="imitation-learning-behavior-cloning.html">模仿学习基础</a> 与 <a href="10-flow-matching-training-inference.html">Flow Matching</a>。</p>
 <p>RL 的任务信号来自执行动作后的结果。环境按照奖励规则返回一个数，算法再用一段经历评价动作的后续影响。没有专家动作标签，并不意味着没有训练目标：价值目标和策略损失可以由交互数据构造。</p>
+<p><strong>是否与环境交互，不能单独判断训练是不是 RL。</strong> DAgger 也让学习者执行动作，但随后请专家为访问到的状态提供动作标签，再用监督损失更新学习者。环境交互用来收集它实际会遇到的情况，参数更新仍可沿用 BC；这一阶段不必计算 advantage 或训练 critic。其五步训练流程见 <a href="teacher-student-and-sim-to-real.html">RL03 第 3 节</a>。</p>
 <table>
 <thead>
 <tr>

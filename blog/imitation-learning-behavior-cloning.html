@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="从 demonstration、policy 和 BC 出发，理解离线监督、闭环 rollout 与分布偏移。" />
+    <meta name="description" content="从 demonstration、policy 和 BC 出发，理解闭环分布偏移，以及 DAgger 如何为学习者访问的状态补充专家标签。" />
     <title>模仿学习与 Behavior Cloning 入门 | 董希越的学习之路</title>
     <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/css/main.css" />
@@ -42,7 +42,10 @@
 </li>
 <li><a href="#3-behavior-cloning">3. Behavior Cloning</a></li>
 <li><a href="#4-demonstration">4. Demonstration 从哪里来</a></li>
-<li><a href="#5-offline-online-rollout">5. Offline 训练与 Online Rollout</a></li>
+<li><a href="#5-offline-online-rollout">5. Offline 训练与 Online Rollout</a><ul>
+<li><a href="#51-dagger">5.1 DAgger：给策略自己遇到的状态补标签</a></li>
+</ul>
+</li>
 <li><a href="#6-loss">6. 为什么训练 Loss 低不等于任务成功</a></li>
 <li><a href="#7-generalist-policy-vla">7. Generalist Policy 与 VLA</a></li>
 <li><a href="#8">8. 预训练没有取代模仿学习</a></li>
@@ -56,8 +59,8 @@
         <article class="blog-article">
           <p class="article-series"><span data-lang="en">Part 2: Imitation Learning</span><span data-lang="zh">第二卷：模仿学习</span> · IL01</p>
           <h1>模仿学习与 Behavior Cloning 入门</h1>
-          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 4 min read</span><span data-lang="zh">入门 · 2026.09 · 约 4 分钟阅读</span></p>
-          <p class="article-deck">从 demonstration、policy 和 BC 出发，理解离线监督、闭环 rollout 与分布偏移。</p>
+          <p class="article-meta"><span data-lang="en">入门 · September 2026 · 5 min read</span><span data-lang="zh">入门 · 2026.09 · 约 5 分钟阅读</span></p>
+          <p class="article-deck">从 demonstration、policy 和 BC 出发，理解闭环分布偏移，以及 DAgger 如何为学习者访问的状态补充专家标签。</p>
           <div class="article-content">
             <p>模仿学习的目标是让策略从示范中学习行为。它是理解 VLA 动作训练的直接起点。</p>
 <p>与交互学习的联系见 <a href="rl-basics-and-training-loop.html">RL 基础与训练闭环</a>；若示范来自 RL 专家，再读 <a href="teacher-student-and-sim-to-real.html">Teacher–Student 与部署</a>，区分 teacher 的求解算法和 student 的模仿目标。</p>
@@ -124,6 +127,11 @@ h_t=\operatorname{GRU}(x_t,h_{t-1}),\qquad
 <pre><code class="language-text">观测 -&gt; 策略 -&gt; 动作 -&gt; 环境改变 -&gt; 新观测 -&gt; 策略
 </code></pre>
 <p>训练样本来自专家访问过的状态，而部署时模型自己的小错误会把机器人带到新状态。这种训练分布和策略访问分布的偏移，是经典的 covariate shift / compounding error 问题。</p>
+<h3 id="51-dagger">5.1 DAgger：给策略自己遇到的状态补标签</h3>
+<p>用一个假设的抓杯子任务理解：专家示范里杯子一直放得很正，策略却可能因为手指位置稍有偏差，先把杯子推歪。继续增加同类成功示范，未必能教会它在这个偏差状态下怎样重新建立接触。</p>
+<p><strong>DAgger（Dataset Aggregation，数据集聚合）让学习者自己执行，再请专家为它实际遇到的状态标注动作，并把这些样本加入历史数据集继续训练。</strong> 在这个例子中，专家要回答的是“面对现在这个歪掉的杯子，该怎样动”，标签不能从原来成功轨迹的同一时间步直接复制。</p>
+<p>它可以继续使用 BC 那样的监督损失，关键改变是数据采集与聚合。执行动作可以来自学习者，监督标签则来自专家；收集新的状态并不意味着把学习者自己的动作当作正确答案。<a href="https://imitation.readthedocs.io/en/latest/algorithms/dagger.html">DAgger 算法与实现说明</a></p>
+<p>专家也可以是人类操作者或规划器，不必是 RL 网络。只有固定示范文件、无法对新状态取得专家标签时，不能直接运行标准 DAgger。完整的“初始化 → student 执行 → teacher 标注 → 聚合训练 → 再采集”五步流程，以及人类纠正和规划器蒸馏的例子，见 <a href="teacher-student-and-sim-to-real.html">RL03 第 3 节</a>。</p>
 <h2 id="6-loss">6. 为什么训练 Loss 低不等于任务成功</h2>
 <p>动作 MSE 可能低，但真实机器人仍失败，原因包括：</p>
 <ul>
@@ -167,6 +175,7 @@ h_t=\operatorname{GRU}(x_t,h_{t-1}),\qquad
 <li>训练数据和测试场景差异是什么？</li>
 <li>是否真实闭环 rollout，失败标准是什么？</li>
 <li>策略遇到偏离示范分布的状态能否恢复？</li>
+<li>若使用 DAgger，谁执行、谁标注，新样本怎样与历史数据一起训练？</li>
 </ol>
 <p>一句话总结：</p>
 <blockquote>

@@ -232,6 +232,8 @@ Object Curriculum Learning，简称 OCL，将训练范围逐步扩展：单个�
 
 Student 用实时点云编码、机器人本体状态和目标生成动作。Teacher 在相同仿真状态上读取特权输入，提供动作标签。
 
+先对照 [RL03 第 3 节的 DAgger 五步流程](45_teacher_student_and_sim_to_real.md)：初始 Student 准备好后，由它执行 → Teacher 为访问状态标注 → 保存数据并更新 Student → 用新策略继续采集。在本文中，同一时刻的视觉输入 \(\mathcal S_t^S\) 与专家动作 \(a_t^E\) 构成训练样本；二者面对同一个物体状态和抓取目标。通用流程中的 BC 初始化与 teacher/student 混合执行是可选安排，不能仅凭“采用 DAgger”推定本项目使用了它们，下面按发布代码说明采集方式。
+
 为清楚区分分布与具体动作，记 \(m_E(\mathcal S_t^E)\) 和 \(m_S(\mathcal S_t^S)\) 为两者用于回归的动作输出。代码中的均方误差可以概念化写成：
 
 \[
@@ -246,6 +248,8 @@ a_t^E=m_E(\mathcal S_t^E).
 \(\mathcal D\) 是监督样本集合，`stopgrad` 表示 Teacher 动作作为固定标签；该损失更新 Student，不通过标签分支更新 Teacher。
 
 DAgger 的关键不在于用了动作 MSE，而在于数据从哪里来。Student 执行动作后可能进入 Teacher 完美轨迹上没有的偏差状态，Teacher 再为这些状态提供纠偏标签；持续聚合这种数据，使模仿训练覆盖 Student 实际遇到的情况。
+
+例如，若 Student 在接触时把物体推歪，应让 Teacher 根据物体当前的真实姿态重新给出动作，再与此时的 Student 点云观测配对；不能沿用 Teacher 原始成功轨迹中同一时间步的动作。这是解释数据配对的假设例子，不是论文额外报告的一项实验。
 
 ~~~python
 # 概念流程，突出执行者、标注者和更新对象；省略并行环境的终止／重置处理
@@ -267,6 +271,8 @@ for iteration in range(num_iterations):
 ~~~
 
 这段伪代码不表示两个独立环境：同一个仿真状态分别构造 Teacher 与 Student 的输入。官方 DAgger 路径使用 Student 动作推进环境，保存同一时刻的 Expert 动作，并用有限容量缓冲区训练。它不要求永远保存全部历史样本。[动作蒸馏循环](https://github.com/PKU-EPIC/UniDexGrasp/blob/36c9bfcf7cedc987dd15e2384c548e51d5aadc21/dexgrasp_policy/dexgrasp/algorithms/rl/dagger/dagger.py)、[缓冲区](https://github.com/PKU-EPIC/UniDexGrasp/blob/36c9bfcf7cedc987dd15e2384c548e51d5aadc21/dexgrasp_policy/dexgrasp/algorithms/rl/dagger/storage.py)
+
+采集阶段的 `no_grad()` 与更新阶段重新调用 `student(batch_obs)` 对应两个环节：先取得固定的观测和标签，再通过动作误差更新 Student。梯度不穿过仿真器，也不会因为 Teacher 由 PPO 训练而自动变成 PPO 梯度。
 
 ## 5. 信息接口、冻结边界与 HORA 的差别
 
